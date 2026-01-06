@@ -1,0 +1,35 @@
+# Composer
+/vendor/
+composer.lock
+
+# Cache files
+/cache/*.cache.php
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Sensitive config (keep example)
+config/config.php
+!config/config.example.php
+
+# Logs
+*.log
+
+# Compiled CSS (keep source SCSS)
+# main.min.css
+
+# Test files (uncomment if not needed in production)
+# test.js
+# a.php

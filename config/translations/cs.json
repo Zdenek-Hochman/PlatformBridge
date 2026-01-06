@@ -1,0 +1,28 @@
+{
+    "form": {
+        "required": "Toto pole je povinné",
+        "submit": "Odeslat",
+        "reset": "Obnovit",
+        "cancel": "Zrušit",
+        "save": "Uložit",
+        "loading": "Načítání..."
+    },
+    "validation": {
+        "required": "Pole {field} je povinné",
+        "minlength": "Minimální délka je {min} znaků",
+        "maxlength": "Maximální délka je {max} znaků",
+        "email": "Zadejte platnou e-mailovou adresu",
+        "pattern": "Hodnota neodpovídá požadovanému formátu"
+    },
+    "error": {
+        "generic": "Něco se pokazilo",
+        "not_found": "Stránka nebyla nalezena",
+        "server": "Chyba serveru"
+    },
+    "generator": {
+        "subject": {
+            "title": "Generátor předmětů e-mailů",
+            "description": "Vygenerujte efektivní předměty pro vaše e-mailové kampaně"
+        }
+    }
+}

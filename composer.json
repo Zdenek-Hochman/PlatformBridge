@@ -1,0 +1,51 @@
+{
+    "name": "your-vendor/ai-form-builder",
+    "description": "AI-powered form builder with template engine and field factory",
+    "type": "library",
+    "license": "proprietary",
+    "version": "1.0.0",
+    "minimum-stability": "stable",
+    "prefer-stable": true,
+    "require": {
+        "php": ">=8.1",
+        "ext-curl": "*",
+        "ext-json": "*"
+    },
+    "autoload": {
+        "psr-4": {
+            "AI\\": "src/AI/",
+            "App\\": "src/App/",
+            "Error\\": "src/Error/",
+            "FieldFactory\\": "src/FieldFactory/",
+            "Handler\\": "src/Handler/",
+            "Parser\\": "src/Parser/",
+            "TemplateEngine\\": "src/TemplateEngine/",
+            "Translator\\": "src/Translator/"
+        },
+        "files": [
+            "autoload.php"
+        ]
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Tests\\": "tests/"
+        }
+    },
+    "config": {
+        "optimize-autoloader": true,
+        "sort-packages": true
+    },
+    "scripts": {
+        "post-install-cmd": [
+            "@php -r \"if (!is_dir('cache')) mkdir('cache', 0755, true);\""
+        ],
+        "post-update-cmd": [
+            "@php -r \"if (!is_dir('cache')) mkdir('cache', 0755, true);\""
+        ]
+    },
+    "extra": {
+        "branch-alias": {
+            "dev-main": "1.0.x-dev"
+        }
+    }
+}

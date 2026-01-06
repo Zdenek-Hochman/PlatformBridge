@@ -1,0 +1,15 @@
+{
+	"generators": {
+		"subject": {
+			"id": "subject",
+  			"label": "Předměty e-mailů (pokročilé)",
+			"layout_ref": "subject_advanced",
+			"config": {
+				"endpoint": "CreateSubject",
+				"api": {
+					"RequestAmount": "3"
+				}
+			}
+		}
+	}
+}

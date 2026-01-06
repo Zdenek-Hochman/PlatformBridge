@@ -1,0 +1,139 @@
+{
+	"blocks": {
+		"language": {
+			"id": "language",
+			"name": "lang",
+			"ai_key": "Language",
+			"component": "input",
+			"variant": "radio",
+			"label": "Jazyková mutace textu",
+			"rules": {
+				"default": "en"
+			},
+			"group": [
+				{ "value": "cs", "label": "CZ" },
+				{ "value": "en", "label": "EN" },
+				{ "value": "de", "label": "DE" },
+				{ "value": "fr", "label": "FR" },
+				{ "value": "it", "label": "IT" },
+				{ "value": "es", "label": "ES" }
+      		]
+		},
+		"tone": {
+      		"id": "tone",
+      		"name": "tone",
+			"ai_key": "CommunicationTone",
+      		"component": "select",
+			"label": "Tón",
+			"rules": {
+				"default": "formal",
+				"required": true
+			},
+      		"options": [
+        		{ "value": "friendly", "label": "Přátelský" },
+        		{ "value": "formal", "label": "Formální" },
+        		{ "value": "informative", "label": "Informační" }
+			]
+    	},
+		"goal": {
+      		"id": "goal",
+      		"name": "goal",
+			"ai_key": "MessagePurpose",
+      		"component": "select",
+			"label": "Záměr",
+			"tooltip": "Vyberte hlavní záměr zprávy",
+			"rules": {
+				"default": "survey",
+				"disabled": true
+			},
+			"options": [
+				{ "value": "survey", "label": "Dotazování" },
+				{ "value": "reminder", "label": "Připomenutí" },
+				{ "value": "announcement", "label": "Oznámení / novinka" }
+			]
+		},
+		"campaign_type": {
+			"id": "campaign_type",
+			"name": "campaign_type",
+			"ai_key": "CampaignType",
+			"component": "select",
+			"label": "Typ kampaně",
+			"tooltip": "Vyberte typ kampaně",
+			"rules": {
+				"default": "offer"
+			},
+			"options": [
+				{ "value": "offer", "label": "Nabídka" },
+				{ "value": "transactional", "label": "Transakční" },
+				{ "value": "newsletter", "label": "Novinka / newsletter" },
+				{ "value": "survey", "label": "Průzkum" },
+				{ "value": "promo", "label": "Reklama / promo" }
+			]
+		},
+		"emoji": {
+      		"id": "emoji",
+			"name": "emoji_enabled",
+			"ai_key": "EmojiInSubject",
+      		"component": "input",
+			"variant": "checkbox",
+			"label": "Emoji v předmětu",
+			"value": "OK",
+			"rules": {
+				"checked": false
+			},
+			"meta": {
+				"info": "Vyberte jazyk, ve kterém chcete generovat text."
+			}
+    	},
+		"personalization": {
+      		"id": "personalization",
+			"name": "personalization",
+			"ai_key": "UsePersonalization",
+      		"component": "input",
+			"variant": "checkbox",
+			"label": "Personalizace",
+			"rules": {
+				"checked": true
+			}
+    	},
+		"topic_source": {
+			"id": "topic_source",
+			"name": "topic_source",
+			"ai_key": "SubjectSource",
+			"component": "input",
+			"variant": "radio",
+			"rules": {
+				"default": "custom",
+				"required": true
+			},
+			"group": [
+				{ "value": "template", "label": "Z obsahu šablony" },
+				{ "value": "custom",  "label": "Z vlastního textu" }
+			]
+		},
+		"email_topic": {
+			"id": "email_topic",
+			"name": "email_topic",
+			"ai_key": "SubjectText",
+			"component": "input",
+			"variant": "text",
+			"small": "Doporučená délka: min 30 znaků",
+			"value":"announcement",
+			"rules": {
+				"placeholder": "Např Pozvánka na vánoční ochutnávku cukroví",
+				"autocomplete": "off",
+				"readonly": true,
+				"disabled": true,
+				"minlength": 30,
+				"required": true,
+				"visible_if": {
+					"topic_source": "template"
+				}
+			},
+			"meta": {
+				"info": "Vyberte jazyk, ve kterém chcete generovat text.",
+				"mutace": "Např. „Pozvánka na vánoční ochutnávku cukroví“"
+			}
+    	}
+	}
+}

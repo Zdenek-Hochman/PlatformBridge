@@ -1,0 +1,28 @@
+{
+    "form": {
+        "required": "This field is required",
+        "submit": "Submit",
+        "reset": "Reset",
+        "cancel": "Cancel",
+        "save": "Save",
+        "loading": "Loading..."
+    },
+    "validation": {
+        "required": "Field {field} is required",
+        "minlength": "Minimum length is {min} characters",
+        "maxlength": "Maximum length is {max} characters",
+        "email": "Please enter a valid email address",
+        "pattern": "Value does not match the required format"
+    },
+    "error": {
+        "generic": "Something went wrong",
+        "not_found": "Page not found",
+        "server": "Server error"
+    },
+    "generator": {
+        "subject": {
+            "title": "Email Subject Generator",
+            "description": "Generate effective subjects for your email campaigns"
+        }
+    }
+}
