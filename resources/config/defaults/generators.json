@@ -1,0 +1,15 @@
+{
+	"generators": {
+		"subject": {
+			"id": "subject",
+  			"label": "Email Subjects (Advanced)",
+			"layout_ref": "subject_advanced",
+			"config": {
+				"endpoint": "CreateSubject",
+				"api": {
+					"request_amount": "3"
+				}
+			}
+		}
+	}
+}

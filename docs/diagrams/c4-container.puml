@@ -1,0 +1,54 @@
+@startuml C4_Container
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Container.puml
+
+LAYOUT_WITH_LEGEND()
+
+title C4 Level 2 – Container: PlatformBridge
+
+Person(developer, "Vývojář", "Integruje knihovnu")
+Person(endUser, "Koncový uživatel", "Interaguje s formulářem")
+
+System_Boundary(pb, "PlatformBridge System") {
+
+    Container(bootstrap, "Bootstrap Entry Point", "PHP Script", "index.php / demo.php\n\nVstupní bod aplikace.\nKonfiguruje PlatformBridge\npomocí Builder patternu.")
+
+    Container(apiHandler, "HTTP API Handler", "PHP Script", "src/PlatformBridge/AI/API/\nApiHandler.php\n\nZpracovává AJAX požadavky:\ndekóduje JSON, ověřuje HMAC,\nvolá AI a vrací HTML snippet.")
+
+    Container(core, "PlatformBridge Core", "PHP Library", "PlatformBridge.php\n\nHlavní fasáda systému.\nOrchestrátor všech subsystémů.\nSpravuje lifecycle celé knihovny.")
+
+    Container(configSystem, "Config System", "PHP Subsystem", "Config/ namespace\n\nNačítá a validuje JSON konfigurace\n(generators, layouts, blocks).\nResolvuje reference mezi konfiguracemi.")
+
+    Container(formEngine, "Form Engine", "PHP Subsystem", "Form/ + Handler/ namespace\n\nDynamicky vytváří formulářové prvky\nz konfiguračních bloků.\nHandlerRegistry + FieldFactory pattern.")
+
+    Container(templateEngine, "Template Engine", "PHP Subsystem", "Template/ namespace\n\nVlastní šablonovací engine.\nKompiluje .tpl šablony do PHP,\nukládá zkompilovaný kód do cache.")
+
+    Container(aiLayer, "AI Layer", "PHP Subsystem", "AI/ namespace\n\nAiClient, AiRequest, AiResponse,\nEndpointRegistry, EndpointDefinition.\nAbstrakce pro volání AI API.")
+
+    Container(security, "Security", "PHP Subsystem", "Security/ namespace\n\nHMAC SHA-256 podepisování\na ověřování parametrů\ns volitelným TTL.")
+
+    Container(assets, "Asset Manager", "PHP Subsystem", "Asset/ namespace\n\nGeneruje HTML tagy pro CSS/JS,\nřeší idempotenci (nevykreslí\nassets vícekrát).")
+}
+
+System_Ext(aiApi, "VirtualZoom AI API", "HTTPS REST")
+System_Ext(filesystem, "Souborový systém", "JSON, TPL, Cache PHP")
+
+Rel(developer, bootstrap, "Volá", "PHP API")
+Rel(endUser, apiHandler, "Odesílá data", "HTTP POST / AJAX JSON")
+
+Rel(bootstrap, core, "Vytváří přes", "PlatformBridgeBuilder")
+Rel(core, configSystem, "Inicializuje a dotazuje", "PHP volání")
+Rel(core, formEngine, "Orchestruje tvorbu formulářů", "PHP volání")
+Rel(core, templateEngine, "Předává šablony k renderování", "PHP volání")
+Rel(core, security, "Volitelně podepisuje parametry", "PHP volání")
+Rel(core, assets, "Generuje HTML tagy assetů", "PHP volání")
+
+Rel(apiHandler, configSystem, "Načítá konfiguraci", "PHP volání")
+Rel(apiHandler, security, "Ověřuje HMAC podpis", "PHP volání")
+Rel(apiHandler, aiLayer, "Orchestruje AI požadavek", "PHP volání")
+Rel(apiHandler, templateEngine, "Renderuje AI odpověď", "PHP volání")
+
+Rel(aiLayer, aiApi, "Odesílá požadavky", "HTTPS cURL / JSON")
+Rel(configSystem, filesystem, "Čte JSON konfigurace", "file_get_contents")
+Rel(templateEngine, filesystem, "Čte .tpl šablony,\nzapisuje PHP cache", "file I/O")
+
+@enduml

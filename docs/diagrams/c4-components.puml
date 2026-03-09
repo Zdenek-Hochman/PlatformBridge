@@ -1,0 +1,83 @@
+@startuml C4_Component_Core
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
+
+LAYOUT_WITH_LEGEND()
+
+title C4 Level 3 – Components: PlatformBridge Core + Form Engine
+
+Container_Boundary(core, "PlatformBridge Core") {
+    Component(bridge, "PlatformBridge", "final class", "Hlavní fasáda systému.\nVytváří přes fromConfig().\nExposes: renderFullForm(), getAssets().")
+    Component(builder, "PlatformBridgeBuilder", "final class", "Fluent builder pro konfiguraci.\nSpravuje všechny nastavitelné\nparametry před sestavením.")
+    Component(config, "PlatformBridgeConfig", "final readonly class", "Immutable value object\ns konfigurací cest, locale,\nHMAC nastavení.")
+    Component(errorHandler, "ErrorHandler", "final class", "Registruje PHP exception/error\nhandlery. Zobrazuje chyby\ndle debug módu.")
+}
+
+Container_Boundary(configSys, "Config System") {
+    Component(configManager, "ConfigManager", "final class", "Centrální přístupový bod\nke konfiguraci.\nFacade nad Loader+Resolver.")
+    Component(configLoader, "ConfigLoader", "final class", "Načítá a cross-validuje\n3 JSON soubory.\nBlocks, Layouts, Generators.")
+    Component(configValidator, "ConfigValidator", "final class", "Validuje strukturu každého\nJSON souboru a relace\nmezi nimi.")
+    Component(configResolver, "ConfigResolver", "final class", "Resolvuje $ref reference\nmezi bloky, layouty\na generátory. S cache.")
+}
+
+Container_Boundary(formSys, "Form Engine") {
+    Component(formRenderer, "FormRenderer", "final class", "Orchestruje tvorbu sekce formuláře.\nIteruje přes bloky, volá FieldFactory,\nakumuluje HTML.")
+    Component(handlerRegistry, "HandlerRegistry", "final class", "Registr handlerů formulářových prvků.\nStrategie pattern.\nResolves handler pro blok.")
+    Component(fieldFactory, "FieldFactory", "final class", "Továrna formulářových prvků.\nDotazuje HandlerRegistry,\ndeleguje na handler.create().")
+    Component(form, "Form", "final class (static buffer)", "Statický buffer pro elementy.\nRenderWrapped() seskupuje\nprvky dle block ID do grid layoutu.")
+    Component(layoutManager, "LayoutManager", "final class (static)", "Obaluje HTML bloků\ndo CSS grid wrapperů\ndle konfigurace (span, row-span).")
+    Component(formElementFactory, "FormElementFactory", "class (static)", "Továrna konkrétních Element tříd.\nValiduje typ, vytváří instanci\npřes ReflectionClass.")
+    Component(handlers, "Field Handlers\n(10 implementací)", "extends FieldConfigurator", "TextHandler, SelectHandler,\nCheckboxHandler, DateHandler...\nKaždý ví, jaký typ bloku\npodporuje a jak ho vytvořit.")
+    Component(elements, "Form Elements\n(Input/Select/Textarea/TickBox)", "extends Element", "Konkrétní prvky formuláře.\nPřipravují strukturu dat\na renderují pomocí šablon.")
+}
+
+Container_Boundary(tmpl, "Template Engine") {
+    Component(engine, "Engine", "final class", "Kompiluje .tpl šablony\ndo PHP kódu a cachuje.\nAssign proměnných, render.")
+    Component(parser, "Parser", "class", "Parsuje vlastní šablonovací\nsyntaxi na PHP kód.\nBlacklist nebezpečných funkcí.")
+    Component(translator, "Translator", "class (static singleton)", "Překlady z JSON souborů.\nDle locale (výchozí: cs).")
+}
+
+Container_Boundary(sec, "Security") {
+    Component(signedParams, "SignedParams", "final class", "HMAC SHA-256 podepisování\na verifikace parametrů.\nVolitelné TTL expirace.")
+}
+
+Container_Boundary(assetSys, "Asset Manager") {
+    Component(assetManager, "AssetManager", "final class", "HTML tagy pro CSS/JS.\nIdempotentní – nevykreslí\nassets vícekrát.")
+}
+
+' Builder → Config → Bridge
+Rel(builder, config, "Vytvoří", "new PlatformBridgeConfig(...)")
+Rel(builder, bridge, "Sestaví", "PlatformBridge::fromConfig(config)")
+
+' Bridge boot() závislosti
+Rel(bridge, errorHandler, "Registruje handlery chyb")
+Rel(bridge, configManager, "Inicializuje a používá")
+Rel(bridge, engine, "Předá šablony k renderování")
+Rel(bridge, handlerRegistry, "Registruje handlery")
+Rel(bridge, fieldFactory, "Deleguje tvorbu prvků")
+Rel(bridge, formRenderer, "Orchestruje renderování sekcí")
+Rel(bridge, assetManager, "Generuje asset HTML")
+Rel(bridge, signedParams, "Podepisuje/ověřuje (volitelně)")
+
+' Config systém
+Rel(configManager, configLoader, "Deleguje načítání")
+Rel(configManager, configResolver, "Deleguje resolvování")
+Rel(configLoader, configValidator, "Validuje po načtení")
+
+' Form systém
+Rel(formRenderer, fieldFactory, "Volá pro každý blok")
+Rel(formRenderer, configManager, "Čte bloky, sekce, layout")
+Rel(formRenderer, form, "Akumuluje HTML do bufferu")
+Rel(fieldFactory, handlerRegistry, "Resolvuje handler")
+Rel(handlerRegistry, handlers, "Obsahuje a volá")
+Rel(handlers, form, "Volá Form::Input/Select/...")
+Rel(form, formElementFactory, "Vytváří elementy přes __callStatic")
+Rel(form, layoutManager, "Obaluje bloky do grid wrapperů")
+Rel(formElementFactory, elements, "Vytváří konkrétní Element")
+
+' Template
+Rel(engine, parser, "Kompiluje šablonu")
+Rel(parser, translator, "Překládá {t:klíč} tagy")
+Rel(elements, engine, "Renderují přes Engine.render()")
+Rel(form, engine, "Renderuje Wrapper/Label/Small")
+
+@enduml

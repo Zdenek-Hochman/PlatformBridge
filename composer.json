@@ -1,5 +1,5 @@
 {
-    "name": "your-vendor/ai-form-builder",
+    "name": "zoom/platform-bridge",
     "description": "AI-powered form builder with template engine and field factory",
     "type": "library",
     "license": "proprietary",
@@ -13,22 +13,7 @@
     },
     "autoload": {
         "psr-4": {
-            "AI\\": "src/AI/",
-            "App\\": "src/App/",
-            "Error\\": "src/Error/",
-            "FieldFactory\\": "src/FieldFactory/",
-            "Handler\\": "src/Handler/",
-            "Parser\\": "src/Parser/",
-            "TemplateEngine\\": "src/TemplateEngine/",
-            "Translator\\": "src/Translator/"
-        },
-        "files": [
-            "autoload.php"
-        ]
-    },
-    "autoload-dev": {
-        "psr-4": {
-            "Tests\\": "tests/"
+    		"Zoom\\PlatformBridge\\": "src/PlatformBridge/"
         }
     },
     "config": {
@@ -47,5 +32,23 @@
         "branch-alias": {
             "dev-main": "1.0.x-dev"
         }
-    }
+    },
+	"authors": [
+        {
+            "name": "Zdeněk Hochman",
+            "email": "zdenek.hochman@virtualzoom.com"
+        }
+	],
+	"archive": {
+    	"exclude": [
+			"var" ,
+			"assets/scss",
+			"assets/ts",
+			"*.scss",
+			"*.ts",
+			"webpack.config.js",
+			"node_modules",
+			".gitignore"
+    	]
+  	}
 }

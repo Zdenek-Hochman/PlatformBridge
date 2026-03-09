@@ -1,0 +1,178 @@
+// ─── Notification / Error Messages ─────────────────────────────
+// Komponenta pro zobrazení chybových, úspěšných a informačních hlášek.
+// Používáno z TS souborů (AiException, ErrorHandler apod.).
+//
+// Struktura (BEM):
+//   .ai-notification                → Block – kontejner hlášky
+//   .ai-notification__icon          → Element – ikona
+//   .ai-notification__content       → Element – tělo zprávy
+//   .ai-notification__title         → Element – nadpis hlášky
+//   .ai-notification__message       → Element – text hlášky
+//   .ai-notification__close         → Element – tlačítko zavření
+//   .ai-notification--error         → Modifier – chybová hláška (červená)
+//   .ai-notification--success       → Modifier – úspěšná hláška (zelená)
+//   .ai-notification--warning       → Modifier – varování (oranžová)
+//   .ai-notification--info          → Modifier – informační (modrá)
+
+@use "../common/mixins" as m;
+
+.ai-notification {
+	@include m.flex(row, flex-start, flex-start, nowrap, var(--space-3));
+	padding: var(--space-3) var(--space-4);
+	border-radius: var(--radius-sm);
+	border-left: 4px solid var(--color-border);
+	background: var(--color-bg-primary);
+	position: relative;
+	animation: ai-notification-in var(--transition-slow) both;
+
+	// ── Varianta: Error ────────────────────────────────────
+
+	&--error {
+		border-left-color: var(--color-danger);
+		background: color-mix(in srgb, var(--color-danger), white 94%);
+
+		.ai-notification__icon {
+			color: var(--color-danger);
+		}
+
+		.ai-notification__title {
+			color: var(--color-danger);
+		}
+	}
+
+	// ── Varianta: Success ──────────────────────────────────
+
+	&--success {
+		border-left-color: var(--color-success);
+		background: color-mix(in srgb, var(--color-success), white 94%);
+
+		.ai-notification__icon {
+			color: var(--color-success);
+		}
+
+		.ai-notification__title {
+			color: var(--color-success);
+		}
+	}
+
+	// ── Varianta: Warning ──────────────────────────────────
+
+	&--warning {
+		border-left-color: var(--color-warning);
+		background: color-mix(in srgb, var(--color-warning), white 90%);
+
+		.ai-notification__icon {
+			color: var(--color-warning);
+		}
+
+		.ai-notification__title {
+			color: var(--color-warning);
+		}
+	}
+
+	// ── Varianta: Info ─────────────────────────────────────
+
+	&--info {
+		border-left-color: var(--color-info);
+		background: color-mix(in srgb, var(--color-info), white 94%);
+
+		.ai-notification__icon {
+			color: var(--color-info);
+		}
+
+		.ai-notification__title {
+			color: var(--color-info);
+		}
+	}
+
+	// ── Elements ───────────────────────────────────────────
+
+	&__icon {
+		flex-shrink: 0;
+		width: m.rem(20px);
+		height: m.rem(20px);
+		margin-top: 2px;
+	}
+
+	&__content {
+		flex: 1;
+		min-width: 0;
+	}
+
+	&__title {
+		font-weight: var(--font-weight-semibold);
+		font-size: var(--text-md);
+		margin-bottom: var(--space-1);
+	}
+
+	&__message {
+		font-size: var(--text-sm);
+		color: var(--color-text-secondary);
+		line-height: var(--line-height-relaxed);
+	}
+
+	&__close {
+		flex-shrink: 0;
+		padding: var(--space-1);
+		border-radius: var(--radius-sm);
+		color: var(--color-text-secondary);
+		@include m.transition(color, background-color);
+
+		&:hover {
+			color: var(--color-text-primary);
+			background-color: var(--color-bg-hover);
+		}
+
+		svg {
+			width: m.rem(16px);
+			height: m.rem(16px);
+		}
+	}
+
+	// ── Odchozí animace ────────────────────────────────────
+
+	&--leaving {
+		animation: ai-notification-out var(--transition-base) both;
+	}
+}
+
+// ── Kontejner pro více notifikací ──────────────────────────────
+
+.ai-notifications {
+	@include m.flex(column, flex-start, stretch, nowrap, var(--space-2));
+	position: fixed;
+	top: var(--space-4);
+	right: var(--space-4);
+	z-index: var(--z-notification);
+	max-width: 420px;
+	width: 100%;
+	pointer-events: none;
+
+	> * {
+		pointer-events: auto;
+	}
+}
+
+// ── Keyframes ──────────────────────────────────────────────────
+
+@keyframes ai-notification-in {
+	from {
+		opacity: 0;
+		transform: translateX(20px);
+	}
+	to {
+		opacity: 1;
+		transform: translateX(0);
+	}
+}
+
+@keyframes ai-notification-out {
+	from {
+		opacity: 1;
+		transform: translateX(0);
+	}
+	to {
+		opacity: 0;
+		transform: translateX(20px);
+	}
+}

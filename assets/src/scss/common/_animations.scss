@@ -1,0 +1,72 @@
+// ─── Shared Animations ─────────────────────────────────────────
+// Sdílené animace a utility třídy pro přechody.
+
+// ── Fade In / Out ──────────────────────────────────────────────
+
+@keyframes ai-fade-in {
+	from {
+		opacity: 0;
+	}
+	to {
+		opacity: 1;
+	}
+}
+
+@keyframes ai-fade-out {
+	from {
+		opacity: 1;
+	}
+	to {
+		opacity: 0;
+	}
+}
+
+// ── Slide ──────────────────────────────────────────────────────
+
+@keyframes ai-slide-up {
+	from {
+		opacity: 0;
+		transform: translateY(8px);
+	}
+	to {
+		opacity: 1;
+		transform: translateY(0);
+	}
+}
+
+@keyframes ai-slide-down {
+	from {
+		opacity: 0;
+		transform: translateY(-8px);
+	}
+	to {
+		opacity: 1;
+		transform: translateY(0);
+	}
+}
+
+// ── Pulse (pro skeleton loading) ───────────────────────────────
+
+@keyframes ai-pulse {
+	0%, 100% {
+		opacity: 1;
+	}
+	50% {
+		opacity: 0.5;
+	}
+}
+
+// ── Utility classes ────────────────────────────────────────────
+// Přidejte tyto třídy z TS pro řízení animací.
+
+.ai-animate-fade-in {
+	animation: ai-fade-in var(--transition-base) both;
+}
+
+.ai-animate-slide-up {
+	animation: ai-slide-up var(--transition-slow) both;
+}
+
+.ai-animate-pulse {
+	animation: ai-pulse 2s ease-in-out infinite;
+}

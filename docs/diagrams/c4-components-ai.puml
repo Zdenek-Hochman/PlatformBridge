@@ -1,0 +1,63 @@
+@startuml C4_Component_AI
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
+
+LAYOUT_WITH_LEGEND()
+
+title C4 Level 3 – Components: AI Layer + HTTP API Handler
+
+Container_Boundary(apiHandlerBound, "HTTP API Handler (ApiHandler.php)") {
+    Component(apiHandler, "ApiHandler", "PHP Script (entry point)", "8-krokový orchestrátor:\n1. Dekóduj JSON vstup\n2. Načti bridge-config.php\n3. Inicializuj ConfigManager\n4. Ověř HMAC podpis\n5. Načti endpoint z registry\n6. Sestav AiRequest\n7. Odešli přes AiClient\n8. Renderuj odpověď")
+}
+
+Container_Boundary(aiSys, "AI Layer") {
+    Component(endpointRegistry, "EndpointRegistry", "class (singleton)", "Registr EndpointDefinition instancí.\nLazy-load přes registerClass.\nVýchozí: CreateSubjectEndpoint.")
+    Component(endpointDef, "EndpointDefinition", "abstract class", "Abstrakce AI endpointu.\nDefines: getEndpoint(), getResponseType(),\ngetTemplate(), createRequest(),\ndetectVariant(), transformInput().")
+    Component(createSubject, "CreateSubjectEndpoint", "extends EndpointDefinition", "Implementace pro endpoint\n'CreateSubject'.\nPodporuje varianty: template / custom.\nResponse: RESPONSE_NESTED.")
+    Component(aiRequest, "AiRequest", "class", "Fluent builder HTTP požadavku.\nMetoda, endpoint, prompt,\nquery params, hlavičky.")
+    Component(aiClient, "AiClient", "class", "Odesílá HTTP požadavky přes cURL.\nRetry logika (max 3 pokusy).\nHází AiException při chybě.")
+    Component(aiClientConfig, "AiClientConfig", "class", "Konfigurace AI klienta:\nAPI klíč, base URL, timeouty,\nSSL verifikace, debug mode.")
+    Component(aiResponse, "AiResponse", "class", "Immutable wrapper odpovědi.\nIsSuccess(), get() tečková notace,\ngetOrFail() s výjimkou.")
+    Component(aiException, "AiException", "extends Exception", "Typované výjimky AI vrstvy.\nStatické factory: timeout(),\nconnectionFailed(), invalidResponse()...")
+    Component(aiResponseRenderer, "AiResponseRenderer", "final class", "Renderuje AI odpověď\ndo HTML pomocí Template Engine.\nVyžívá šablony NestedResult,\nSingleKeyResult.")
+}
+
+Container_Boundary(configBound, "Config System") {
+    Component(configMgr2, "ConfigManager", "final class", "Přístup ke konfiguraci\ngenerátorů, layoutů, bloků.")
+}
+
+Container_Boundary(secBound, "Security") {
+    Component(signedParams2, "SignedParams", "final class", "Ověřuje HMAC SHA-256\npodpis vstupních parametrů.")
+}
+
+Container_Boundary(tmplBound, "Template Engine") {
+    Component(engine2, "Engine", "final class", "Renderuje .tpl šablony\ndo HTML řetězce.")
+}
+
+System_Ext(aiApi, "VirtualZoom AI API", "https://api.virtualzoom.com/v2/AI\nHTTPS REST / JSON")
+
+' API Handler orchestrace
+Rel(apiHandler, configMgr2, "3. Inicializuje", "ConfigManager::create()")
+Rel(apiHandler, signedParams2, "4. Ověřuje podpis", "SignedParams::verify()")
+Rel(apiHandler, endpointRegistry, "5. Načte endpoint", "EndpointRegistry::getInstance()->getOrFail()")
+Rel(apiHandler, aiClient, "7. Odesílá", "AiClient::send(AiRequest)")
+Rel(apiHandler, aiResponseRenderer, "8. Renderuje HTML", "AiResponseRenderer::create()->render()")
+
+' EndpointRegistry
+Rel(endpointRegistry, endpointDef, "Spravuje a vrací instance")
+Rel(endpointRegistry, createSubject, "Výchozí registrace")
+Rel(createSubject, endpointDef, "Rozšiřuje")
+
+' Request building
+Rel(endpointDef, aiRequest, "6. Sestaví přes", "EndpointDefinition::createRequest()")
+Rel(apiHandler, aiRequest, "Předá do AiClient")
+
+' AiClient
+Rel(aiClient, aiClientConfig, "Konfigurován přes")
+Rel(aiClient, aiApi, "Odesílá cURL POST", "HTTPS / Bearer token")
+Rel(aiClient, aiResponse, "Vrací wrapper")
+Rel(aiClient, aiException, "Hází při chybě")
+
+' Response rendering
+Rel(aiResponseRenderer, engine2, "Renderuje šablonu")
+
+@enduml

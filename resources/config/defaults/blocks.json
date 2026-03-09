@@ -1,0 +1,146 @@
+{
+	"blocks": {
+		"language": {
+			"id": "language",
+			"name": "lang",
+			"ai_key": "Language",
+			"component": "input",
+			"variant": "radio",
+			"label": "Text language variant",
+			"rules": {
+				"default": "en"
+			},
+			"group": [
+				{ "value": "cs", "label": "CZ" },
+				{ "value": "en", "label": "EN" },
+				{ "value": "de", "label": "DE" },
+				{ "value": "fr", "label": "FR" },
+				{ "value": "it", "label": "IT" },
+				{ "value": "es", "label": "ES" }
+      		]
+		},
+		"tone": {
+      		"id": "tone",
+      		"name": "tone",
+			"ai_key": "CommunicationTone",
+      		"component": "select",
+			"label": "Tón",
+			"rules": {
+				"default": "formal",
+				"required": true
+			},
+      		"options": [
+        		{ "value": "friendly", "label": "Friendly" },
+        		{ "value": "formal", "label": "Formal" },
+        		{ "value": "informative", "label": "Informative" }
+			]
+    	},
+		"goal": {
+      		"id": "goal",
+      		"name": "goal",
+			"ai_key": "MessagePurpose",
+      		"component": "select",
+			"label": "Goal",
+			"tooltip": "Select the main purpose of the message",
+			"rules": {
+				"default": "survey",
+				"disabled": false
+			},
+			"options": [
+				{ "value": "survey", "label": "Survey" },
+				{ "value": "reminder", "label": "Reminder" },
+				{ "value": "announcement", "label": "Announcement / News" }
+			]
+		},
+		"campaign_type": {
+			"id": "campaign_type",
+			"name": "campaign_type",
+			"ai_key": "CampaignType",
+			"component": "select",
+			"label": "Campaign type",
+			"tooltip": "Select the campaign type",
+			"rules": {
+				"default": "offer"
+			},
+			"options": [
+				{ "value": "offer", "label": "Offer" },
+				{ "value": "transactional", "label": "Transactional" },
+				{ "value": "newsletter", "label": "NNewsletter" },
+				{ "value": "survey", "label": "Survey" },
+				{ "value": "promo", "label": "Promo" }
+			]
+		},
+		"emoji": {
+      		"id": "emoji",
+			"name": "emoji_enabled",
+			"ai_key": "EmojiInSubject",
+      		"component": "input",
+			"variant": "checkbox",
+			"label": "Emoji in subject",
+			"value": "OK",
+			"rules": {
+				"checked": false
+			},
+			"meta": {
+				"info": "Select the language in which you want to generate the text."
+			}
+    	},
+		"personalization": {
+      		"id": "personalization",
+			"name": "personalization",
+			"ai_key": "UsePersonalization",
+      		"component": "input",
+			"variant": "checkbox",
+			"label": "Personalization",
+			"rules": {
+				"checked": true
+			}
+    	},
+		"topic_source": {
+			"id": "topic_source",
+			"name": "topic_source",
+			"ai_key": "SubjectSource",
+			"component": "input",
+			"variant": "radio",
+			"rules": {
+				"default": "custom",
+				"required": true
+			},
+			"group": [
+				{ "value": "template", "label": "From template content" },
+				{ "value": "custom",  "label": "From custom text" }
+			]
+		},
+		"template_id": {
+			"id": "template_id",
+			"name": "template_id",
+			"ai_key": "TemplateID",
+			"component": "input",
+			"variant": "hidden",
+			"rules": {}
+		},
+		"email_topic": {
+			"id": "email_topic",
+			"name": "email_topic",
+			"ai_key": "SubjectText",
+			"component": "input",
+			"variant": "text",
+			"small": "Recommended length: min 30 characters",
+			"value":"announcement",
+			"rules": {
+				"placeholder": "E.g. Invitation to Christmas cookie tasting",
+				"autocomplete": "off",
+				"readonly": false,
+				"disabled": false,
+				"minlength": 30,
+				"required": true,
+				"visible_if": {
+					"topic_source": "custom"
+				}
+			},
+			"meta": {
+				"test": "OK"
+			}
+    	}
+	}
+}

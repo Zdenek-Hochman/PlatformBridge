@@ -1,0 +1,24 @@
+// ─── Typography ────────────────────────────────────────────────
+// Headingové styly generované z design tokens.
+
+@for $i from 1 through 6 {
+	h#{$i} {
+		font-size: var(--h#{$i}-fluid, var(--h#{$i}-size));
+		line-height: var(--line-height-tight);
+		font-weight: var(--font-weight-bold);
+	}
+}
+
+small {
+	font-size: var(--text-sm);
+	color: var(--color-text-secondary);
+}
+
+a {
+	color: var(--color-primary);
+	text-decoration: none;
+
+	&:hover {
+		text-decoration: underline;
+	}
+}

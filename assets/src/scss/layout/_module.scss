@@ -1,0 +1,61 @@
+// ─── Module Layout ─────────────────────────────────────────────
+// Hlavní layout formuláře AI modulu (.ai-module).
+
+@use "../common/mixins" as m;
+
+$ai-module: ".ai-module";
+
+#{$ai-module} {
+	padding: var(--module-spacing);
+
+	&__title {
+		font-weight: var(--font-weight-bold);
+		margin-bottom: var(--space-3);
+	}
+
+	&__form {
+		background: var(--module-bg);
+		border-radius: var(--radius);
+		padding: var(--module-spacing);
+		@include m.flex(column, stretch, stretch, nowrap, var(--space-3));
+	}
+
+	&__wrapper {
+		background: var(--wrapper-bg);
+		border: var(--border);
+		border-radius: var(--radius);
+		padding: var(--space-5);
+	}
+
+	&__section {
+		position: relative;
+		gap: var(--space-3);
+	}
+
+	&__block {
+		min-width: 0;
+		position: relative;
+		@include m.transition(opacity);
+
+		&[aria-hidden="true"] {
+			opacity: 0;
+			display: none;
+		}
+
+		& > #{$ai-module}__label + * {
+			margin-left: m.rem(10px);
+		}
+		& > #{$ai-module}__label:not(:has(select)) * + * {
+			margin-inline-start: var(--space-2);
+		}
+	}
+
+	&__result {
+		margin-top: var(--space-4);
+
+		&-title {
+			font-weight: var(--font-weight-bold);
+			margin-bottom: var(--space-3);
+		}
+	}
+}

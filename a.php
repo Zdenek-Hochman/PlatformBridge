@@ -1,1 +1,0 @@
-<video class="jw-video jw-reset" x-webkit-airplay="allow" webkit-playsinline="" playsinline="" preload="auto" jw-loaded="data" src="https://data10.sledujteto.cz/player/index/sledujteto/ad85b26b8c24bfea2c3370233cedaa00"></video>

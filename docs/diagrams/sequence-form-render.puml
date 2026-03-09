@@ -1,0 +1,143 @@
+@startuml Sequence_FormRender
+skinparam sequenceMessageAlign left
+skinparam responseMessageBelowArrow true
+skinparam maxMessageSize 200
+
+title Sekvenční diagram – Renderování formuláře (renderFullForm)
+
+actor "Vývojář" as dev
+participant "demo.php" as demo
+participant "PlatformBridgeBuilder" as builder
+participant "PlatformBridgeConfig" as cfg
+participant "PlatformBridge" as pb
+participant "ConfigManager" as cm
+participant "FormRenderer" as fr
+participant "FieldFactory" as ff
+participant "HandlerRegistry" as hr
+participant "FieldHandler\n(např. TextHandler)" as fh
+participant "Form (static buffer)" as form
+participant "LayoutManager" as lm
+participant "Engine (Template)" as eng
+participant "Parser" as parser
+
+dev -> demo : require / volání skriptu
+demo -> builder : PlatformBridge::create()
+activate builder
+
+builder -> cfg : new PlatformBridgeConfig(\n  configPath, viewsPath,\n  cachePath, locale, ...)
+activate cfg
+cfg -> cfg : validatePaths()
+cfg -> cfg : loadBridgeConfig()
+cfg --> builder : $config
+deactivate cfg
+
+builder -> pb : PlatformBridge::fromConfig($config)
+activate pb
+pb -> pb : boot()
+
+note over pb
+  boot() inicializuje:
+  • ErrorHandler::register()
+  • ConfigManager::create()
+  • new Engine(config)
+  • new HandlerRegistry()
+  • Registruje 10 FieldHandler instancí
+  • new FieldFactory(registry)
+  • new FormRenderer(...)
+  • new AssetManager(...)
+  • new SignedParams (volitelně)
+end note
+
+pb --> builder : $platformBridge instance
+deactivate pb
+builder --> demo : $platformBridge
+deactivate builder
+
+demo -> pb : renderFullForm('subject', $params)
+activate pb
+
+pb -> cm : load() – načte JSON konfigurace
+activate cm
+cm -> cm : ConfigLoader::load()
+note right of cm
+  Načte blocks.json,
+  layouts.json,
+  generators.json
+  → validuje → cross-validuje
+end note
+cm --> pb : konfigurace načtena
+deactivate cm
+
+pb -> cm : getGenerator('subject')
+cm --> pb : $generatorConfig (layout ref, sekce, …)
+
+pb -> fr : build('subject', $params)
+activate fr
+
+fr -> cm : getResolvedSections('subject')
+cm --> fr : [$section1, $section2, ...]
+
+loop Pro každou sekci
+    fr -> cm : getSectionBlocks(generatorId, sectionId)
+    cm --> fr : [$block1, $block2, ...]
+
+    loop Pro každý blok
+        fr -> form : Form::setCurrentBlock($blockId)
+        fr -> ff : createFromBlock($block)
+        activate ff
+
+        ff -> hr : resolve($block)
+        activate hr
+        hr -> hr : Hledá dle variantMap, poté supports()
+        hr --> ff : $handler (např. TextHandler)
+        deactivate hr
+
+        ff -> fh : create($block)
+        activate fh
+        fh -> fh : applyDefaults()\ngetRule()\ndefaultValue()
+        fh -> form : Form::Input($data)\n (přes Form::__callStatic)
+        activate form
+        form -> form : FormElementFactory::create('Input', $data)
+        form -> form : ElementValidator::validate()
+        form -> form : new Input($data)
+        form -> form : Uloží do statického bufferu $elements[]
+        form --> fh
+        deactivate form
+        fh --> ff : [Form $element]
+        deactivate fh
+
+        ff --> fr : [Form $element]
+        deactivate ff
+
+        fr -> form : Form::renderWrapped($engine, $blockDefs)
+        activate form
+        form -> lm : LayoutManager::wrapBlock($html, $blockDef)
+        activate lm
+        lm --> form : "<div class=\"ai-module__block\">...</div>"
+        deactivate lm
+        form -> eng : engine->assign($vars)->render('Element/Input')
+        activate eng
+        eng -> parser : parseCodeToPhp($template)
+        parser --> eng : $phpCode
+        eng -> eng : require $cacheFile
+        eng --> form : $elementHtml
+        deactivate eng
+        form --> fr : $sectionHtml
+        deactivate form
+    end
+
+    fr -> fr : Přidá sekci do $sections[]
+end
+
+fr --> pb : $sections (array of HTML)
+deactivate fr
+
+pb -> eng : engine->assign(...)->render('Handlers')
+eng --> pb : $formHtml (celé HTML formuláře)
+
+pb --> demo : $htmlString
+deactivate pb
+
+demo -> demo : echo $html
+
+@enduml

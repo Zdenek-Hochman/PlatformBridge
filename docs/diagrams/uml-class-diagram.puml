@@ -1,0 +1,487 @@
+@startuml UML_ClassDiagram
+skinparam classAttributeIconSize 0
+skinparam classFontSize 11
+skinparam packageFontSize 12
+skinparam ArrowColor #444
+skinparam ClassBorderColor #666
+skinparam packageStyle rectangle
+hide empty members
+
+title UML Class Diagram – PlatformBridge (kompletní)
+
+' ─────────────────────────────────────────────
+' PACKAGE: Fasáda & Builder
+' ─────────────────────────────────────────────
+package "Zoom\\PlatformBridge" #DDEEFF {
+
+    class PlatformBridgeBuilder {
+        -configPath: ?string
+        -viewsPath: ?string
+        -cachePath: ?string
+        -locale: string = 'cs'
+        -useHmac: bool
+        -paramsTtl: ?int
+        +withConfigPath(string): self
+        +withViewsPath(string): self
+        +withCachePath(string): self
+        +withLocale(string): self
+        +withBridgeConfigPath(string): self
+        +withSecretKey(bool): self
+        +withParamsTtl(int): self
+        +build(): PlatformBridge
+    }
+
+    class PlatformBridgeConfig <<readonly>> {
+        -configPath: string
+        -viewsPath: string
+        -cachePath: string
+        -locale: string
+        -bridgeConfigPath: string
+        -useHmac: bool
+        -paramsTtl: ?int
+        +getConfigPath(): string
+        +getViewsPath(): string
+        +getCachePath(): string
+        +getSecretKey(): ?string
+        +isHmacEnabled(): bool
+        +getHandlersConfig(): array
+    }
+
+    class PlatformBridge <<final>> {
+        -configManager: ConfigManager
+        -handlerRegistry: HandlerRegistry
+        -fieldFactory: FieldFactory
+        -engine: Engine
+        -assetManager: ?AssetManager
+        -formRenderer: FormRenderer
+        -signedParams: ?SignedParams
+        +{static} create(): PlatformBridgeBuilder
+        +{static} createDefault(): self
+        +{static} fromConfig(PlatformBridgeConfig): self
+        +renderFullForm(string, array): string
+        +getGenerator(string): array
+        +getTemplateEngine(): Engine
+        +getConfig(): PlatformBridgeConfig
+        +getAssets(): string
+        -boot(): void
+    }
+}
+
+' ─────────────────────────────────────────────
+' PACKAGE: Config
+' ─────────────────────────────────────────────
+package "Zoom\\PlatformBridge\\Config" #DDFFD0 {
+
+    class ConfigManager <<final>> {
+        -configDir: string
+        +{static} create(string): self
+        +load(): void
+        +isLoaded(): bool
+        +getGenerator(string): array
+        +getAllGenerators(): array
+        +getLayout(string): array
+        +getBlock(string): array
+        +getResolvedSections(string): array
+        +getSectionBlocks(string, string): array
+    }
+
+    class ConfigLoader <<final>> {
+        -configDir: string
+        +{static} BLOCKS_FILE: string
+        +{static} LAYOUTS_FILE: string
+        +{static} GENERATORS_FILE: string
+        +load(): array
+        +loadRaw(string): array
+    }
+
+    class ConfigValidator <<final>> {
+        +validateGenerators(array, string): array
+        +validateLayouts(array, string): array
+        +validateBlocks(array, string): array
+        +validateRelations(array, array, array): void
+    }
+
+    class ConfigResolver <<final>> {
+        -cache: array
+        +setData(array, array, array): void
+        +resolveGenerator(string): array
+        +resolveLayout(string): array
+        +resolveLayoutSections(string): array
+        +resolveBlockReference(string, array): array
+    }
+
+    enum ConfigKeys {
+        BLOCKS
+        LAYOUTS
+        GENERATORS
+        ID / LABEL / NAME / REF
+        SECTIONS / COLUMNS / SPAN
+        COMPONENT / VARIANT / RULES
+        AI_KEY / DEFAULT / REQUIRED
+        VISIBLE_IF / CONFIG
+    }
+
+    class ConfigException <<RuntimeException>> {
+        +{static} fileNotFound(string): self
+        +{static} invalidJson(string, string): self
+        +{static} missingKey(string, string, ?string): self
+        +{static} invalidReference(string, string, ?string): self
+        +{static} validationFailed(string): self
+        +getConfigFile(): ?string
+        +getConfigKey(): ?string
+    }
+}
+
+' ─────────────────────────────────────────────
+' PACKAGE: Handler
+' ─────────────────────────────────────────────
+package "Zoom\\PlatformBridge\\Handler" #FFF3CC {
+
+    interface FieldHandler {
+        +supports(array): bool
+        +create(array): array
+    }
+
+    abstract class FieldConfigurator implements FieldHandler {
+        #applyDefaults(object, array): void
+        #getRule(array, string, mixed): mixed
+        #isRequired(array): bool
+        #defaultValue(string, array, mixed): ?string
+        #prepareMetaAttributes(array): array
+    }
+
+    class HandlerRegistry <<final>> {
+        -handlers: FieldHandler[]
+        -variantMap: array
+        -defaultHandler: ?string
+        +addHandler(FieldHandler): void
+        +mapVariant(string, string): void
+        +setDefaultHandler(string): void
+        +resolve(array): ?FieldHandler
+    }
+
+    class FieldFactory <<final>> {
+        -registry: HandlerRegistry
+        +createFromBlock(array): Form[]
+    }
+
+    class TextHandler extends FieldConfigurator
+    class NumberHandler extends FieldConfigurator
+    class DateHandler extends FieldConfigurator
+    class HiddenHandler extends FieldConfigurator
+    class CheckboxHandler extends FieldConfigurator
+    class RadioHandler extends FieldConfigurator
+    class FileHandler extends FieldConfigurator
+    class SelectHandler extends FieldConfigurator
+    class TextareaHandler extends FieldConfigurator
+    class TickBoxHandler extends FieldConfigurator
+}
+
+' ─────────────────────────────────────────────
+' PACKAGE: Form
+' ─────────────────────────────────────────────
+package "Zoom\\PlatformBridge\\Form" #FFE8E0 {
+
+    class Form <<final>> {
+        -{static} elements: array
+        -{static} currentBlockId: ?string
+        +{static} setCurrentBlock(?string): void
+        +{static} render(Engine): string
+        +{static} renderWrapped(Engine, array): string
+        +setLabel(array): self
+        +setSmall(array): self
+        +{static} __callStatic(string, array): self
+    }
+
+    interface ElementInterface {
+        +renderElement(object): string
+        +setElementLabel(array): static
+        +setElementSmall(array): static
+    }
+
+    enum ElementType {
+        INPUT = 'Input'
+        SELECT = 'Select'
+        TEXTAREA = 'Textarea'
+        TICKBOX = 'TickBox'
+        +getElementClass(): string
+    }
+
+    abstract class Element {
+        #data: array
+        +{abstract} prepareFormElementStructure(): object
+        +{abstract} renderFormElement(array, object): string
+        #prepareDataAttributes(array): array
+        #sanitize(string): string
+        #renderComposedElement(array, object, string, array): string
+        #wrapWithLabel(array, object, string): string
+    }
+
+    class ElementProxy implements ElementInterface {
+        -data: array
+        -element: Element
+        +setElementLabel(array): static
+        +setElementSmall(array): static
+        +renderElement(object): string
+    }
+
+    class Input extends Element
+    class Select extends Element
+    class Textarea extends Element
+    class TickBox extends Element
+
+    class ElementValidator {
+        +{static} validateBasicAttributes(array): void
+        +{static} validateInputTypeAttributes(string, array): array
+    }
+
+    class FormElementFactory {
+        +{static} create(string, array): mixed
+    }
+}
+
+' ─────────────────────────────────────────────
+' PACKAGE: Runtime
+' ─────────────────────────────────────────────
+package "Zoom\\PlatformBridge\\Runtime" #EAE0FF {
+
+    class FormRenderer <<final>> {
+        -fieldFactory: FieldFactory
+        -configManager: ConfigManager
+        -engine: Engine
+        +build(string, array): array
+    }
+
+    class LayoutManager <<final>> {
+        +{static} wrapBlock(string, array, string): string
+    }
+}
+
+' ─────────────────────────────────────────────
+' PACKAGE: Template
+' ─────────────────────────────────────────────
+package "Zoom\\PlatformBridge\\Template" #FFF0D0 {
+
+    class Engine <<final>> {
+        -config: array
+        -variables: array
+        +assign(array|string, mixed): self
+        +clear(): self
+        +render(string): string
+        +{static} cleanExpiredCacheFiles(int): void
+    }
+
+    class Parser extends VariableModifier {
+        +parseCodeToPhp(string): string
+        +processHtml(string): void
+    }
+
+    class VariableModifier {
+        #{static} transformHtmlVariables(string, bool, bool): string
+        #{static} replaceTemplateModifiers(string): string
+    }
+}
+
+' ─────────────────────────────────────────────
+' PACKAGE: AI
+' ─────────────────────────────────────────────
+package "Zoom\\PlatformBridge\\AI" #FFD0D0 {
+
+    class AiClient {
+        #config: AiClientConfig
+        +send(AiRequest): AiResponse
+        #executeRequest(string, AiRequest): AiResponse
+    }
+
+    class AiClientConfig {
+        +apiKey: string
+        +baseUrl: string
+        +timeout: int
+        +maxRetries: int
+        +verifySsl: bool
+        +{static} fromArray(array): self
+        +buildUrl(string, array): string
+        +getHeaders(array): array
+    }
+
+    class AiRequest {
+        -endpoint: string
+        -method: string
+        -data: array
+        +{static} to(string): static
+        +usingMethod(string): static
+        +withPrompt(array): static
+        +withQueryParams(array): static
+        +toPayload(): array
+    }
+
+    class AiResponse {
+        #response: mixed
+        #statusCode: int
+        #success: bool
+        #error: ?string
+        +isSuccess(): bool
+        +getResponse(): mixed
+        +get(string, mixed): mixed
+        +getOrFail(): mixed
+        +{static} fromApi(array, int): self
+        +{static} error(string, int, array): self
+    }
+
+    class AiException extends "\\Exception" {
+        +{static} ERROR_TIMEOUT: int
+        +{static} ERROR_CONNECTION: int
+        +{static} invalidRequest(string, array): self
+        +{static} connectionFailed(string, array): self
+        +{static} timeout(int, array): self
+        +{static} invalidResponse(string, array): self
+        +{static} apiError(string, int, array): self
+    }
+
+    class AiResponseRenderer <<final>> {
+        -engine: Engine
+        +{static} create(array): self
+        +render(mixed, string, array): string
+        +getEngine(): Engine
+    }
+}
+
+' ─────────────────────────────────────────────
+' PACKAGE: AI\API
+' ─────────────────────────────────────────────
+package "Zoom\\PlatformBridge\\AI\\API" #FFD0E8 {
+
+    abstract class EndpointDefinition {
+        #variantKey: ?string
+        #configManager: ?ConfigManager
+        +{abstract} getEndpoint(): string
+        +{abstract} getResponseType(): string
+        +{abstract} getTemplate(): string
+        +{abstract} getGeneratorId(): ?string
+        +setConfigManager(ConfigManager): self
+        +setSingleKeyMode(string): self
+        +detectVariant(array): ?string
+        +transformInput(array, string): array
+        +createRequest(array, array, array): AiRequest
+        +parseResponse(mixed): mixed
+    }
+
+    class EndpointRegistry {
+        -{static} instance: self
+        -endpoints: array
+        +{static} getInstance(): self
+        +registerClass(string, string): void
+        +registerDefaults(): void
+        +get(string): ?EndpointDefinition
+        +getOrFail(string): EndpointDefinition
+    }
+
+    class CreateSubjectEndpoint extends EndpointDefinition {
+        +getEndpoint(): string
+        +getGeneratorId(): string
+        +getResponseType(): string
+        +getTemplate(): string
+        +transformInput(array, string): array
+    }
+}
+
+' ─────────────────────────────────────────────
+' PACKAGE: Security
+' ─────────────────────────────────────────────
+package "Zoom\\PlatformBridge\\Security" #D0F0D0 {
+    class SignedParams <<final>> {
+        -secretKey: string
+        -ttl: ?int
+        +{static} ALGORITHM: string
+        +sign(array): string
+        +verify(string): array
+        +isValid(string): bool
+        +{static} generateSecretKey(int): string
+    }
+
+    class SecurityException extends "\\Exception"
+}
+
+' ─────────────────────────────────────────────
+' PACKAGE: Asset / Error / Translator
+' ─────────────────────────────────────────────
+package "Zoom\\PlatformBridge\\Asset" #E0E0E0 {
+    class AssetManager <<final>> {
+        +getScripts(bool): string
+        +getStyles(bool): string
+        +getAssets(): string
+    }
+}
+
+package "Zoom\\PlatformBridge\\Error" #E0E0E0 {
+    class ErrorHandler <<final>> {
+        +register(): void
+        +handleException(Throwable): void
+        +handleError(int, string, ?string, ?int): bool
+    }
+}
+
+package "Zoom\\PlatformBridge\\Translator" #E0E0E0 {
+    class Translator {
+        +{static} setLocale(string): void
+        +{static} translate(string, array, ?string): string
+        +{static} t(string, array, ?string): string
+    }
+}
+
+' ─────────────────────────────────────────────
+' RELACE
+' ─────────────────────────────────────────────
+
+PlatformBridgeBuilder ..> PlatformBridgeConfig : creates
+PlatformBridgeBuilder ..> PlatformBridge : builds
+
+PlatformBridge *-- ConfigManager
+PlatformBridge *-- Engine
+PlatformBridge *-- HandlerRegistry
+PlatformBridge *-- FieldFactory
+PlatformBridge *-- FormRenderer
+PlatformBridge o-- AssetManager
+PlatformBridge o-- SignedParams
+PlatformBridge *-- ErrorHandler
+
+ConfigManager *-- ConfigLoader
+ConfigManager *-- ConfigValidator
+ConfigManager *-- ConfigResolver
+ConfigLoader --> ConfigValidator : uses
+ConfigManager ..> ConfigException : throws
+
+HandlerRegistry o-- FieldHandler
+FieldFactory --> HandlerRegistry : uses
+FieldFactory ..> Form : produces
+
+FormRenderer --> FieldFactory : uses
+FormRenderer --> ConfigManager : uses
+FormRenderer --> Engine : uses
+FormRenderer ..> Form : writes
+
+Form ..> FormElementFactory : delegates
+Form --> LayoutManager : wraps blocks
+FormElementFactory ..> ElementValidator : validates
+FormElementFactory ..> Input : creates
+FormElementFactory ..> Select : creates
+FormElementFactory ..> Textarea : creates
+FormElementFactory ..> TickBox : creates
+
+Input --> ElementProxy
+Select --> ElementProxy
+Textarea --> ElementProxy
+TickBox --> ElementProxy
+
+Engine *-- Parser
+Parser --> VariableModifier : extends
+Parser --> Translator : uses
+
+AiResponseRenderer --> Engine : uses
+AiClient --> AiClientConfig : uses
+AiClient ..> AiResponse : returns
+AiClient ..> AiException : throws
+EndpointDefinition ..> AiRequest : creates
+EndpointRegistry o-- EndpointDefinition
+
+@enduml

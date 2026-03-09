@@ -1,0 +1,174 @@
+@use 'variables';
+@use 'sass:math';
+@use 'sass:map';
+@use 'sass:list';
+
+// ─── Layout ────────────────────────────────────────────────────
+
+@mixin flex($direction: row, $justify: flex-start, $align: stretch, $wrap: wrap, $gap: 0) {
+	display: flex;
+	flex-direction: $direction;
+	justify-content: $justify;
+	align-items: $align;
+	flex-wrap: $wrap;
+
+	@if $gap != 0 {
+		gap: $gap;
+	}
+}
+
+@mixin grid($columns: 1fr, $rows: 1fr, $gap: 0) {
+	display: grid;
+	grid-template-columns: $columns;
+	grid-template-rows: $rows;
+
+	@if $gap != 0 {
+		gap: $gap;
+	}
+}
+
+@mixin box-shadow($x, $y, $blur, $spread: 0, $color, $inset: null) {
+	$shadow: $x $y $blur $spread $color;
+	@if $inset {
+		$shadow: inset $shadow;
+	}
+	-webkit-box-shadow: $shadow;
+	-moz-box-shadow: $shadow;
+	box-shadow: $shadow;
+}
+
+@mixin pseudo-element($element, $content: '', $width: auto, $height: auto, $display) {
+	&::#{$element} {
+		content: $content;
+		width: $width;
+		height: $height;
+		@if $display {
+			display: $display;
+		}
+		@content;
+	}
+}
+
+@function rem($pixels) {
+	@return math.div($pixels, variables.$base-font-size) * 1rem;
+}
+
+@function em($pixels) {
+	@return math.div($pixels, variables.$base-font-size) * 1em;
+}
+
+// ─── Transitions ───────────────────────────────────────────────
+
+@mixin transition($properties...) {
+	$result: ();
+
+	@each $prop in $properties {
+		$result: list.append($result, #{$prop} var(--transition-base), comma);
+	}
+
+	transition: $result;
+}
+
+// ─── Breakpoints ───────────────────────────────────────────────
+
+@function get-breakpoint($name) {
+	@if map.has-key(variables.$breakpoints, $name) {
+		@return map.get(variables.$breakpoints, $name);
+	} @else {
+		@warn "Breakpoint '#{$name}' nebyl nalezen v $breakpoints.";
+		@return null;
+	}
+}
+
+@mixin mq($from: false, $until: false) {
+	$conditions: ();
+
+	@if $from {
+		$min: get-breakpoint($from);
+		@if $min {
+			$conditions: list.append($conditions, "(min-width: #{$min})");
+		}
+	}
+
+	@if $until {
+		$max: get-breakpoint($until) - 0.01px;
+		@if $max {
+			$conditions: list.append($conditions, "(max-width: #{$max})");
+		}
+	}
+
+	@if list.length($conditions) > 0 {
+		$query: "";
+		@each $cond in $conditions {
+			@if $query == "" {
+				$query: $cond;
+			} @else {
+				$query: "#{$query} and #{$cond}";
+			}
+		}
+
+		@media #{$query} {
+			@content;
+		}
+	}
+}
+
+// ─── Focus Styles ──────────────────────────────────────────────
+
+@mixin focus-ring {
+	&:focus-visible {
+		outline: none;
+		box-shadow: var(--focus-ring);
+	}
+}
+
+// ─── Text Utilities ────────────────────────────────────────────
+
+@mixin text-truncate($lines: 1) {
+	@if $lines == 1 {
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	} @else {
+		display: -webkit-box;
+		-webkit-line-clamp: $lines;
+		-webkit-box-orient: vertical;
+		overflow: hidden;
+	}
+}
+
+// ─── Pseudo Element ────────────────────────────────────────────
+
+@mixin pseudo($element: before, $content: "", $display: block) {
+	&::#{$element} {
+		content: $content;
+		display: $display;
+		@content;
+	}
+}
+
+// ─── Shadows ───────────────────────────────────────────────────
+
+@mixin shadow($level: md) {
+	@if $level == sm {
+		box-shadow: var(--shadow-sm);
+	} @else if $level == md {
+		box-shadow: var(--shadow-md);
+	} @else if $level == lg {
+		box-shadow: var(--shadow-lg);
+	}
+}
+
+// ─── Visually Hidden ───────────────────────────────────────────
+
+@mixin sr-only {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	padding: 0;
+	margin: -1px;
+	overflow: hidden;
+	clip: rect(0, 0, 0, 0);
+	white-space: nowrap;
+	border: 0;
+}

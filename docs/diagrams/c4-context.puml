@@ -1,0 +1,23 @@
+@startuml C4_Context
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Context.puml
+
+LAYOUT_WITH_LEGEND()
+
+title C4 Level 1 – System Context: PlatformBridge
+
+Person(developer, "Vývojář / Integrátor", "Integruje PlatformBridge\ndo PHP aplikace pomocí\nPlatformBridgeBuilder API.")
+
+Person(endUser, "Koncový uživatel", "Vyplňuje dynamický formulář\nv prohlížeči a odesílá data\npro AI generování obsahu.")
+
+System(platformBridge, "PlatformBridge", "PHP knihovna pro dynamické\nformulářové systémy s AI\ngenerováním obsahu.\n\nRendering, validace, HMAC bezpečnost.")
+
+System_Ext(aiApi, "VirtualZoom AI API", "Externí REST API\nhttps://api.virtualzoom.com/v2/AI\n\nGeneruje obsah na základě\nstrukturovaného promptu.")
+
+System_Ext(filesystem, "Souborový systém", "JSON konfigurace\n(generators.json, layouts.json,\nblocks.json), šablony .tpl,\nPHP cache soubory.")
+
+Rel(developer, platformBridge, "Konfiguruje a volá", "PlatformBridgeBuilder::build()")
+Rel(endUser, platformBridge, "Odesílá formulář", "HTTP POST / AJAX")
+Rel(platformBridge, aiApi, "Odesílá AI požadavky", "HTTPS REST / JSON\nBearer token")
+Rel(platformBridge, filesystem, "Čte konfigurace,\nšablony; zapisuje cache", "PHP file I/O")
+
+@enduml

@@ -1,0 +1,98 @@
+@startuml Sequence_AiRequest
+skinparam sequenceMessageAlign left
+skinparam responseMessageBelowArrow true
+skinparam maxMessageSize 200
+
+title Sekvenční diagram – AI HTTP požadavek (ApiHandler)
+
+actor "Prohlížeč\n(AJAX)" as browser
+participant "ApiHandler.php" as api
+participant "ConfigManager" as cm
+participant "SignedParams" as sp
+participant "EndpointRegistry" as er
+participant "CreateSubjectEndpoint\n(EndpointDefinition)" as ep
+participant "AiRequest" as req
+participant "AiClient" as client
+participant "AiClientConfig" as clientCfg
+participant "AiResponse" as resp
+participant "AiResponseRenderer" as renderer
+participant "Engine (Template)" as eng
+
+browser -> api : HTTP POST\n{ action, params_signed, ... }
+
+api -> api : 1. json_decode($_POST)
+api -> api : 2. require 'bridge-config.php'
+
+api -> cm : 3. ConfigManager::create($configDir)
+activate cm
+cm -> cm : Načte generators.json
+cm --> api : $configManager
+deactivate cm
+
+api -> sp : 4. new SignedParams($secretKey, $ttl)\n   $sp->verify($params_signed)
+activate sp
+sp -> sp : base64url_decode()\n json_decode()\n hash_hmac('sha256', ...)\n hash_equals()\n TTL kontrola
+alt Podpis OK
+    sp --> api : $params (decoded array)
+else Podpis FAIL / Expirováno
+    sp --> api : throw SecurityException
+    api --> browser : 403 JSON { error: 'Neplatný podpis' }
+end
+deactivate sp
+
+api -> er : 5. EndpointRegistry::getInstance()\n   ->getOrFail($action)
+activate er
+er -> er : Lazy-load: new CreateSubjectEndpoint()
+er -> ep : setConfigManager($configManager)
+er --> api : $endpoint
+deactivate er
+
+api -> ep : 6. $endpoint->createRequest($params)
+activate ep
+ep -> ep : detectVariant($params)\n  → 'template' nebo 'custom'
+ep -> ep : transformInput($params, $variant)\n  → filtruje klíče dle varianty
+ep -> req : new AiRequest('CreateSubject')\n  ->usingMethod('POST')\n  ->withPrompt($transformedData)\n  ->withQueryParams($queryParams)
+req --> ep : $aiRequest
+ep --> api : $aiRequest
+deactivate ep
+
+api -> client : 7. new AiClient(new AiClientConfig(...))\n   ->send($aiRequest)
+activate client
+client -> clientCfg : buildUrl('CreateSubject', queryParams)
+clientCfg --> client : $url
+client -> clientCfg : getHeaders(['Content-Type'=>'application/json'])
+clientCfg --> client : $headers (+ Bearer token)
+
+loop Retry logika (max 3 pokusy)
+    client -> client : cURL POST $url\n  CURLOPT_TIMEOUT=30\n  CURLOPT_CONNECTTIMEOUT=10
+    alt HTTP 200
+        client -> resp : AiResponse::fromApi($decodedJson, 200)
+        resp --> client : $response
+        client --> api : $response
+    else HTTP 4xx/5xx
+        client -> resp : AiResponse::error($msg, $statusCode)
+        resp --> client : $errorResponse
+    else cURL timeout
+        client -> client : throw AiException::timeout(30)
+    else cURL connection failed
+        client -> client : throw AiException::connectionFailed($msg)
+    end
+end
+deactivate client
+
+api -> ep : 8a. $endpoint->parseResponse($response->getResponse())
+ep --> api : $parsedData
+
+api -> renderer : 8b. AiResponseRenderer::create()\n    ->render($parsedData, 'Components/NestedResult')
+activate renderer
+renderer -> eng : engine->assign(['response' => $parsedData])\n       ->render('Components/NestedResult')
+activate eng
+eng -> eng : Kompiluje/načítá z cache\nComponents/NestedResult.tpl
+eng --> renderer : $htmlSnippet
+deactivate eng
+renderer --> api : $htmlSnippet
+deactivate renderer
+
+api --> browser : HTTP 200 JSON\n{ html: $htmlSnippet, success: true }
+
+@enduml

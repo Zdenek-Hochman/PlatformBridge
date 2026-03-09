@@ -1,0 +1,1 @@
+<small class="ai-module__small {$small.class}">{$small.text}</small>

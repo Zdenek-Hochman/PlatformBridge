@@ -1,1 +1,0 @@
-<small class="{$small.class}">{$small.text}</small>

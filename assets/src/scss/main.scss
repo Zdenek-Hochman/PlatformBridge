@@ -1,0 +1,19 @@
+// ─── AI Module – Main Entry ────────────────────────────────────
+// Importní pořadí: tokens → base → layout → components
+
+// 1. Base (reset, typography, forms)
+@use "base";
+
+// 2. Shared animations
+@use "common/animations";
+
+// 3. Layout
+@use "layout/module";
+@use "layout/result";
+
+// 4. Components
+@use "components/primitives";
+@use "components/custom-select";
+@use "components/loader";
+@use "components/notification";
+@use "components/progress";

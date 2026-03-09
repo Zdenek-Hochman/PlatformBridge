@@ -1,0 +1,78 @@
+// ─── Result Layout ─────────────────────────────────────────────
+// Layout pro zobrazení AI výsledků (.ai-result).
+
+@use "../common/mixins" as m;
+
+.ai-result {
+	@include m.flex(column, stretch, stretch, wrap);
+
+	&__item {
+		background: var(--result-bg);
+		border-radius: var(--radius);
+		border: var(--border);
+		padding: var(--space-5);
+		margin-bottom: var(--space-3);
+		@include m.flex(column, stretch, stretch, wrap, var(--space-3));
+		@include m.transition(opacity, transform);
+	}
+
+	&__wrapper {
+		@include m.grid(repeat(2, 1fr), repeat(2, 1fr), m.rem(5px));
+		align-items: center;
+	}
+
+	&__label {
+		font-weight: var(--font-weight-semibold);
+		font-size: var(--text-sm);
+		color: var(--color-text-secondary);
+		text-transform: uppercase;
+		letter-spacing: 0.5px;
+	}
+
+	&__content {
+		grid-row: 2;
+		align-self: center;
+		font-size: var(--text-md);
+		color: var(--color-text-primary);
+	}
+
+	&__actions {
+		@include m.flex(row, center, center, wrap, m.rem(10px));
+		grid-column: 2;
+		grid-row: 1 / -1;
+		align-self: center;
+	}
+
+	&__action {
+		padding: var(--space-1);
+		border-radius: var(--radius-sm);
+		color: var(--color-text-secondary);
+		@include m.transition(color, background-color);
+
+		&:hover {
+			color: var(--color-primary);
+			background-color: var(--color-bg-hover);
+		}
+	}
+
+	&__icon {
+		width: m.rem(16px);
+		height: m.rem(16px);
+	}
+
+	&__use {
+		margin-left: auto;
+		padding: var(--space-1) var(--space-3);
+		background: var(--color-primary);
+		color: var(--color-text-inverse);
+		border-radius: var(--radius-sm);
+		font-weight: var(--font-weight-semibold);
+		font-size: var(--text-sm);
+		cursor: pointer;
+		@include m.transition(background-color);
+
+		&:hover {
+			background: color-mix(in srgb, var(--color-primary), white 10%);
+		}
+	}
+}

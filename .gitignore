@@ -1,9 +1,12 @@
+# Node modules
+/node_modules
+
 # Composer
 /vendor/
 composer.lock
 
 # Cache files
-/cache/*.cache.php
+/var/cache/*.cache.php
 
 # IDE
 .idea/
@@ -20,16 +23,5 @@ Thumbs.db
 .env.local
 .env.*.local
 
-# Sensitive config (keep example)
-config/config.php
-!config/config.example.php
-
 # Logs
 *.log
-
-# Compiled CSS (keep source SCSS)
-# main.min.css
-
-# Test files (uncomment if not needed in production)
-# test.js
-# a.php
