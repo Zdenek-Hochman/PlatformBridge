@@ -6,7 +6,7 @@ const watch = true;
 /* ---------- TS build ---------- */
 const tsCtx = await esbuild.context({
 	entryPoints: [
-		"assets/src/ts/main.ts"
+		"assets/src/ts/pb-main.ts"
 	],
   	outdir: "assets/dist/js",
   	bundle: true,
@@ -19,7 +19,7 @@ const tsCtx = await esbuild.context({
 /* ---------- SCSS build ---------- */
 const scssCtx = await esbuild.context({
 	entryPoints: [
-		"assets/src/scss/main.scss"
+		"assets/src/scss/pb-main.scss"
 	],
 	entryNames: "[name]",
   	outdir: "assets/dist/css",

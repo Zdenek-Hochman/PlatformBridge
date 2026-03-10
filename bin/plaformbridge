@@ -1,0 +1,28 @@
+#!/usr/bin/env php
+<?php
+
+$source = __DIR__ . '/../assets';
+$target = getcwd() . '/public/platformbridge';
+
+if (!is_dir($target)) {
+    mkdir($target, 0777, true);
+}
+
+$iterator = new RecursiveIteratorIterator(
+    new RecursiveDirectoryIterator($source)
+);
+
+foreach ($iterator as $file) {
+    if ($file->isDir()) continue;
+
+	$relativePath = str_replace($source . DIRECTORY_SEPARATOR, '', $file->getPathname());
+    $dest = $target . DIRECTORY_SEPARATOR . $relativePath;
+
+    if (!is_dir(dirname($dest))) {
+        mkdir(dirname($dest), 0777, true);
+    }
+
+	copy($file->getPathname(), $dest);
+}
+
+echo "PlatformBridge assets installed to /public/platformbridge\n";

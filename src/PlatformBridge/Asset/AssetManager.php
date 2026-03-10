@@ -30,7 +30,8 @@ final class AssetManager
      */
     public function __construct(string $baseUrl)
     {
-        $this->baseUrl = rtrim($baseUrl, '/');
+        // $this->baseUrl = rtrim($baseUrl, '/');
+        $this->baseUrl = rtrim($baseUrl, '/') . '/';
     }
 
     /**
@@ -47,7 +48,7 @@ final class AssetManager
 
         self::$rendered['scripts'] = true;
 
-        $url = $this->buildAssetUrl('js', 'main.js');
+        $url = $this->buildAssetUrl('js', 'pb-main.js');
         return sprintf('<script src="%s"></script>', htmlspecialchars($url, ENT_QUOTES, 'UTF-8'));
     }
 
@@ -65,7 +66,7 @@ final class AssetManager
 
         self::$rendered['styles'] = true;
 
-        $url = $this->buildAssetUrl('css', 'main.css');
+        $url = $this->buildAssetUrl('css', 'pb-main.css');
         return sprintf('<link rel="stylesheet" href="%s">', htmlspecialchars($url, ENT_QUOTES, 'UTF-8'));
     }
 
@@ -112,6 +113,6 @@ final class AssetManager
      */
     private function buildAssetUrl(string $type, string $filename): string
     {
-        return sprintf('%s?type=%s&file=%s', $this->baseUrl, $type, $filename);
+        return sprintf('%s?type=%s&file=%s&pkg=platformbridge', $this->baseUrl, $type, $filename);
     }
 }

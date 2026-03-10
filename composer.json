@@ -3,7 +3,6 @@
     "description": "AI-powered form builder with template engine and field factory",
     "type": "library",
     "license": "proprietary",
-    "version": "1.0.0",
     "minimum-stability": "stable",
     "prefer-stable": true,
     "require": {
@@ -22,10 +21,12 @@
     },
     "scripts": {
         "post-install-cmd": [
-            "@php -r \"if (!is_dir('cache')) mkdir('cache', 0755, true);\""
+            "@php -r \"if (!is_dir('cache')) mkdir('cache', 0755, true);\"",
+			"@php vendor/bin/platformbridge install"
         ],
         "post-update-cmd": [
-            "@php -r \"if (!is_dir('cache')) mkdir('cache', 0755, true);\""
+            "@php -r \"if (!is_dir('cache')) mkdir('cache', 0755, true);\"",
+			"@php vendor/bin/platformbridge update"
         ]
     },
     "extra": {
@@ -50,5 +51,8 @@
 			"node_modules",
 			".gitignore"
     	]
-  	}
+  	},
+	"bin": [
+    	"bin/platformbridge"
+  	]
 }

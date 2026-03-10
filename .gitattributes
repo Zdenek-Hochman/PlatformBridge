@@ -1,0 +1,6 @@
+tsconfig.json export-ignore
+build.mjs export-ignore
+/var/cache export-ignore
+/node_modules export-ignore
+/docs export-ignore
+/assets/src export-ignore

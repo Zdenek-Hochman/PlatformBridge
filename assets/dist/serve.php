@@ -3,16 +3,17 @@
 declare(strict_types=1);
 
 $allowed = [
-    'js'  => ['main.js', 'main.min.js'],
-    'css' => ['main.css', 'main.min.css'],
+    'js'  => ['pb-main.js', 'pb-main.min.js'],
+    'css' => ['pb-main.css', 'pb-main.min.css'],
 ];
 
 $type = $_GET['type'] ?? null;
 $file = $_GET['file'] ?? null;
+$pkg = $_GET['pkg'] ?? null;
 
 if (!isset($allowed[$type]) || !in_array($file, $allowed[$type], true)) {
     http_response_code(404);
-    exit('Not found');
+    exit;
 }
 
 $mime = $type === 'js' ? 'application/javascript' : 'text/css';
