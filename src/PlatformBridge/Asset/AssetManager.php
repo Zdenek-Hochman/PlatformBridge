@@ -9,6 +9,10 @@ namespace Zoom\PlatformBridge\Asset;
  *
  * Zajišťuje, že se assety vloží do stránky pouze jednou,
  * bez ohledu na počet vykreslených formulářů.
+ *
+ * Cesta k assetům (auto-detekce z DOCUMENT_ROOT):
+ *   - Standalone (localhost): /{basePath}/public/platformbridge
+ *   - Vendor (produkce):      /platformbridge
  */
 final class AssetManager
 {
@@ -26,12 +30,12 @@ final class AssetManager
     private string $baseUrl;
 
     /**
-     * @param string $baseUrl URL k asset endpointu (např. '/vendor/zoom/platform-bridge/assets/dist/serve.php')
+     * @param string $baseUrl Základní URL ke složce platformbridge (např. '/public/platformbridge' nebo '/platformbridge')
+     *                        Složka musí obsahovat podsložky js/ a css/ s příslušnými soubory.
      */
     public function __construct(string $baseUrl)
     {
-        // $this->baseUrl = rtrim($baseUrl, '/');
-        $this->baseUrl = rtrim($baseUrl, '/') . '/';
+        $this->baseUrl = rtrim($baseUrl, '/');
     }
 
     /**
@@ -48,7 +52,7 @@ final class AssetManager
 
         self::$rendered['scripts'] = true;
 
-        $url = $this->buildAssetUrl('js', 'pb-main.js');
+        $url = $this->baseUrl . '/js/pb-main.js';
         return sprintf('<script src="%s"></script>', htmlspecialchars($url, ENT_QUOTES, 'UTF-8'));
     }
 
@@ -66,7 +70,7 @@ final class AssetManager
 
         self::$rendered['styles'] = true;
 
-        $url = $this->buildAssetUrl('css', 'pb-main.css');
+        $url = $this->baseUrl . '/css/pb-main.css';
         return sprintf('<link rel="stylesheet" href="%s">', htmlspecialchars($url, ENT_QUOTES, 'UTF-8'));
     }
 
@@ -93,26 +97,13 @@ final class AssetManager
     }
 
     /**
-     * Zkontroluje, zda už byly skripty vykresleny.
+     * Resetuje stav vykreslení (užitečné pro testy).
      */
-    public static function scriptsRendered(): bool
+    public static function reset(): void
     {
-        return self::$rendered['scripts'];
-    }
-
-    /**
-     * Zkontroluje, zda už byly styly vykresleny.
-     */
-    public static function stylesRendered(): bool
-    {
-        return self::$rendered['styles'];
-    }
-
-    /**
-     * Sestaví URL pro konkrétní asset.
-     */
-    private function buildAssetUrl(string $type, string $filename): string
-    {
-        return sprintf('%s?type=%s&file=%s&pkg=platformbridge', $this->baseUrl, $type, $filename);
+        self::$rendered = [
+            'scripts' => false,
+            'styles' => false,
+        ];
     }
 }

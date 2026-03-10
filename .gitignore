@@ -5,6 +5,14 @@
 /vendor/
 composer.lock
 
+# Build output (generováno přes npm run build)
+/public/platformbridge/js/
+/public/platformbridge/css/
+/public/platformbridge/*.map
+
+# Starý build output
+/assets/dist/
+
 # Cache files
 /var/cache/*.cache.php
 

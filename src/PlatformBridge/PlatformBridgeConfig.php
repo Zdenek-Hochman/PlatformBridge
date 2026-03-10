@@ -22,6 +22,7 @@ final readonly class PlatformBridgeConfig
         private string $cachePath,
         private string $locale,
         private string $bridgeConfigPath,
+        private string $assetUrl = '/public/platformbridge',
         private bool $useHmac = false,
         private ?int $paramsTtl = null,
     ) {
@@ -93,6 +94,30 @@ final readonly class PlatformBridgeConfig
                 "Views path does not exist: {$this->viewsPath}"
             );
         }
+    }
+
+    /**
+     * Vrátí URL pro načítání assetů (JS/CSS).
+     *
+     * @return string URL k asset složce (např. '/public/platformbridge' nebo '/platformbridge')
+     */
+    public function getAssetUrl(): string
+    {
+        return $this->assetUrl;
+    }
+
+    /**
+     * Vrátí URL k API endpointu.
+     *
+     * Odvozuje se ze stejné base URL jako assety:
+     *   - Standalone: '/public/platformbridge/api.php'
+     *   - Vendor: '/platformbridge/api.php'
+     *
+     * @return string URL k API endpointu
+     */
+    public function getApiUrl(): string
+    {
+        return rtrim($this->assetUrl, '/') . '/api.php';
     }
 
     /**

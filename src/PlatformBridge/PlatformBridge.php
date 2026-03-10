@@ -100,8 +100,8 @@ final class PlatformBridge
         // 5. Form renderer
         $this->formRenderer = new FormRenderer($this->fieldFactory, $this->configManager, $this->templateEngine);
 
-        // 6. Asset manager (pokud je nastavena URL)
-        $this->assetManager = new AssetManager("assets/dist/serve.php");
+        // 6. Asset manager - URL se detekuje automaticky (standalone vs vendor)
+        $this->assetManager = new AssetManager($this->config->getAssetUrl());
 
         // 7. Signed params (pokud je nastaven secret key)
         $secretKey = $this->config->getSecretKey();
@@ -178,6 +178,7 @@ final class PlatformBridge
             'data'         => $sections,
             'signedParams' => $this->buildSignedParams($params),
             'params'       => $this->buildRawParams($params),
+            'apiUrl'       => $this->config->getApiUrl(),
         ];
 
         $html = $this->templateEngine->assign($template)->render('/Atoms/Wrapper');

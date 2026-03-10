@@ -21,12 +21,10 @@
     },
     "scripts": {
         "post-install-cmd": [
-            "@php -r \"if (!is_dir('cache')) mkdir('cache', 0755, true);\"",
-			"@php vendor/bin/platformbridge install"
+            "@php bin/platformbridge install"
         ],
         "post-update-cmd": [
-            "@php -r \"if (!is_dir('cache')) mkdir('cache', 0755, true);\"",
-			"@php vendor/bin/platformbridge update"
+            "@php bin/platformbridge update"
         ]
     },
     "extra": {
@@ -42,12 +40,12 @@
 	],
 	"archive": {
     	"exclude": [
-			"var" ,
-			"assets/scss",
-			"assets/ts",
+			"var",
+			"assets/src",
 			"*.scss",
 			"*.ts",
-			"webpack.config.js",
+			"build.mjs",
+			"tsconfig.json",
 			"node_modules",
 			".gitignore"
     	]

@@ -1,4 +1,4 @@
-<div class="ai-module" data-controller="layout">
+<div class="ai-module" data-controller="layout" data-api-url="{$apiUrl}">
     <h1 class="ai-module__title">{$title}</h1>
     <form method="POST" class="ai-module__form">
 		{if $signedParams}

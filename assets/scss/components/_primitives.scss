@@ -1,0 +1,65 @@
+// ─── Module Field Primitives ───────────────────────────────────
+// BEM styly pro formulářové prvky uvnitř .ai-module.
+
+@use "../common/mixins" as m;
+
+.ai-module {
+	&__field {
+		border: var(--border);
+		padding: var(--space-2);
+		border-radius: var(--radius-sm);
+	}
+
+	&__select {
+		width: 100%;
+	}
+
+	&__label {
+		font-weight: var(--font-weight-semibold);
+		color: var(--color-text-primary);
+
+		&-value {
+			vertical-align: baseline;
+		}
+	}
+
+	&__small {
+		display: block;
+		font-size: var(--text-sm);
+		color: var(--color-text-secondary);
+		margin-top: var(--space-1);
+	}
+
+	&__button {
+		@include m.flex(row-reverse, center, center, nowrap, m.rem(10px));
+		align-self: end;
+		border-radius: var(--radius-sm);
+		padding: var(--button-space);
+		font-weight: var(--font-weight-semibold);
+		width: max-content;
+		cursor: pointer;
+		@include m.transition(background-color, transform);
+
+		&--primary {
+			background: var(--color-primary);
+			color: var(--color-text-inverse);
+
+			&:hover {
+				background: color-mix(in srgb, var(--color-primary), white 10%);
+			}
+
+			&:active {
+				transform: scale(0.98);
+			}
+
+			&:disabled {
+				opacity: var(--disabled-opacity);
+				cursor: not-allowed;
+			}
+		}
+
+		svg {
+			fill: currentColor;
+		}
+	}
+}

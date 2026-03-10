@@ -1,0 +1,54 @@
+#!/usr/bin/env php
+<?php
+
+/**
+ * PlatformBridge CLI
+ *
+ * Instalace a aktualizace assetů a konfigurace.
+ *
+ * Usage:
+ *   php vendor/bin/platformbridge install   - Kompletní instalace (assety + API + config)
+ *   php vendor/bin/platformbridge update    - Aktualizace assetů a API endpointu
+ *
+ * @see \Zoom\PlatformBridge\Installer\Installer
+ */
+
+// Detekce autoloaderu - podporuje vendor i standalone režim
+$autoloaderFound = false;
+$autoloadPaths = [
+    __DIR__ . '/../../../autoload.php',          // vendor/zoom/platform-bridge/bin → vendor/autoload.php
+    __DIR__ . '/../vendor/autoload.php',         // standalone: bin → vendor/autoload.php
+];
+
+foreach ($autoloadPaths as $autoloadPath) {
+    if (file_exists($autoloadPath)) {
+        require_once $autoloadPath;
+        $autoloaderFound = true;
+        break;
+    }
+}
+
+if (!$autoloaderFound) {
+    fwrite(STDERR, "Error: Could not find autoload.php. Run 'composer install' first.\n");
+    exit(1);
+}
+
+use Zoom\PlatformBridge\Installer\Installer;
+
+$command = $argv[1] ?? 'install';
+$installer = new Installer();
+
+switch ($command) {
+    case 'install':
+        $installer->install();
+        break;
+
+    case 'update':
+        $installer->update();
+        break;
+
+    default:
+        fwrite(STDERR, "Unknown command: {$command}\n");
+        fwrite(STDERR, "Usage: platformbridge [install|update]\n");
+        exit(1);
+}

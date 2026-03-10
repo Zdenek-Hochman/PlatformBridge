@@ -31,6 +31,7 @@ final class PlatformBridgeBuilder
     private ?string $translationsPath = null;
     private string $locale = 'cs';
     private ?string $bridgeConfigPath = null;
+    private ?string $assetUrl = null;
     private bool $useHmac = false;
     private ?int $paramsTtl = null;
 
@@ -109,6 +110,22 @@ final class PlatformBridgeBuilder
     }
 
     /**
+     * Nastaví URL pro načítání assetů (JS/CSS).
+     *
+     * Pokud není nastaveno, automaticky se detekuje z DOCUMENT_ROOT:
+     *   - Standalone: '/{basePath}/public/platformbridge' (build output v public/)
+     *   - Vendor: '/platformbridge' (soubory publikované instalátorem)
+     *
+     * @param string $url URL ke složce s js/ a css/ podsložkami
+     * @return self
+     */
+    public function withAssetUrl(string $url): self
+    {
+        $this->assetUrl = $url;
+        return $this;
+    }
+
+    /**
      * Zapne/vypne HMAC podepisování parametrů (ochrana integrity dat).
      * Secret key se načte z bridge-config.php.
      *
@@ -153,6 +170,7 @@ final class PlatformBridgeBuilder
             // translationsPath: $this->resolveTranslationsPath(),
             locale: $this->locale,
             bridgeConfigPath: $this->resolveBridgeConfigPath(),
+            assetUrl: $this->resolveAssetUrl(),
             useHmac: $this->useHmac,
             paramsTtl: $this->paramsTtl,
         );
@@ -219,6 +237,26 @@ final class PlatformBridgeBuilder
     private function resolveTranslationsPath(): string
     {
         return $this->translationsPath ?? $this->getPackageResourcesPath() . DIRECTORY_SEPARATOR . 'translations';
+    }
+
+    /**
+     * Vrátí výslednou URL pro assety.
+     *
+     * Priorita:
+     *   1. Explicitně nastavená URL přes withAssetUrl()
+     *   2. Auto-detekce na základě vendor/standalone režimu
+     *
+     * @return string URL ke složce s assety
+     */
+    private function resolveAssetUrl(): string
+    {
+        if ($this->assetUrl !== null) {
+            return $this->assetUrl;
+        }
+
+        return \Zoom\PlatformBridge\Installer\Installer::getDefaultAssetUrl(
+            dirname(__DIR__, 2)
+        );
     }
 
     /**

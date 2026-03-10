@@ -7,7 +7,7 @@
 
 		"baseUrl": ".",
 		"paths": {
-			"@/*": ["assets/src/ts/*"]
+			"@/*": ["assets/ts/*"]
 		}
 	}
 }

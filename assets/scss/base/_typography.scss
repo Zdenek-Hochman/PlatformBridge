@@ -1,0 +1,19 @@
+// ─── Typography ────────────────────────────────────────────────
+// Headingové styly generované z design tokens.
+
+@for $i from 1 through 6 {
+	.ai-module h#{$i} {
+		font-size: var(--h#{$i}-fluid, var(--h#{$i}-size));
+		line-height: var(--line-height-tight);
+		font-weight: var(--font-weight-bold);
+	}
+}
+
+.ai-module a {
+	color: var(--color-primary);
+	text-decoration: none;
+
+	&:hover {
+		text-decoration: underline;
+	}
+}
