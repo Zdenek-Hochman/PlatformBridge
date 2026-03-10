@@ -1,6 +1,6 @@
 {
 	"name": "platform-bridge",
-	"version": "1.0.0",
+	"version": "1.0.1",
 	"description": "AI-powered form builder with template engine and field factory.",
 	"main": "index.php",
 	"directories": {
