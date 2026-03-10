@@ -10,9 +10,10 @@ namespace Zoom\PlatformBridge\Asset;
  * Zajišťuje, že se assety vloží do stránky pouze jednou,
  * bez ohledu na počet vykreslených formulářů.
  *
- * Cesta k assetům (auto-detekce z DOCUMENT_ROOT):
- *   - Standalone (localhost): /{basePath}/public/platformbridge
- *   - Vendor (produkce):      /platformbridge
+ * Cesta k assetům se auto-detekuje z DOCUMENT_ROOT:
+ *   - doc root = project/public  → /platformbridge
+ *   - doc root = project root    → /public/platformbridge
+ *   - doc root = parent, projekt v podsložce → /{basePath}/public/platformbridge
  */
 final class AssetManager
 {

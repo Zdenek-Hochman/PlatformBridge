@@ -7,8 +7,10 @@
  * Instalace a aktualizace assetů a konfigurace.
  *
  * Usage:
- *   php vendor/bin/platformbridge install   - Kompletní instalace (assety + API + config)
- *   php vendor/bin/platformbridge update    - Aktualizace assetů a API endpointu
+ *   php vendor/bin/platformbridge install        - Kompletní instalace (assety + API + config)
+ *   php vendor/bin/platformbridge update         - Aktualizace assetů a API endpointu
+ *   php vendor/bin/platformbridge full-install   - npm install + npm build + instalace
+ *   php vendor/bin/platformbridge build          - Pouze npm install + npm build
  *
  * @see \Zoom\PlatformBridge\Installer\Installer
  */
@@ -47,8 +49,26 @@ switch ($command) {
         $installer->update();
         break;
 
+    case 'full-install':
+        $installer->fullInstall();
+        break;
+
+    case 'build':
+        $buildScript = $argv[2] ?? 'build';
+        $success = $installer->buildAssets($buildScript);
+        if (!$success) {
+            exit(1);
+        }
+        break;
+
     default:
         fwrite(STDERR, "Unknown command: {$command}\n");
-        fwrite(STDERR, "Usage: platformbridge [install|update]\n");
+        fwrite(STDERR, "Usage: platformbridge [install|update|full-install|build]\n");
+        fwrite(STDERR, "\n");
+        fwrite(STDERR, "Commands:\n");
+        fwrite(STDERR, "  install        Publish assets, API endpoint and config\n");
+        fwrite(STDERR, "  update         Update assets and API endpoint (keeps config)\n");
+        fwrite(STDERR, "  full-install   npm install + npm build + install\n");
+        fwrite(STDERR, "  build [script] Run npm install + npm build (default: 'build')\n");
         exit(1);
 }

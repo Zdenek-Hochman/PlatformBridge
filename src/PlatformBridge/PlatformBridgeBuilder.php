@@ -113,8 +113,9 @@ final class PlatformBridgeBuilder
      * Nastaví URL pro načítání assetů (JS/CSS).
      *
      * Pokud není nastaveno, automaticky se detekuje z DOCUMENT_ROOT:
-     *   - Standalone: '/{basePath}/public/platformbridge' (build output v public/)
-     *   - Vendor: '/platformbridge' (soubory publikované instalátorem)
+     *   - doc root = project/public  → '/platformbridge'
+     *   - doc root = project root    → '/public/platformbridge'
+     *   - doc root = parent          → '/{basePath}/public/platformbridge'
      *
      * @param string $url URL ke složce s js/ a css/ podsložkami
      * @return self
