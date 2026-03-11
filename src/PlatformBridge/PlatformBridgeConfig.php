@@ -117,7 +117,7 @@ final readonly class PlatformBridgeConfig
      */
     public function getApiUrl(): string
     {
-        return rtrim($this->assetUrl, '/') . '/api.php';
+        return './resources/stubs/api.php';
     }
 
     /**

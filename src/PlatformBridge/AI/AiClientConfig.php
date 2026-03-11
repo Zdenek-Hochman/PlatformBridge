@@ -10,8 +10,7 @@ class AiClientConfig
 {
     public function __construct(
         public readonly string $apiKey,
-        public readonly string $baseUrl = 'https://api.virtualzoom.com/v2/AI',
-        // public readonly string $baseUrl = 'http://localhost/ai/src/PlatformBridge/AI/TEST',
+        public readonly string $baseUrl,
         public readonly int $timeout = 30,
         public readonly int $connectTimeout = 10,
         public readonly int $maxRetries = 3,
@@ -28,8 +27,7 @@ class AiClientConfig
     {
         return new self(
             apiKey: $config['api_key'] ?? throw new \InvalidArgumentException('API key je povinný'),
-            baseUrl: $config['base_url'] ?? 'http://localhost/ai/src/PlatformBridge/AI/TEST',
-            // baseUrl: $config['base_url'] ?? 'https://api.virtualzoom.com/v2/AI',
+            baseUrl: $config['base_url'],
             timeout: $config['timeout'] ?? 30,
             connectTimeout: $config['connect_timeout'] ?? 10,
             verifySsl: $config['verify_ssl'] ?? false,

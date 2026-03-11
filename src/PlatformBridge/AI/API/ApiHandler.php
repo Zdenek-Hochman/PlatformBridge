@@ -242,6 +242,7 @@ final class ApiHandler
             'api_key'     => $this->bridgeConfig['api_key'] ?? "YOUR_API_KEY_HERE",
             'timeout'     => $this->bridgeConfig['timeout'] ?? 30,
             'max_retries' => $this->bridgeConfig['max_retries'] ?? 3,
+			'base_url'    => $this->bridgeConfig['base_url'],
             'debug'       => defined('DEBUG_MODE'),
         ]);
 
