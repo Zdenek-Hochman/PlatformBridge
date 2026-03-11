@@ -21,10 +21,10 @@
     },
     "scripts": {
         "post-install-cmd": [
-            "@php bin/platformbridge install"
+            "@php bin/platformbridge full-install"
         ],
         "post-update-cmd": [
-            "@php bin/platformbridge update"
+            "@php bin/platformbridge full-install"
         ]
     },
     "extra": {
@@ -40,14 +40,16 @@
 	],
 	"archive": {
     	"exclude": [
+			"node_modules",
 			"var",
-			"assets/src",
-			"*.scss",
-			"*.ts",
+			"assets",
+			"docs",
 			"build.mjs",
 			"tsconfig.json",
-			"node_modules",
-			".gitignore"
+			"package.json",
+			"package-lock.json",
+			".gitignore",
+			"demo.php"
     	]
   	},
 	"bin": [

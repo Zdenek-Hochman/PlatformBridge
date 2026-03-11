@@ -22,7 +22,7 @@ final readonly class PlatformBridgeConfig
         private string $cachePath,
         private string $locale,
         private string $bridgeConfigPath,
-        private string $assetUrl = '/public/platformbridge',
+        private string $assetUrl,
         private bool $useHmac = false,
         private ?int $paramsTtl = null,
     ) {
@@ -32,48 +32,47 @@ final readonly class PlatformBridgeConfig
 
     /**
      * Načte konfiguraci z bridge-config.php.
-     *
-     * @return array{0: ?string, 1: ?int} [secretKey, ttl]
-     *
-     * @throws \InvalidArgumentException Pokud chybí nebo je neplatný config
      */
     private function loadBridgeConfig(): array
     {
-        //Pokud je Hmac vypnutý, není potřeba načítat konfiguraci a můžeme vrátit null hodnoty
         if (!$this->useHmac) {
             return [null, null];
         }
 
+        $config = $this->requireBridgeConfig();
+
+        $secretKey = $config['secretKey']
+            ?? throw new \InvalidArgumentException("Bridge config must contain 'secretKey'.");
+
+        $ttl = $this->paramsTtl ?? ($config['ttl'] ?? null);
+
+        return [$secretKey, $ttl];
+    }
+
+    /**
+     * Načte bridge-config.php a vrátí pole.
+     * Funguje stejně na localhost i na serveru – soubor je vždy
+     * v resources/config/bridge-config.php uvnitř balíčku.
+     */
+    private function requireBridgeConfig(): array
+    {
         if (!file_exists($this->bridgeConfigPath)) {
             throw new \InvalidArgumentException(
-                "Bridge config file does not exist: {$this->bridgeConfigPath}"
+                "Bridge config not found: {$this->bridgeConfigPath}"
             );
         }
 
-        // Definujeme konstantu pro bezpečnostní kontrolu v konfiguračním souboru
         if (!defined('BRIDGE_BOOTSTRAPPED')) {
             define('BRIDGE_BOOTSTRAPPED', true);
         }
 
-        // Načteme konfiguraci z externího souboru, který musí vrátit pole s klíči 'secretKey' a volitelně 'ttl'
         $config = require $this->bridgeConfigPath;
 
         if (!is_array($config)) {
-            throw new \InvalidArgumentException(
-                "Bridge config must return an array."
-            );
+            throw new \InvalidArgumentException('Bridge config must return an array.');
         }
 
-        $secretKey = $config['secretKey'] ?? null;
-        $ttl = $this->paramsTtl ?? ($config['ttl'] ?? null);
-
-        if ($secretKey === null) {
-            throw new \InvalidArgumentException(
-                "Bridge config must contain 'secretKey'."
-            );
-        }
-
-        return [$secretKey, $ttl];
+        return $config;
     }
 
     /**
@@ -112,18 +111,14 @@ final readonly class PlatformBridgeConfig
      * Odvozuje se ze stejné base URL jako assety:
      *   - Standalone: '/public/platformbridge/api.php'
      *   - Vendor: '/platformbridge/api.php'
-     *
-     * @return string URL k API endpointu
      */
     public function getApiUrl(): string
     {
-        return './resources/stubs/api.php';
+        return rtrim($this->assetUrl, '/') . '/api.php';
     }
 
     /**
-     * Vrátí cestu ke složce s JSON konfigurací (blocks, layouts, generators).
-     *
-     * @return string Absolutní cesta ke konfiguraci.
+     * Vrátí cestu ke složce s konfiguracemi.
      */
     public function getConfigPath(): string
     {

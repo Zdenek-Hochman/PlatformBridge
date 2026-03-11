@@ -62,7 +62,6 @@ final class Installer
         $this->ensureCacheDir();
         $this->publishAssets();
         $this->publishApiEndpoint();
-        $this->publishConfig();
 
         $this->info("");
         $this->info("PlatformBridge installed successfully!");
@@ -89,6 +88,7 @@ final class Installer
         $this->info("");
 
         $this->buildAssets();
+        $this->cleanupAfterBuild();
         $this->info("");
         $this->install();
     }
@@ -200,6 +200,46 @@ final class Installer
     }
 
     /**
+     * Smaže node_modules po úspěšném buildu.
+     * Zmenší velikost balíčku pro nahrání na server.
+     */
+    private function cleanupAfterBuild(): void
+    {
+        $nodeModules = $this->packageRoot . DIRECTORY_SEPARATOR . 'node_modules';
+
+        if (is_dir($nodeModules)) {
+            $this->info("  Cleaning up node_modules...");
+            $this->removeDirectory($nodeModules);
+            $this->info("  Removed: {$nodeModules}");
+        }
+    }
+
+    /**
+     * Rekurzivně smaže adresář.
+     */
+    private function removeDirectory(string $dir): void
+    {
+        if (!is_dir($dir)) {
+            return;
+        }
+
+        $iterator = new \RecursiveIteratorIterator(
+            new \RecursiveDirectoryIterator($dir, \RecursiveDirectoryIterator::SKIP_DOTS),
+            \RecursiveIteratorIterator::CHILD_FIRST,
+        );
+
+        foreach ($iterator as $item) {
+            if ($item->isDir()) {
+                @rmdir($item->getPathname());
+            } else {
+                @unlink($item->getPathname());
+            }
+        }
+
+        @rmdir($dir);
+    }
+
+    /**
      * Publikuje JS a CSS soubory do public složky.
      *
      * Zdrojové soubory jsou v package: public/platformbridge/js/ a css/
@@ -270,44 +310,6 @@ final class Installer
 
         copy($stubSource, $target);
         $this->info("  Published API endpoint to: {$target}");
-    }
-
-    /**
-     * Publikuje konfigurační soubor (bridge-config.php) do projektu.
-     * Nepřepisuje existující soubor.
-     */
-    private function publishConfig(): void
-    {
-        // Ve standalone režimu nepublikujeme - konfig je už v resources/
-        if (!$this->isVendorInstall()) {
-            $this->info("  Config: using local resources/config/bridge-config.php");
-            return;
-        }
-
-        $target = $this->projectRoot . DIRECTORY_SEPARATOR . 'config'
-            . DIRECTORY_SEPARATOR . 'bridge-config.php';
-
-        // Nepřepisovat existující konfiguraci
-        if (file_exists($target)) {
-            $this->info("  Config already exists: {$target}");
-            return;
-        }
-
-        $stubSource = $this->packageRoot . DIRECTORY_SEPARATOR . 'resources'
-            . DIRECTORY_SEPARATOR . 'stubs' . DIRECTORY_SEPARATOR . 'bridge-config.php';
-
-        if (!file_exists($stubSource)) {
-            $this->info("  [WARNING] Config stub not found: {$stubSource}");
-            return;
-        }
-
-        $targetDir = dirname($target);
-        if (!is_dir($targetDir)) {
-            mkdir($targetDir, 0755, true);
-        }
-
-        copy($stubSource, $target);
-        $this->info("  Published config to: {$target}");
     }
 
     /**
