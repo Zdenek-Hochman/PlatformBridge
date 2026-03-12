@@ -21,10 +21,10 @@
     },
     "scripts": {
         "post-install-cmd": [
-            "@php bin/platformbridge full-install"
+			"@php vendor/zoom/platform-bridge/bin/platformbridge install"
         ],
         "post-update-cmd": [
-            "@php bin/platformbridge full-install"
+            "@php vendor/zoom/platform-bridge/bin/platformbridge update"
         ]
     },
     "extra": {
@@ -38,20 +38,6 @@
             "email": "zdenek.hochman@virtualzoom.com"
         }
 	],
-	"archive": {
-    	"exclude": [
-			"node_modules",
-			"var",
-			"assets",
-			"docs",
-			"build.mjs",
-			"tsconfig.json",
-			"package.json",
-			"package-lock.json",
-			".gitignore",
-			"demo.php"
-    	]
-  	},
 	"bin": [
     	"bin/platformbridge"
   	]

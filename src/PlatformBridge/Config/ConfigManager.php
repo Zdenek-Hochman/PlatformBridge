@@ -32,25 +32,28 @@ final class ConfigManager
     /** @var array<string, array> */
     private array $generators = [];
 
-    private ConfigLoader $loader;
     private ConfigValidator $validator;
     private ConfigResolver $resolver;
 
     /**
-     * @param string $configDir Cesta ke složce s JSON konfiguracemi
+     * @param ConfigLoader $loader Loader s fallback mechanikou
      */
-    public function __construct(private readonly string $configDir) {
+    public function __construct(private readonly ConfigLoader $loader) {
         $this->validator = new ConfigValidator();
-        $this->loader = new ConfigLoader($configDir, $this->validator);
         $this->resolver = new ConfigResolver();
     }
 
     /**
      * Tovární metoda - vytvoří a načte konfiguraci.
+     *
+     * @param string $userConfigPath     Cesta k uživatelským JSON souborům
+     * @param string $packageDefaultsPath Cesta k výchozím JSON souborům balíčku
      */
-    public static function create(string $configDir): self
+    public static function create(string $userConfigPath, string $packageDefaultsPath): self
     {
-        $manager = new self($configDir);
+        $validator = new ConfigValidator();
+        $loader = new ConfigLoader($userConfigPath, $packageDefaultsPath, $validator);
+        $manager = new self($loader);
         $manager->load();
         return $manager;
     }

@@ -4,12 +4,10 @@ import { sassPlugin } from "esbuild-sass-plugin";
 const watch = process.argv.includes("--watch");
 const isProd = process.argv.includes("--prod");
 
-/* ---------- TS build ---------- */
+// ✅ Output vždy do dist/ (ne do public/)
 const tsCtx = await esbuild.context({
-	entryPoints: [
-		"assets/ts/pb-main.ts"
-	],
-	outdir: "public/platformbridge/js",
+	entryPoints: ["assets/ts/pb-main.ts"],
+	outdir: "dist/js",
 	bundle: true,
 	minify: isProd,
 	sourcemap: !isProd,
@@ -17,24 +15,16 @@ const tsCtx = await esbuild.context({
 	tsconfig: "tsconfig.json"
 });
 
-/* ---------- SCSS build ---------- */
 const scssCtx = await esbuild.context({
-	entryPoints: [
-		"assets/scss/pb-main.scss"
-	],
+	entryPoints: ["assets/scss/pb-main.scss"],
 	entryNames: "[name]",
-	outdir: "public/platformbridge/css",
+	outdir: "dist/css",
 	bundle: true,
 	minify: isProd,
 	sourcemap: !isProd,
-	plugins: [
-		sassPlugin({
-			loadPaths: ["assets/scss"]
-		})
-	]
+	plugins: [sassPlugin({ loadPaths: ["assets/scss"] })]
 });
 
-/* ---------- BUILD / WATCH ---------- */
 if (watch) {
 	await tsCtx.watch();
 	await scssCtx.watch();
@@ -44,5 +34,5 @@ if (watch) {
 	await scssCtx.rebuild();
 	await tsCtx.dispose();
 	await scssCtx.dispose();
-	console.log("[esbuild] Build complete.");
+	console.log("[esbuild] Build complete → dist/");
 }

@@ -1,4 +1,5 @@
 #!/usr/bin/env php
+chmod +x bin/platformbridge
 <?php
 
 /**
@@ -7,10 +8,10 @@
  * Instalace a aktualizace assetů a konfigurace.
  *
  * Usage:
- *   php vendor/bin/platformbridge install        - Kompletní instalace (assety + API + config)
- *   php vendor/bin/platformbridge update         - Aktualizace assetů a API endpointu
- *   php vendor/bin/platformbridge full-install   - npm install + npm build + instalace
- *   php vendor/bin/platformbridge build          - Pouze npm install + npm build
+ *   php vendor/bin/platformbridge install          - Kompletní instalace (assety + API + config + JSON)
+ *   php vendor/bin/platformbridge update           - Aktualizace assetů a API endpointu
+ *   php vendor/bin/platformbridge publish:config   - Publikuje POUZE konfiguraci (bridge-config.php)
+ *   php vendor/bin/platformbridge publish:json     - Publikuje POUZE JSON soubory
  *
  * @see \Zoom\PlatformBridge\Installer\Installer
  */
@@ -49,26 +50,22 @@ switch ($command) {
         $installer->update();
         break;
 
-    case 'full-install':
-        $installer->fullInstall();
+    case 'publish:config':
+        $installer->publishConfig();
         break;
 
-    case 'build':
-        $buildScript = $argv[2] ?? 'build';
-        $success = $installer->buildAssets($buildScript);
-        if (!$success) {
-            exit(1);
-        }
+    case 'publish:json':
+        $installer->publishJson();
         break;
 
     default:
         fwrite(STDERR, "Unknown command: {$command}\n");
-        fwrite(STDERR, "Usage: platformbridge [install|update|full-install|build]\n");
+        fwrite(STDERR, "Usage: platformbridge [install|update|publish:config|publish:json]\n");
         fwrite(STDERR, "\n");
         fwrite(STDERR, "Commands:\n");
-        fwrite(STDERR, "  install        Publish assets, API endpoint and config\n");
-        fwrite(STDERR, "  update         Update assets and API endpoint (keeps config)\n");
-        fwrite(STDERR, "  full-install   npm install + npm build + install\n");
-        fwrite(STDERR, "  build [script] Run npm install + npm build (default: 'build')\n");
+        fwrite(STDERR, "  install          Publish assets, API endpoint, config and JSON files\n");
+        fwrite(STDERR, "  update           Update assets and API endpoint (keeps config)\n");
+        fwrite(STDERR, "  publish:config   Publish ONLY bridge-config.php (skip if exists)\n");
+        fwrite(STDERR, "  publish:json     Publish ONLY JSON config files (skip if exists)\n");
         exit(1);
 }

@@ -9,10 +9,12 @@ use Zoom\PlatformBridge\Config\Exception\ConfigException;
 /**
  * Načítá konfigurační JSON soubory pro PlatformBridge.
  *
- * Zodpovídá za:
- * - Načítání JSON souborů z disku
- * - Parsování JSON obsahu
- * - Validace pomocí ConfigValidator
+ * Podporuje fallback mechaniku:
+ *   1. Uživatelský soubor (config/platform-bridge/*.json)
+ *   2. Package default  (vendor/.../resources/defaults/*.json)
+ *
+ * Strategie: Pokud existuje uživatelský soubor → použij POUZE ten (full override).
+ *            Pokud neexistuje → použij package default.
  */
 final class ConfigLoader
 {
@@ -20,20 +22,27 @@ final class ConfigLoader
     private const LAYOUTS_FILE = 'layouts.json';
     private const GENERATORS_FILE = 'generators.json';
 
-    public function __construct(private readonly string $configDir, private readonly ConfigValidator $validator) {}
+    /**
+     * @param string $userConfigPath     Cesta k uživatelské konfiguraci (může neexistovat)
+     * @param string $packageDefaultsPath Cesta k výchozím JSON souborům balíčku
+     * @param ConfigValidator $validator   Validátor konfigurací
+     */
+    public function __construct(
+        private readonly string $userConfigPath,
+        private readonly string $packageDefaultsPath,
+        private readonly ConfigValidator $validator,
+    ) {}
 
     /**
      * Načte a zvaliduje všechny konfigurační soubory.
      *
      * @return array{blocks: array, layouts: array, generators: array}
-	 *
+     *
      * @throws ConfigException
      */
     public function load(): array
     {
-        $this->validateConfigDir();
-
-        // Načtení raw JSON dat
+        // Načtení raw JSON dat s fallbackem
         $blocksJson = $this->loadJsonFile(self::BLOCKS_FILE);
         $layoutsJson = $this->loadJsonFile(self::LAYOUTS_FILE);
         $generatorsJson = $this->loadJsonFile(self::GENERATORS_FILE);
@@ -56,59 +65,80 @@ final class ConfigLoader
     /**
      * Načte pouze konkrétní soubor bez validace.
      *
-     * Užitečné pro debugging nebo částečné načtení.
-     *
      * @param string $filename Název souboru
-	 *
+     *
      * @return array Raw data
-	 *
+     *
      * @throws ConfigException
      */
     public function loadRaw(string $filename): array
     {
-        $this->validateConfigDir();
         return $this->loadJsonFile($filename);
     }
 
     /**
-     * Vrátí cestu ke konfiguračnímu adresáři.
-	 *
-	 * @return string Cesta ke konfiguračnímu adresáři
+     * Zjistí, zda je používán uživatelský override.
+     */
+    public function isUserOverride(string $filename): bool
+    {
+        return file_exists($this->userConfigPath . DIRECTORY_SEPARATOR . $filename);
+    }
+
+    /**
+     * Vrátí cestu ke konfiguračnímu adresáři (resolved).
+     *
+     * @return string Cesta ke konfiguračnímu adresáři
      */
     public function getConfigDir(): string
     {
-        return $this->configDir;
-    }
-
-	/**
-	 * Ověří, že konfigurační adresář existuje.
-	 *
-	 * @throws ConfigException Pokud adresář neexistuje
-	 */
-    private function validateConfigDir(): void
-    {
-        if (!is_dir($this->configDir)) {
-            throw ConfigException::directoryNotFound($this->configDir);
+        if (is_dir($this->userConfigPath)) {
+            return $this->userConfigPath;
         }
+        return $this->packageDefaultsPath;
     }
 
-	/**
-	 * Načte a zparsuje JSON soubor z konfiguračního adresáře.
-	 *
-	 * @param string $filename Název souboru k načtení
-	 *
-	 * @return array Parsovaná data z JSON souboru
-	 *
-	 * @throws ConfigException Pokud soubor neexistuje, nelze ho přečíst nebo má neplatný JSON
-	 */
+    /**
+     * Načte a zparsuje JSON soubor s fallbackem.
+     *
+     * Priorita:
+     *   1. Uživatelský soubor (userConfigPath/filename)
+     *   2. Package default (packageDefaultsPath/filename)
+     *
+     * @param string $filename Název souboru k načtení
+     *
+     * @return array Parsovaná data z JSON souboru
+     *
+     * @throws ConfigException Pokud soubor neexistuje ani ve fallbacku
+     */
     private function loadJsonFile(string $filename): array
     {
-        $path = $this->configDir . DIRECTORY_SEPARATOR . $filename;
-
-        if (!file_exists($path)) {
-            throw ConfigException::fileNotFound($path);
+        // 1. User override
+        $userFile = $this->userConfigPath . DIRECTORY_SEPARATOR . $filename;
+        if (file_exists($userFile)) {
+            return $this->parseJsonFile($userFile, $filename);
         }
 
+        // 2. Package default
+        $defaultFile = $this->packageDefaultsPath . DIRECTORY_SEPARATOR . $filename;
+        if (file_exists($defaultFile)) {
+            return $this->parseJsonFile($defaultFile, $filename);
+        }
+
+        throw ConfigException::fileNotFound($filename);
+    }
+
+    /**
+     * Parsuje JSON soubor.
+     *
+     * @param string $path     Absolutní cesta k souboru
+     * @param string $filename Název souboru pro chybové hlášky
+     *
+     * @return array Parsovaná data
+     *
+     * @throws ConfigException
+     */
+    private function parseJsonFile(string $path, string $filename): array
+    {
         $content = file_get_contents($path);
 
         if ($content === false) {

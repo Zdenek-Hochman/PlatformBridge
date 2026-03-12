@@ -21,10 +21,11 @@ use Zoom\PlatformBridge\PlatformBridge;
 // PŘÍKLAD 2: Vytvoření instance s vlastní konfigurací
 // ============================================================================
 $bridge = PlatformBridge::create()
+    // Pro standalone režim: explicitní cesty ke konfiguraci
+    // Ve vendor režimu se cesty resolví automaticky přes PathResolver
     ->withConfigPath(__DIR__ . '/resources/config/defaults')
     ->withViewsPath(__DIR__ . '/resources/views')
     ->withCachePath(__DIR__ . '/var/cache')
-    // ->withTranslationsPath(__DIR__ . '/resources/translations');
     // ->withLocale('cs');
     // HMAC podepisování - zapnout/vypnout (secret key se načítá z bridge-config.php)
     ->withSecretKey(true)

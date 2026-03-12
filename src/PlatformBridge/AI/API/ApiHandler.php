@@ -9,7 +9,10 @@ use Zoom\PlatformBridge\AI\AiClientConfig;
 use Zoom\PlatformBridge\AI\AiException;
 use Zoom\PlatformBridge\AI\AiResponse;
 use Zoom\PlatformBridge\AI\AiResponseRenderer;
+use Zoom\PlatformBridge\Config\ConfigLoader;
 use Zoom\PlatformBridge\Config\ConfigManager;
+use Zoom\PlatformBridge\Config\ConfigValidator;
+use Zoom\PlatformBridge\Config\PathResolver;
 use Zoom\PlatformBridge\Security\SecurityException;
 use Zoom\PlatformBridge\Security\SignedParams;
 
@@ -44,11 +47,19 @@ final class ApiHandler
     }
 
     /**
-     * Bootstrap s automatickou detekcí cest.
+     * Bootstrap s automatickou detekcí cest přes PathResolver.
      */
     public static function bootstrap(): self
     {
-        [$configPath, $configDir] = self::resolveConfigPaths();
+        $paths = new PathResolver();
+
+        if (!defined('BRIDGE_BOOTSTRAPPED')) {
+            define('BRIDGE_BOOTSTRAPPED', true);
+        }
+
+        $configPath = $paths->resolvedBridgeConfigFile();
+        $configDir = $paths->resolvedConfigPath();
+
         return new self($configPath, $configDir);
     }
 
@@ -113,8 +124,15 @@ final class ApiHandler
         $name = $params['config']['endpoint']
             ?? throw AiException::invalidRequest('Chybí název endpointu v konfiguraci.');
 
+        $paths = new PathResolver();
+        $loader = new ConfigLoader(
+            $paths->userConfigPath(),
+            $paths->packageDefaultsPath(),
+            new ConfigValidator(),
+        );
+
         $registry = EndpointRegistry::getInstance();
-        $registry->setConfigManager(ConfigManager::create($this->configDir));
+        $registry->setConfigManager(new ConfigManager($loader));
 
         $endpoint = $registry->getOrFail($name);
 
@@ -201,30 +219,6 @@ final class ApiHandler
     }
 
     // ─── Konfigurace ────────────────────────────────────────────
-
-    private static function resolveConfigPaths(): array
-    {
-        $packageRoot = dirname(__DIR__, 4);
-        $isVendor    = file_exists(
-            dirname($packageRoot, 2) . DIRECTORY_SEPARATOR . 'autoload.php',
-        );
-        $projectRoot = $isVendor ? dirname($packageRoot, 3) : $packageRoot;
-
-        // Bridge config: project-level má přednost před package-level
-        $projectConfig = $projectRoot . DIRECTORY_SEPARATOR . 'config'
-            . DIRECTORY_SEPARATOR . 'bridge-config.php';
-
-        $configPath = file_exists($projectConfig)
-            ? $projectConfig
-            : $packageRoot . DIRECTORY_SEPARATOR . 'resources'
-                . DIRECTORY_SEPARATOR . 'config'
-                . DIRECTORY_SEPARATOR . 'bridge-config.php';
-
-        $configDir = $packageRoot . DIRECTORY_SEPARATOR . 'resources'
-            . DIRECTORY_SEPARATOR . 'config' . DIRECTORY_SEPARATOR . 'defaults';
-
-        return [$configPath, $configDir];
-    }
 
     private function loadConfig(): array
     {

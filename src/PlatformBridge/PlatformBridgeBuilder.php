@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Zoom\PlatformBridge;
 
+use Zoom\PlatformBridge\Config\PathResolver;
+
 /**
  * Builder pro konfiguraci PlatformBridge instance.
  *
@@ -34,6 +36,14 @@ final class PlatformBridgeBuilder
     private ?string $assetUrl = null;
     private bool $useHmac = false;
     private ?int $paramsTtl = null;
+
+    // PathResolver se vytvoří jednou a sdílí
+    private PathResolver $paths;
+
+    public function __construct()
+    {
+        $this->paths = new PathResolver(dirname(__DIR__, 2));
+    }
 
     /**
      * Nastaví cestu ke složce s JSON konfigurací
@@ -165,15 +175,14 @@ final class PlatformBridgeBuilder
     public function build(): PlatformBridge
     {
         $config = new PlatformBridgeConfig(
-            configPath: $this->resolveConfigPath(),
-            viewsPath: $this->resolveViewsPath(),
-            cachePath: $this->resolveCachePath(),
-            // translationsPath: $this->resolveTranslationsPath(),
-            locale: $this->locale,
-            bridgeConfigPath: $this->resolveBridgeConfigPath(),
-            assetUrl: $this->resolveAssetUrl(),
-            useHmac: $this->useHmac,
-            paramsTtl: $this->paramsTtl,
+            configPath:       $this->configPath       ?? $this->paths->resolvedConfigPath(),
+            viewsPath:        $this->viewsPath        ?? $this->paths->packageViewsPath(),
+            cachePath:        $this->cachePath         ?? $this->paths->cachePath(),
+            locale:           $this->locale,
+            bridgeConfigPath: $this->bridgeConfigPath  ?? $this->paths->resolvedBridgeConfigFile(),
+            assetUrl:         $this->assetUrl          ?? $this->resolveAssetUrl(),
+            useHmac:          $this->useHmac,
+            paramsTtl:        $this->paramsTtl,
         );
 
         return PlatformBridge::fromConfig($config);
@@ -191,53 +200,11 @@ final class PlatformBridgeBuilder
     }
 
     /**
-     * Vrátí výchozí cestu k resources v rámci balíčku (fallback pro všechny složky).
-     *
-     * @return string Absolutní cesta k resources
+     * Vrátí PathResolver pro přístup k cestám.
      */
-    private function getPackageResourcesPath(): string
+    public function getPathResolver(): PathResolver
     {
-        return dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'resources';
-    }
-
-    /**
-     * Vrátí výslednou cestu ke konfiguraci (s fallbackem na resources/config/defaults).
-     *
-     * @return string
-     */
-    private function resolveConfigPath(): string
-    {
-        return $this->configPath ?? $this->getPackageResourcesPath() . DIRECTORY_SEPARATOR . 'config' . DIRECTORY_SEPARATOR . 'defaults';
-    }
-
-    /**
-     * Vrátí výslednou cestu ke konfiguračnímu souboru bridge-config.php.
-     *
-     * @return string
-     */
-    private function resolveBridgeConfigPath(): string
-    {
-        return $this->bridgeConfigPath ?? $this->getPackageResourcesPath() . DIRECTORY_SEPARATOR . 'config' . DIRECTORY_SEPARATOR . 'bridge-config.php';
-    }
-
-    /**
-     * Vrátí výslednou cestu ke složce se šablonami (views).
-     *
-     * @return string
-     */
-    private function resolveViewsPath(): string
-    {
-        return $this->viewsPath ?? $this->getPackageResourcesPath() . DIRECTORY_SEPARATOR . 'views';
-    }
-
-    /**
-     * Vrátí výslednou cestu ke složce s překlady (translations).
-     *
-     * @return string
-     */
-    private function resolveTranslationsPath(): string
-    {
-        return $this->translationsPath ?? $this->getPackageResourcesPath() . DIRECTORY_SEPARATOR . 'translations';
+        return $this->paths;
     }
 
     /**
@@ -251,33 +218,8 @@ final class PlatformBridgeBuilder
      */
     private function resolveAssetUrl(): string
     {
-        if ($this->assetUrl !== null) {
-            return $this->assetUrl;
-        }
-
         return \Zoom\PlatformBridge\Installer\Installer::getDefaultAssetUrl(
-            dirname(__DIR__, 2)
+            $this->paths->packageRoot()
         );
-    }
-
-    /**
-     * Vrátí výslednou cestu ke složce pro cache šablon.
-     * Pokud složka neexistuje, automaticky ji vytvoří.
-     *
-     * @return string
-     */
-    private function resolveCachePath(): string
-    {
-        if ($this->cachePath) {
-            return $this->cachePath;
-        }
-
-        $defaultCache = dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'var' . DIRECTORY_SEPARATOR . 'cache';
-
-        if (!is_dir($defaultCache)) {
-            @mkdir($defaultCache, 0755, true);
-        }
-
-        return $defaultCache;
     }
 }

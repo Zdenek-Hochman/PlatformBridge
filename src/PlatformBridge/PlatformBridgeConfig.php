@@ -11,7 +11,7 @@ namespace Zoom\PlatformBridge;
  *
  * @see PlatformBridgeBuilder Pro doporučený způsob vytváření konfigurace
  */
-final readonly class PlatformBridgeConfig
+final  class PlatformBridgeConfig
 {
     private ?string $secretKey;
     private ?int $resolvedTtl;
@@ -82,6 +82,8 @@ final readonly class PlatformBridgeConfig
      */
     private function validatePaths(): void
     {
+		//TODO: Odamzat hardcode přepsát na cesty z builderu, které se sem předávají
+		$this->configPath = "resources/defaults";
         if (!is_dir($this->configPath)) {
             throw new \InvalidArgumentException(
                 "Config path does not exist: {$this->configPath}"

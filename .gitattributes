@@ -1,6 +1,25 @@
-tsconfig.json export-ignore
-build.mjs export-ignore
-/var/cache export-ignore
-/node_modules export-ignore
-/docs export-ignore
-/assets/src export-ignore
+# ─── Exclude from Composer distribution ──────────────────────────
+# Tyto soubory existují v git repozitáři ale NE v composer install.
+# Funguje s `composer install --prefer-dist` (výchozí).
+
+# Vývojové soubory
+/assets                 export-ignore
+/build.mjs              export-ignore
+/tsconfig.json          export-ignore
+/package.json           export-ignore
+/package-lock.json      export-ignore
+
+# Testy a dokumentace
+/docs                   export-ignore
+/demo.php               export-ignore
+/index.php              export-ignore
+
+# Runtime cache a temp soubory
+/var                    export-ignore
+/node_modules           export-ignore
+
+# CI/CD
+/.github                export-ignore
+
+# Staré public/ (nahrazeno dist/)
+/public                 export-ignore

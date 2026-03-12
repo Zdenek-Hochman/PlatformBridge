@@ -6,6 +6,9 @@ namespace Zoom\PlatformBridge;
 
 use Zoom\PlatformBridge\Asset\AssetManager;
 use Zoom\PlatformBridge\Config\ConfigManager;
+use Zoom\PlatformBridge\Config\ConfigLoader;
+use Zoom\PlatformBridge\Config\ConfigValidator;
+use Zoom\PlatformBridge\Config\PathResolver;
 use Zoom\PlatformBridge\Handler\HandlerRegistry;
 use Zoom\PlatformBridge\Handler\FieldFactory;
 use Zoom\PlatformBridge\Template\Engine;
@@ -84,7 +87,13 @@ final class PlatformBridge
         // $this->translator = new Translator($this->config->getTranslationsPath(), $this->config->getLocale());
 
         // 2. Načtení konfigurace (bloky, layouty, generátory)
-        $this->configManager = new ConfigManager($this->config->getConfigPath());
+        $paths = new PathResolver(dirname(__DIR__, 2));
+        $loader = new ConfigLoader(
+            userConfigPath: $paths->userConfigPath(),
+            packageDefaultsPath: $paths->packageDefaultsPath(),
+            validator: new ConfigValidator(),
+        );
+        $this->configManager = new ConfigManager($loader);
         $this->configManager->load();
         // 3. Inicializace template engine
         $this->templateEngine = new Engine([
