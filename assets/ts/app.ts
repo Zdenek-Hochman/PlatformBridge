@@ -88,6 +88,8 @@ export class App {
 
 		if (!url) {
 			console.warn('[PlatformBridge] data-api-url not found on .ai-module, using fallback');
+			// Fallback: produkce → public/platformbridge/api.php
+			// Na localhost se data-api-url nastaví z PHP na resources/stubs/api.php
 			return '/public/platformbridge/api.php';
 		}
 

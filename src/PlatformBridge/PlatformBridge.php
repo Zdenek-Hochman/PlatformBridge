@@ -79,41 +79,57 @@ final class PlatformBridge
      *
      * @return void
      */
+    /**
+     * Inicializuje všechny hlavní komponenty knihovny PlatformBridge.
+     * Provádí registraci error handleru, načtení konfigurace, inicializaci šablonovacího enginu,
+     * registraci handlerů, vytvoření rendereru formulářů, asset manageru a podepisování parametrů.
+     */
     private function boot(): void
     {
+        // 1. Registrace globálního error handleru pro lepší zachytávání chyb v rámci knihovny
         (new ErrorHandler())->register();
 
-        // 1. Inicializace překladů
+        // 2. Inicializace překladů (zatím zakomentováno, připraveno pro budoucí použití)
         // $this->translator = new Translator($this->config->getTranslationsPath(), $this->config->getLocale());
 
-        // 2. Načtení konfigurace (bloky, layouty, generátory)
+        // 3. Vytvoření resolveru cest pro správné určení umístění konfiguračních a dalších souborů
         $paths = new PathResolver(dirname(__DIR__, 2));
+
+        // 4. Načtení konfigurace (bloky, layouty, generátory) s validací
         $loader = new ConfigLoader(
-            userConfigPath: $paths->userConfigPath(),
-            packageDefaultsPath: $paths->packageDefaultsPath(),
-            validator: new ConfigValidator(),
+            $paths->userConfigPath(),           // Uživatelská konfigurace (pokud existuje)
+            $paths->packageDefaultsPath(),      // Výchozí konfigurace balíčku
+            new ConfigValidator()               // Validátor konfigurace
         );
+
         $this->configManager = new ConfigManager($loader);
         $this->configManager->load();
-        // 3. Inicializace template engine
+
+        // 5. Inicializace šablonovacího enginu s cestami k šablonám a cache
         $this->templateEngine = new Engine([
-            'tpl_dir' => $this->config->getViewsPath(),
-            'cache_dir' => $this->config->getCachePath(),
+            'tpl_dir' => $this->config->getViewsPath(),   // Cesta k view šablonám
+            'cache_dir' => $this->config->getCachePath(), // Cesta ke cache
             'debug' => false,
         ]);
 
-        // 4. Registrace handlerů
+        // 6. Registrace handlerů a vytvoření továrny na pole (FieldFactory)
         $this->handlerRegistry = $this->createHandlerRegistry();
         $this->fieldFactory = new FieldFactory($this->handlerRegistry);
 
-        // 5. Form renderer
-        $this->formRenderer = new FormRenderer($this->fieldFactory, $this->configManager, $this->templateEngine);
+        // 7. Inicializace rendereru formulářů s továrnou, konfigurací a šablonovacím enginem
+        $this->formRenderer = new FormRenderer(
+            $this->fieldFactory,
+            $this->configManager,
+            $this->templateEngine
+        );
 
-        // 6. Asset manager - URL se detekuje automaticky (standalone vs vendor)
+        // 8. Inicializace asset manageru pro správu a generování HTML assetů (CSS/JS)
+        // URL se detekuje automaticky podle režimu (standalone vs vendor)
         $this->assetManager = new AssetManager($this->config->getAssetUrl());
 
-        // 7. Signed params (pokud je nastaven secret key)
+        // 9. Inicializace podepisování parametrů, pokud je nastaven secret key
         $secretKey = $this->config->getSecretKey();
+
         if ($secretKey !== null) {
             $this->signedParams = new SignedParams($secretKey, $this->config->getParamsTtl());
         }
@@ -141,10 +157,6 @@ final class PlatformBridge
 
         return $registry;
     }
-
-    // =========================================================================
-    // PUBLIC API
-    // =========================================================================
 
     /**
      * Vykreslí formulář podle ID generátoru.
@@ -189,6 +201,10 @@ final class PlatformBridge
             'params'       => $this->buildRawParams($params),
             'apiUrl'       => $this->config->getApiUrl(),
         ];
+
+		echo "<pre>";
+		// \var_dump($template);
+		echo "</pre>";
 
         $html = $this->templateEngine->assign($template)->render('/Atoms/Wrapper');
 

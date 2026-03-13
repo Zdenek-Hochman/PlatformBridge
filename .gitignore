@@ -6,12 +6,11 @@
 composer.lock
 
 # Build output (generováno přes npm run build)
-/public/platformbridge/js/
-/public/platformbridge/css/
-/public/platformbridge/*.map
+/dist/
 
-# Starý build output
-/assets/dist/
+# Generated at install (php vendor/bin/platformbridge install)
+/d/platformbridge/
+/public/platformbridge/
 
 # Cache files
 /var/cache/*.cache.php

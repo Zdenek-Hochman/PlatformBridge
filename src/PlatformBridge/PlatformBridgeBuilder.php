@@ -34,6 +34,7 @@ final class PlatformBridgeBuilder
     private string $locale = 'cs';
     private ?string $bridgeConfigPath = null;
     private ?string $assetUrl = null;
+    private ?string $apiUrl = null;
     private bool $useHmac = false;
     private ?int $paramsTtl = null;
 
@@ -122,10 +123,9 @@ final class PlatformBridgeBuilder
     /**
      * Nastaví URL pro načítání assetů (JS/CSS).
      *
-     * Pokud není nastaveno, automaticky se detekuje z DOCUMENT_ROOT:
-     *   - doc root = project/public  → '/platformbridge'
-     *   - doc root = project root    → '/public/platformbridge'
-     *   - doc root = parent          → '/{basePath}/public/platformbridge'
+     * Pokud není nastaveno, automaticky se detekuje:
+     *   - Standalone (dev): '/dist' (build output)
+     *   - Vendor (prod): '/platformbridge' nebo '/public/platformbridge'
      *
      * @param string $url URL ke složce s js/ a css/ podsložkami
      * @return self
@@ -133,6 +133,22 @@ final class PlatformBridgeBuilder
     public function withAssetUrl(string $url): self
     {
         $this->assetUrl = $url;
+        return $this;
+    }
+
+    /**
+     * Nastaví URL k API endpointu.
+     *
+     * Pokud není nastaveno, automaticky se detekuje:
+     *   - Standalone (dev): '/resources/stubs/api.php'
+     *   - Vendor (prod): '/public/platformbridge/api.php'
+     *
+     * @param string $url URL k API endpointu
+     * @return self
+     */
+    public function withApiUrl(string $url): self
+    {
+        $this->apiUrl = $url;
         return $this;
     }
 
@@ -181,6 +197,7 @@ final class PlatformBridgeBuilder
             locale:           $this->locale,
             bridgeConfigPath: $this->bridgeConfigPath  ?? $this->paths->resolvedBridgeConfigFile(),
             assetUrl:         $this->assetUrl          ?? $this->resolveAssetUrl(),
+            apiUrl:           $this->apiUrl            ?? $this->resolveApiUrl(),
             useHmac:          $this->useHmac,
             paramsTtl:        $this->paramsTtl,
         );
@@ -212,13 +229,33 @@ final class PlatformBridgeBuilder
      *
      * Priorita:
      *   1. Explicitně nastavená URL přes withAssetUrl()
-     *   2. Auto-detekce na základě vendor/standalone režimu
+     *   2. Auto-detekce:
+     *      - Standalone (dev): '/dist'
+     *      - Vendor (prod): '/platformbridge' nebo '/public/platformbridge'
      *
      * @return string URL ke složce s assety
      */
     private function resolveAssetUrl(): string
     {
         return \Zoom\PlatformBridge\Installer\Installer::getDefaultAssetUrl(
+            $this->paths->packageRoot()
+        );
+    }
+
+    /**
+     * Vrátí výslednou URL pro API endpoint.
+     *
+     * Priorita:
+     *   1. Explicitně nastavená URL přes withApiUrl()
+     *   2. Auto-detekce:
+     *      - Standalone (dev): '/resources/stubs/api.php'
+     *      - Vendor (prod): '/public/platformbridge/api.php'
+     *
+     * @return string URL k API endpointu
+     */
+    private function resolveApiUrl(): string
+    {
+        return \Zoom\PlatformBridge\Installer\Installer::getDefaultApiUrl(
             $this->paths->packageRoot()
         );
     }

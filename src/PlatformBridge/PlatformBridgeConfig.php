@@ -23,6 +23,7 @@ final  class PlatformBridgeConfig
         private string $locale,
         private string $bridgeConfigPath,
         private string $assetUrl,
+        private string $apiUrl,
         private bool $useHmac = false,
         private ?int $paramsTtl = null,
     ) {
@@ -82,8 +83,8 @@ final  class PlatformBridgeConfig
      */
     private function validatePaths(): void
     {
-		//TODO: Odamzat hardcode přepsát na cesty z builderu, které se sem předávají
-		$this->configPath = "resources/defaults";
+		// TODO: Odamzat hardcode přepsát na cesty z builderu, které se sem předávají
+		// $this->configPath = "resources/defaults";
         if (!is_dir($this->configPath)) {
             throw new \InvalidArgumentException(
                 "Config path does not exist: {$this->configPath}"
@@ -110,13 +111,13 @@ final  class PlatformBridgeConfig
     /**
      * Vrátí URL k API endpointu.
      *
-     * Odvozuje se ze stejné base URL jako assety:
-     *   - Standalone: '/public/platformbridge/api.php'
-     *   - Vendor: '/platformbridge/api.php'
+     * URL se resolvuje samostatně od asset URL:
+     *   - Standalone (dev): '/resources/stubs/api.php'
+     *   - Vendor (prod): '/public/platformbridge/api.php'
      */
     public function getApiUrl(): string
     {
-        return rtrim($this->assetUrl, '/') . '/api.php';
+        return $this->apiUrl;
     }
 
     /**

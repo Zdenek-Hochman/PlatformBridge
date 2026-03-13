@@ -107,10 +107,16 @@ final class Installer
     }
 
     /**
-     * Publikuje dist/ assety do public/ (VŽDY přepíše).
+     * Publikuje dist/ assety do public/platformbridge/ (VŽDY přepíše).
+     * V standalone režimu se přeskočí – dev používá dist/ přímo.
      */
     private function publishAssets(): void
     {
+        if (!$this->paths->isVendor()) {
+            $this->info("  ⏭️  Standalone mode: assets served from dist/ directly (skipped)");
+            return;
+        }
+
         $distPath = $this->paths->packageDistPath();
         $targetPath = $this->paths->publicAssetsPath();
 
@@ -128,16 +134,25 @@ final class Installer
 
     /**
      * Publikuje API endpoint (bez přepisu).
+     *
+     * Vendor: {projectRoot}/public/platformbridge/api.php
+     * Standalone: používá přímo resources/stubs/api.php (bez kopírování)
      */
     private function publishApiEndpoint(): void
     {
+        if (!$this->paths->isVendor()) {
+            $this->info("  ⏭️  Standalone mode: using resources/stubs/api.php directly (skipped)");
+            return;
+        }
+
         $stub = $this->paths->packageStubsPath() . '/api.php';
         $target = $this->paths->publicAssetsPath() . '/api.php';
+        $label = 'public/platformbridge/api.php';
 
         $written = $this->publisher->publish($stub, $target, overwrite: false);
         $this->info($written
-            ? "  ✅ Published: public/platformbridge/api.php"
-            : "  ⏭️  Skipped:   public/platformbridge/api.php (exists)"
+            ? "  ✅ Published: {$label}"
+            : "  ⏭️  Skipped:   {$label} (exists)"
         );
     }
 
@@ -160,8 +175,9 @@ final class Installer
     /**
      * Vrátí výchozí web-accessible URL pro assety.
      *
-     * Dynamicky detekuje cestu z DOCUMENT_ROOT ke složce
-     * {projectRoot}/public/platformbridge.
+     * Dynamicky detekuje cestu z DOCUMENT_ROOT:
+     *   - Standalone (dev): cesta k dist/ složce
+     *   - Vendor (prod): cesta k public/platformbridge složce
      *
      * @param string $packageRoot Absolutní cesta ke kořeni balíčku
      * @return string URL relativní k document root
@@ -173,19 +189,28 @@ final class Installer
         $projectRoot = $isVendor ? dirname($packageRoot, 3) : $packageRoot;
 
         if (php_sapi_name() !== 'cli' && !empty($_SERVER['DOCUMENT_ROOT'])) {
-            $url = self::resolveAssetUrlFromDocRoot($projectRoot);
+            $url = self::resolveAssetUrlFromDocRoot($projectRoot, $isVendor);
             if ($url !== null) {
                 return $url;
             }
         }
 
-        return $isVendor ? '/platformbridge' : '/public/platformbridge';
+        // Fallback:
+        // Vendor → /platformbridge (předpokládá doc root = {projectRoot}/public)
+        // Standalone → /dist (build output přímo z balíčku)
+        return $isVendor ? '/platformbridge' : '/dist';
     }
 
     /**
      * Vypočítá URL k assets relativně k DOCUMENT_ROOT.
+     *
+     * Standalone (dev): resolvuje cestu k dist/ složce
+     * Vendor (prod): resolvuje cestu k public/platformbridge složce
+     *
+     * @param string $projectRoot Absolutní cesta ke kořeni projektu
+     * @param bool $isVendor Zda běžíme ve vendor režimu
      */
-    private static function resolveAssetUrlFromDocRoot(string $projectRoot): ?string
+    private static function resolveAssetUrlFromDocRoot(string $projectRoot, bool $isVendor): ?string
     {
         $docRoot = realpath($_SERVER['DOCUMENT_ROOT']);
         if ($docRoot === false) {
@@ -194,8 +219,14 @@ final class Installer
 
         $docRoot = str_replace('\\', '/', rtrim($docRoot, '/\\'));
 
-        $assetsPath = $projectRoot . DIRECTORY_SEPARATOR . 'public'
-            . DIRECTORY_SEPARATOR . 'platformbridge';
+        // Cílová složka závisí na režimu:
+        //   Vendor  → {projectRoot}/public/platformbridge
+        //   Standalone → {projectRoot}/dist
+        $targetSuffix = $isVendor
+            ? DIRECTORY_SEPARATOR . 'public' . DIRECTORY_SEPARATOR . 'platformbridge'
+            : DIRECTORY_SEPARATOR . 'dist';
+
+        $assetsPath = $projectRoot . $targetSuffix;
         $realAssets = realpath($assetsPath);
 
         if ($realAssets !== false) {
@@ -211,21 +242,23 @@ final class Installer
         }
         $realProject = str_replace('\\', '/', rtrim($realProject, '/\\'));
 
+        // Relativní suffix pro URL
+        $urlSuffix = $isVendor ? '/public/platformbridge' : '/dist';
+
         if (str_starts_with($realProject, $docRoot . '/')) {
             $basePath = substr($realProject, strlen($docRoot));
-            return $basePath . '/public/platformbridge';
+            return $basePath . $urlSuffix;
         }
 
         if (str_starts_with($docRoot, $realProject . '/')) {
             $subPath = substr($docRoot, strlen($realProject));
-            $fullPath = '/public/platformbridge';
-            if (str_starts_with($fullPath, $subPath)) {
-                return substr($fullPath, strlen($subPath));
+            if (str_starts_with($urlSuffix, $subPath)) {
+                return substr($urlSuffix, strlen($subPath));
             }
         }
 
         if ($realProject === $docRoot) {
-            return '/public/platformbridge';
+            return $urlSuffix;
         }
 
         return null;
@@ -239,5 +272,50 @@ final class Installer
     public function getProjectRoot(): string
     {
         return $this->paths->projectRoot();
+    }
+
+    /**
+     * Vrátí výchozí URL k API endpointu.
+     *
+     * Dynamicky detekuje cestu z DOCUMENT_ROOT:
+     *   - Standalone (dev): cesta k resources/stubs/api.php
+     *   - Vendor (prod): public/platformbridge/api.php
+     *
+     * @param string $packageRoot Absolutní cesta ke kořeni balíčku
+     * @return string URL relativní k document root
+     */
+    public static function getDefaultApiUrl(string $packageRoot): string
+    {
+        $vendorAutoload = dirname($packageRoot, 2) . DIRECTORY_SEPARATOR . 'autoload.php';
+        $isVendor = file_exists($vendorAutoload);
+
+        if ($isVendor) {
+            // Vendor (prod): API je v public/platformbridge/api.php
+            return rtrim(self::getDefaultAssetUrl($packageRoot), '/') . '/api.php';
+        }
+
+        // Standalone (dev): API endpoint je přímo v resources/stubs/api.php
+        $projectRoot = $packageRoot;
+
+        if (php_sapi_name() !== 'cli' && !empty($_SERVER['DOCUMENT_ROOT'])) {
+            $docRoot = realpath($_SERVER['DOCUMENT_ROOT']);
+            $realProject = realpath($projectRoot);
+
+            if ($docRoot !== false && $realProject !== false) {
+                $docRoot = str_replace('\\', '/', rtrim($docRoot, '/\\'));
+                $realProject = str_replace('\\', '/', rtrim($realProject, '/\\'));
+
+                if ($realProject === $docRoot) {
+                    return '/resources/stubs/api.php';
+                }
+
+                if (str_starts_with($realProject, $docRoot . '/')) {
+                    $basePath = substr($realProject, strlen($docRoot));
+                    return $basePath . '/resources/stubs/api.php';
+                }
+            }
+        }
+
+        return '/resources/stubs/api.php';
     }
 }

@@ -3,7 +3,10 @@
  * PlatformBridge API Endpoint
  *
  * Publikováno příkazem: php vendor/bin/platformbridge install
- * Umístění: {projectRoot}/public/platformbridge/api.php
+ *
+ * Umístění:
+ *   - Vendor (prod):     {projectRoot}/public/platformbridge/api.php
+ *   - Standalone (dev):  {packageRoot}/d/platformbridge/api.php
  *
  * Můžete přidat vlastní middleware, autentizaci apod.
  * Tento soubor se NEPŘEPISUJE při composer update.

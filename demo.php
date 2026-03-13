@@ -23,7 +23,7 @@ use Zoom\PlatformBridge\PlatformBridge;
 $bridge = PlatformBridge::create()
     // Pro standalone režim: explicitní cesty ke konfiguraci
     // Ve vendor režimu se cesty resolví automaticky přes PathResolver
-    ->withConfigPath(__DIR__ . '/resources/config/defaults')
+    ->withConfigPath(__DIR__ . '/resources/defaults')
     ->withViewsPath(__DIR__ . '/resources/views')
     ->withCachePath(__DIR__ . '/var/cache')
     // ->withLocale('cs');
