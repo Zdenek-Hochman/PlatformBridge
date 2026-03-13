@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Zoom\PlatformBridge\AI;
 
+use Zoom\PlatformBridge\Config\PathResolver;
 use Zoom\PlatformBridge\Template\Engine;
 
 /**
@@ -18,13 +19,19 @@ final class AiResponseRenderer
 
     /**
      * Vytvoří instanci s výchozí konfigurací template engine.
+     *
+     * Cesty se resolvují přes PathResolver:
+     *   - Standalone: views a cache přímo z balíčku
+     *   - Vendor: cache z {projectRoot}/var/cache/
      */
     public static function create(array $engineConfig = []): self
     {
+        $paths = new PathResolver();
+
         $defaultConfig = [
-        	'tpl_dir' => dirname(__DIR__, 3) . '/resources/views/',
-    		'cache_dir' => dirname(__DIR__, 3) . '/var/cache/',
-            'debug' => false,
+            'tpl_dir'   => $paths->packageViewsPath() . '/',
+            'cache_dir' => $paths->cachePath() . '/',
+            'debug'     => false,
         ];
 
         $config = array_merge($defaultConfig, $engineConfig);

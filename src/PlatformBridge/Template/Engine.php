@@ -217,10 +217,9 @@ final class Engine
      * Metoda pro čištění expirovaných cache souborů.
      *
      * Tato statická metoda prohledá cache adresář a odstraní všechny soubory cache,
-     * které jsou starší než zadaná doba vypršení. Pokud cache adresář neexistuje, vyhodí výjimku.
+     * které jsou starší než zadaná doba vypršení. Pokud cache adresář neexistuje, automaticky ho vytvoří.
      *
      * @param int $expireTime Časový limit pro expiraci cache souborů (v sekundách). Výchozí hodnota je 3000.
-     * @throws \RuntimeException Pokud adresář cache neexistuje.
      * @return void
      * @internal Tuto metodu není potřeba volat ručně, je automaticky volána při konstrukci Engine a lze ji použít pro manuální údržbu cache.
      */
@@ -229,7 +228,8 @@ final class Engine
         $cacheDir = static::$conf['cache_dir'];
 
         if (!is_dir($cacheDir)) {
-            throw new \RuntimeException("Cache directory {$cacheDir} does not exist.");
+            mkdir($cacheDir, 0755, true);
+            return; // Nově vytvořená složka je prázdná, není co čistit
         }
 
         // Získá seznam všech souborů cache v cache adresáři s příponou ".cache.php".
