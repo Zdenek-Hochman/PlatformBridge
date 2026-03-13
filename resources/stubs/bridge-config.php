@@ -1,12 +1,16 @@
 <?php
 /**
- * PlatformBridge – Uživatelská konfigurace
+ * PlatformBridge – Konfigurace API připojení
  *
  * Tento soubor byl vygenerován příkazem:
  *   php vendor/bin/platformbridge install
  *
- * Upravte hodnoty podle svého prostředí.
+ * Nastavuje adresu a parametry API, na které se odkazuje AJAX z frontendu.
+ * Při install se kopíruje do {projectRoot}/public/bridge-config.php.
  * Tento soubor se NEPŘEPISUJE při composer update.
+ *
+ * ⚠️  Bezpečnostní klíče (secretKey, ttl) jsou v samostatném souboru
+ *     security-config.php, ke kterému má přístup pouze interní jádro.
  */
 
 if (!defined('BRIDGE_BOOTSTRAPPED')) {
@@ -20,13 +24,16 @@ $host     = $_SERVER['HTTP_HOST'] ?? 'localhost';
 $baseHost = "{$protocol}://{$host}";
 
 return [
-    // ─── HMAC Podpis ────────────────────────────────────────────
-    'secretKey' => 'CHANGE-ME-put-your-long-super-secret-key-here-32chars-minimum',
-    'ttl'       => 3600,
-
     // ─── AI Provider ────────────────────────────────────────────
+    // API klíč pro autentizaci vůči AI provideru
     'api_key'     => 'YOUR_API_KEY_HERE',
+
+    // Timeout HTTP požadavku na AI v sekundách
     'timeout'     => 30,
+
+    // Počet opakování při selhání požadavku
     'max_retries' => 3,
+
+    // URL AI API endpointu, kam se odesílají AJAX požadavky
     'base_url'    => $baseHost . '/api/ai',
 ];

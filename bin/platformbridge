@@ -8,10 +8,11 @@ chmod +x bin/platformbridge
  * Instalace a aktualizace assetů a konfigurace.
  *
  * Usage:
- *   php vendor/bin/platformbridge install          - Kompletní instalace (assety + API + config + JSON)
- *   php vendor/bin/platformbridge update           - Aktualizace assetů a API endpointu
- *   php vendor/bin/platformbridge publish:config   - Publikuje POUZE konfiguraci (bridge-config.php)
- *   php vendor/bin/platformbridge publish:json     - Publikuje POUZE JSON soubory
+ *   php vendor/bin/platformbridge install                - Kompletní instalace (assety + API + config + JSON)
+ *   php vendor/bin/platformbridge update                 - Aktualizace assetů a API endpointu
+ *   php vendor/bin/platformbridge publish:config         - Publikuje bridge-config.php (API nastavení)
+ *   php vendor/bin/platformbridge publish:security-config - Publikuje security-config.php (HMAC klíče)
+ *   php vendor/bin/platformbridge publish:json           - Publikuje POUZE JSON soubory
  *
  * @see \Zoom\PlatformBridge\Installer\Installer
  */
@@ -54,18 +55,23 @@ switch ($command) {
         $installer->publishConfig();
         break;
 
+    case 'publish:security-config':
+        $installer->publishSecurityConfig();
+        break;
+
     case 'publish:json':
         $installer->publishJson();
         break;
 
     default:
         fwrite(STDERR, "Unknown command: {$command}\n");
-        fwrite(STDERR, "Usage: platformbridge [install|update|publish:config|publish:json]\n");
+        fwrite(STDERR, "Usage: platformbridge [install|update|publish:config|publish:security-config|publish:json]\n");
         fwrite(STDERR, "\n");
         fwrite(STDERR, "Commands:\n");
-        fwrite(STDERR, "  install          Publish assets, API endpoint, config and JSON files\n");
-        fwrite(STDERR, "  update           Update assets and API endpoint (keeps config)\n");
-        fwrite(STDERR, "  publish:config   Publish ONLY bridge-config.php (skip if exists)\n");
-        fwrite(STDERR, "  publish:json     Publish ONLY JSON config files (skip if exists)\n");
+        fwrite(STDERR, "  install                 Publish assets, API endpoint, config and JSON files\n");
+        fwrite(STDERR, "  update                  Update assets and API endpoint (keeps config)\n");
+        fwrite(STDERR, "  publish:config          Publish bridge-config.php to public/ (API settings)\n");
+        fwrite(STDERR, "  publish:security-config Publish security-config.php to config/ (HMAC keys)\n");
+        fwrite(STDERR, "  publish:json            Publish JSON config files (skip if exists)\n");
         exit(1);
 }

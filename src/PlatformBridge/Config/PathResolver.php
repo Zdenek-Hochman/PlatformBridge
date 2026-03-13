@@ -67,12 +67,12 @@ final class PathResolver
     }
 
     /**
-     * Vrací cestu ke složce s výchozí referenční konfigurací balíčku.
-     * Typicky obsahuje bridge-config.php a další konfigurační soubory.
+     * Vrací cestu ke složce s referenční konfigurací balíčku.
+     * Poznámka: bridge-config.php se nyní načítá z resources/stubs/.
      */
     public function packageConfigPath(): string
     {
-        return $this->packageRoot . '/config';
+        return $this->packageRoot . '/resources/config';
     }
 
     /**
@@ -127,10 +127,23 @@ final class PathResolver
 
     /**
      * Vrací cestu k uživatelskému konfiguračnímu souboru bridge-config.php v hostitelské aplikaci.
+     * V vendor režimu: {projectRoot}/public/bridge-config.php
+     * V standalone režimu: cesta neexistuje → fallback na resources/stubs/bridge-config.php
      */
     public function userBridgeConfigFile(): string
     {
-        return $this->userConfigPath() . '/bridge-config.php';
+        return $this->projectRoot . '/public/bridge-config.php';
+    }
+
+    /**
+     * Vrací cestu k uživatelskému bezpečnostnímu konfiguračnímu souboru.
+     * Tento soubor NENÍ v public/ – je přístupný pouze internímu jádru.
+     * V vendor režimu: {projectRoot}/config/security-config.php
+     * V standalone režimu: cesta neexistuje → fallback na resources/stubs/security-config.php
+     */
+    public function userSecurityConfigFile(): string
+    {
+        return $this->projectRoot . '/config/security-config.php';
     }
 
     /**
@@ -186,7 +199,9 @@ final class PathResolver
 
     /**
      * Vrátí cestu k bridge-config.php s fallbackem.
-     * Priorita: user config → package config
+     * Priorita:
+     *   1. Vendor: {projectRoot}/public/bridge-config.php (publikován install příkazem)
+     *   2. Standalone/localhost: resources/stubs/bridge-config.php (výchozí šablona)
      */
     public function resolvedBridgeConfigFile(): string
     {
@@ -194,7 +209,22 @@ final class PathResolver
         if (file_exists($userFile)) {
             return $userFile;
         }
-        return $this->packageConfigPath() . '/bridge-config.php';
+        return $this->packageStubsPath() . '/bridge-config.php';
+    }
+
+    /**
+     * Vrátí cestu k security-config.php s fallbackem.
+     * Priorita:
+     *   1. Vendor: {projectRoot}/config/security-config.php (publikován install příkazem)
+     *   2. Standalone/localhost: resources/stubs/security-config.php (výchozí šablona)
+     */
+    public function resolvedSecurityConfigFile(): string
+    {
+        $userFile = $this->userSecurityConfigFile();
+        if (file_exists($userFile)) {
+            return $userFile;
+        }
+        return $this->packageStubsPath() . '/security-config.php';
     }
 
     public function isVendor(): bool

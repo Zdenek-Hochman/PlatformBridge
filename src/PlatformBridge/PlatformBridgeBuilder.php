@@ -33,6 +33,7 @@ final class PlatformBridgeBuilder
     private ?string $translationsPath = null;
     private string $locale = 'cs';
     private ?string $bridgeConfigPath = null;
+    private ?string $securityConfigPath = null;
     private ?string $assetUrl = null;
     private ?string $apiUrl = null;
     private bool $useHmac = false;
@@ -109,7 +110,7 @@ final class PlatformBridgeBuilder
 
     /**
      * Nastaví cestu ke konfiguračnímu souboru bridge-config.php.
-     * Tento soubor obsahuje secretKey a další bezpečnostní nastavení.
+     * Tento soubor obsahuje nastavení API připojení (base_url, api_key, atd.).
      *
      * @param string $path Absolutní nebo relativní cesta
      * @return self
@@ -117,6 +118,20 @@ final class PlatformBridgeBuilder
     public function withBridgeConfigPath(string $path): self
     {
         $this->bridgeConfigPath = $this->normalizePath($path);
+        return $this;
+    }
+
+    /**
+     * Nastaví cestu k bezpečnostnímu konfiguračnímu souboru security-config.php.
+     * Tento soubor obsahuje secretKey a TTL pro HMAC podepisování.
+     * Musí být umístěn MIMO public/ složku.
+     *
+     * @param string $path Absolutní nebo relativní cesta
+     * @return self
+     */
+    public function withSecurityConfigPath(string $path): self
+    {
+        $this->securityConfigPath = $this->normalizePath($path);
         return $this;
     }
 
@@ -154,7 +169,7 @@ final class PlatformBridgeBuilder
 
     /**
      * Zapne/vypne HMAC podepisování parametrů (ochrana integrity dat).
-     * Secret key se načte z bridge-config.php.
+     * Secret key se načte ze security-config.php.
      *
      * @param bool $enable Zapnout/vypnout HMAC (default: true)
      * @return self
@@ -185,21 +200,22 @@ final class PlatformBridgeBuilder
      * @throws \InvalidArgumentException Pokud chybí povinná konfigurace nebo jsou cesty neplatné
      *
      * Bezpečnost:
-     *  - Pokud je HMAC zapnutý, musí být nastaven validní secret key v bridge-config.php.
+     *  - Pokud je HMAC zapnutý, musí být nastaven validní secret key v security-config.php.
      *  - TTL pomáhá chránit proti replay útokům, doporučuje se nastavit.
      */
     public function build(): PlatformBridge
     {
         $config = new PlatformBridgeConfig(
-            configPath:       $this->configPath       ?? $this->paths->resolvedConfigPath(),
-            viewsPath:        $this->viewsPath        ?? $this->paths->packageViewsPath(),
-            cachePath:        $this->cachePath         ?? $this->paths->cachePath(),
-            locale:           $this->locale,
-            bridgeConfigPath: $this->bridgeConfigPath  ?? $this->paths->resolvedBridgeConfigFile(),
-            assetUrl:         $this->assetUrl          ?? $this->resolveAssetUrl(),
-            apiUrl:           $this->apiUrl            ?? $this->resolveApiUrl(),
-            useHmac:          $this->useHmac,
-            paramsTtl:        $this->paramsTtl,
+            configPath:         $this->configPath       ?? $this->paths->resolvedConfigPath(),
+            viewsPath:          $this->viewsPath        ?? $this->paths->packageViewsPath(),
+            cachePath:          $this->cachePath         ?? $this->paths->cachePath(),
+            locale:             $this->locale,
+            bridgeConfigPath:   $this->bridgeConfigPath  ?? $this->paths->resolvedBridgeConfigFile(),
+            securityConfigPath: $this->securityConfigPath ?? $this->paths->resolvedSecurityConfigFile(),
+            assetUrl:           $this->assetUrl          ?? $this->resolveAssetUrl(),
+            apiUrl:             $this->apiUrl            ?? $this->resolveApiUrl(),
+            useHmac:            $this->useHmac,
+            paramsTtl:          $this->paramsTtl,
         );
 
         return PlatformBridge::fromConfig($config);

@@ -42,6 +42,7 @@ final class Installer
         $this->publishAssets();
         $this->publishApiEndpoint();
         $this->publishConfig();
+        $this->publishSecurityConfig();
         $this->publishJson();
         $this->ensureCacheDir();
 
@@ -63,17 +64,63 @@ final class Installer
     }
 
     /**
-     * Publikuje bridge-config.php (bez přepisu).
+     * Publikuje bridge-config.php do hostující aplikace (bez přepisu).
+     * V standalone režimu se přeskočí – dev používá resources/stubs/ přímo.
+     *
+     * Vendor: {projectRoot}/public/bridge-config.php
+     * Standalone: resources/stubs/bridge-config.php (bez kopírování)
      */
     public function publishConfig(): void
     {
+        if (!$this->paths->isVendor()) {
+            $this->info("  ⏭️  Standalone mode: using resources/stubs/bridge-config.php directly (skipped)");
+            return;
+        }
+
         $stub = $this->paths->packageStubsPath() . '/bridge-config.php';
         $target = $this->paths->userBridgeConfigFile();
 
+        // Zajistí existenci public/ složky
+        $targetDir = dirname($target);
+        if (!is_dir($targetDir)) {
+            mkdir($targetDir, 0755, true);
+        }
+
         $written = $this->publisher->publish($stub, $target, overwrite: false);
         $this->info($written
-            ? "  ✅ Published: config/platform-bridge/bridge-config.php"
-            : "  ⏭️  Skipped:   config/platform-bridge/bridge-config.php (exists)"
+            ? "  ✅ Published: public/bridge-config.php"
+            : "  ⏭️  Skipped:   public/bridge-config.php (exists)"
+        );
+    }
+
+    /**
+     * Publikuje security-config.php do hostující aplikace (bez přepisu).
+     * Soubor se umístí MIMO public/ složku – přístupný pouze internímu jádru.
+     * V standalone režimu se přeskočí – dev používá resources/stubs/ přímo.
+     *
+     * Vendor: {projectRoot}/config/security-config.php
+     * Standalone: resources/stubs/security-config.php (bez kopírování)
+     */
+    public function publishSecurityConfig(): void
+    {
+        if (!$this->paths->isVendor()) {
+            $this->info("  ⏭️  Standalone mode: using resources/stubs/security-config.php directly (skipped)");
+            return;
+        }
+
+        $stub = $this->paths->packageStubsPath() . '/security-config.php';
+        $target = $this->paths->userSecurityConfigFile();
+
+        // Zajistí existenci config/ složky
+        $targetDir = dirname($target);
+        if (!is_dir($targetDir)) {
+            mkdir($targetDir, 0755, true);
+        }
+
+        $written = $this->publisher->publish($stub, $target, overwrite: false);
+        $this->info($written
+            ? "  ✅ Published: config/security-config.php"
+            : "  ⏭️  Skipped:   config/security-config.php (exists)"
         );
     }
 

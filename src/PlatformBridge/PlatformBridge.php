@@ -96,10 +96,18 @@ final class PlatformBridge
         $paths = new PathResolver(dirname(__DIR__, 2));
 
         // 4. Načtení konfigurace (bloky, layouty, generátory) s validací
+        // Standalone (localhost): konfigurace se načítá z resources/stubs/
+        // Vendor (produkce): bridge-config.php z {projectRoot}/public/, security-config.php z {projectRoot}/config/
+        $userConfigPath = $paths->userConfigPath();
+        $packageDefaultsPath = $paths->packageDefaultsPath();
+        if (!$paths->isVendor()) {
+            // Standalone režim: userConfigPath je resources/config
+            $userConfigPath = $paths->packageRoot() . '/resources/config';
+        }
         $loader = new ConfigLoader(
-            $paths->userConfigPath(),           // Uživatelská konfigurace (pokud existuje)
-            $paths->packageDefaultsPath(),      // Výchozí konfigurace balíčku
-            new ConfigValidator()               // Validátor konfigurace
+            $userConfigPath,
+            $packageDefaultsPath,
+            new ConfigValidator()
         );
 
         $this->configManager = new ConfigManager($loader);

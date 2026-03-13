@@ -22,28 +22,29 @@ final  class PlatformBridgeConfig
         private string $cachePath,
         private string $locale,
         private string $bridgeConfigPath,
+        private string $securityConfigPath,
         private string $assetUrl,
         private string $apiUrl,
         private bool $useHmac = false,
         private ?int $paramsTtl = null,
     ) {
         $this->validatePaths();
-        [$this->secretKey, $this->resolvedTtl] = $this->loadBridgeConfig();
+        [$this->secretKey, $this->resolvedTtl] = $this->loadSecurityConfig();
     }
 
     /**
-     * Načte konfiguraci z bridge-config.php.
+     * Načte bezpečnostní konfiguraci ze security-config.php.
      */
-    private function loadBridgeConfig(): array
+    private function loadSecurityConfig(): array
     {
         if (!$this->useHmac) {
             return [null, null];
         }
 
-        $config = $this->requireBridgeConfig();
+        $config = $this->requireSecurityConfig();
 
         $secretKey = $config['secretKey']
-            ?? throw new \InvalidArgumentException("Bridge config must contain 'secretKey'.");
+            ?? throw new \InvalidArgumentException("Security config must contain 'secretKey'.");
 
         $ttl = $this->paramsTtl ?? ($config['ttl'] ?? null);
 
@@ -51,15 +52,16 @@ final  class PlatformBridgeConfig
     }
 
     /**
-     * Načte bridge-config.php a vrátí pole.
-     * Funguje stejně na localhost i na serveru – soubor je vždy
-     * v resources/config/bridge-config.php uvnitř balíčku.
+     * Načte security-config.php a vrátí pole.
+     * Soubor se načítá:
+     *   - Standalone (localhost): z resources/stubs/security-config.php
+     *   - Vendor (produkce): z {projectRoot}/config/security-config.php
      */
-    private function requireBridgeConfig(): array
+    private function requireSecurityConfig(): array
     {
-        if (!file_exists($this->bridgeConfigPath)) {
+        if (!file_exists($this->securityConfigPath)) {
             throw new \InvalidArgumentException(
-                "Bridge config not found: {$this->bridgeConfigPath}"
+                "Security config not found: {$this->securityConfigPath}"
             );
         }
 
@@ -67,10 +69,10 @@ final  class PlatformBridgeConfig
             define('BRIDGE_BOOTSTRAPPED', true);
         }
 
-        $config = require $this->bridgeConfigPath;
+        $config = require $this->securityConfigPath;
 
         if (!is_array($config)) {
-            throw new \InvalidArgumentException('Bridge config must return an array.');
+            throw new \InvalidArgumentException('Security config must return an array.');
         }
 
         return $config;
@@ -155,7 +157,7 @@ final  class PlatformBridgeConfig
 
     /**
      * Vrátí secret key pro HMAC podepisování parametrů.
-     * Načítá se z bridge-config.php pokud je HMAC zapnutý.
+     * Načítá se ze security-config.php pokud je HMAC zapnutý.
      *
      * @return string|null Tajný klíč nebo null, pokud není nastaven nebo je HMAC vypnutý.
      */

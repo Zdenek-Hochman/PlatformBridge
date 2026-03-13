@@ -20,30 +20,40 @@ use Zoom\PlatformBridge\Security\SignedParams;
  * API Handler – zpracování příchozích AI požadavků.
  *
  * Podporuje standalone (localhost) i vendor (produkce) režim.
- * Konfigurace se načítá vždy z resources/config/bridge-config.php
- * (package-level), nebo z config/bridge-config.php (project-level).
+ * Konfigurace se načítá ze dvou oddělených souborů:
+ *   - bridge-config.php: API připojení (base_url, api_key, timeout, max_retries)
+ *   - security-config.php: HMAC podepisování (secretKey, ttl)
+ *
+ * Standalone: oba soubory z resources/stubs/
+ * Vendor: bridge-config z {projectRoot}/public/, security-config z {projectRoot}/config/
  *
  * Použití:
  *   ApiHandler::bootstrap()->handle();
- *   ApiHandler::create($configPath, $configDir)->handle();
+ *   ApiHandler::create($configPath, $securityConfigPath, $configDir)->handle();
  */
 final class ApiHandler
 {
+    /** @var array Konfigurace API připojení (base_url, api_key, timeout, max_retries) */
     private array $config;
+
+    /** @var array Bezpečnostní konfigurace (secretKey, ttl) */
+    private array $securityConfig;
 
     private function __construct(
         private readonly string $configPath,
+        private readonly string $securityConfigPath,
         private readonly string $configDir,
     ) {
-        $this->config = $this->loadConfig();
+        $this->config = $this->loadConfig($this->configPath, 'Bridge');
+        $this->securityConfig = $this->loadConfig($this->securityConfigPath, 'Security');
     }
 
     /**
      * Tovární metoda s explicitními cestami.
      */
-    public static function create(string $configPath, string $configDir): self
+    public static function create(string $configPath, string $securityConfigPath, string $configDir): self
     {
-        return new self($configPath, $configDir);
+        return new self($configPath, $securityConfigPath, $configDir);
     }
 
     /**
@@ -58,9 +68,10 @@ final class ApiHandler
         }
 
         $configPath = $paths->resolvedBridgeConfigFile();
+        $securityConfigPath = $paths->resolvedSecurityConfigFile();
         $configDir = $paths->resolvedConfigPath();
 
-        return new self($configPath, $configDir);
+        return new self($configPath, $securityConfigPath, $configDir);
     }
 
     // ─── Request handling ───────────────────────────────────────
@@ -104,14 +115,14 @@ final class ApiHandler
 
     private function verifySignature(array &$input): array
     {
-        $secretKey = $this->config['secretKey']
-            ?? throw new \RuntimeException('Secret key not configured.');
+        $secretKey = $this->securityConfig['secretKey']
+            ?? throw new \RuntimeException('Secret key not configured in security-config.php.');
 
         if (!isset($input['__ai_signed'])) {
             throw new SecurityException('Missing signed params (__ai_signed).');
         }
 
-        $verified = (new SignedParams($secretKey, $this->config['ttl'] ?? null))
+        $verified = (new SignedParams($secretKey, $this->securityConfig['ttl'] ?? null))
             ->verify($input['__ai_signed']);
 
         unset($input['__ai_signed']);
@@ -220,20 +231,20 @@ final class ApiHandler
 
     // ─── Konfigurace ────────────────────────────────────────────
 
-    private function loadConfig(): array
+    private function loadConfig(string $path, string $label): array
     {
-        if (!file_exists($this->configPath)) {
-            throw new \RuntimeException("Config not found: {$this->configPath}");
+        if (!file_exists($path)) {
+            throw new \RuntimeException("{$label} config not found: {$path}");
         }
 
         if (!defined('BRIDGE_BOOTSTRAPPED')) {
             define('BRIDGE_BOOTSTRAPPED', true);
         }
 
-        $config = require $this->configPath;
+        $config = require $path;
 
         if (!is_array($config)) {
-            throw new \RuntimeException('Bridge config must return an array.');
+            throw new \RuntimeException("{$label} config must return an array.");
         }
 
         return $config;
