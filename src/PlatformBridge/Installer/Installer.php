@@ -219,8 +219,7 @@ final class Installer
      */
     public static function getDefaultAssetUrl(string $packageRoot): string
     {
-        $vendorAutoload = dirname($packageRoot, 2) . DIRECTORY_SEPARATOR . 'autoload.php';
-        $isVendor = file_exists($vendorAutoload);
+        $isVendor = preg_match('#[\\\\/]vendor[\\\\/]#', $packageRoot) === 1;
         $projectRoot = $isVendor ? dirname($packageRoot, 3) : $packageRoot;
 
         if (php_sapi_name() !== 'cli' && !empty($_SERVER['DOCUMENT_ROOT'])) {
