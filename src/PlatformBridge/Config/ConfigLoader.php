@@ -31,7 +31,8 @@ final class ConfigLoader
         private readonly string $userConfigPath,
         private readonly string $packageDefaultsPath,
         private readonly ConfigValidator $validator,
-    ) {}
+    ) {
+    }
 
     /**
      * Načte a zvaliduje všechny konfigurační soubory.
@@ -60,41 +61,6 @@ final class ConfigLoader
             'layouts' => $layouts,
             'generators' => $generators,
         ];
-    }
-
-    /**
-     * Načte pouze konkrétní soubor bez validace.
-     *
-     * @param string $filename Název souboru
-     *
-     * @return array Raw data
-     *
-     * @throws ConfigException
-     */
-    public function loadRaw(string $filename): array
-    {
-        return $this->loadJsonFile($filename);
-    }
-
-    /**
-     * Zjistí, zda je používán uživatelský override.
-     */
-    public function isUserOverride(string $filename): bool
-    {
-        return file_exists($this->userConfigPath . DIRECTORY_SEPARATOR . $filename);
-    }
-
-    /**
-     * Vrátí cestu ke konfiguračnímu adresáři (resolved).
-     *
-     * @return string Cesta ke konfiguračnímu adresáři
-     */
-    public function getConfigDir(): string
-    {
-        if (is_dir($this->userConfigPath)) {
-            return $this->userConfigPath;
-        }
-        return $this->packageDefaultsPath;
     }
 
     /**

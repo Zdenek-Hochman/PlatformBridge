@@ -108,6 +108,33 @@ final class PathResolver
     }
 
     /**
+     * Vrací cestu ke stub souboru bridge-config.php v balíčku.
+     * Používá se jako zdroj při publikování konfigurace do hostitelské aplikace.
+     */
+    public function stubBridgeConfigFile(): string
+    {
+        return $this->packageStubsPath() . '/bridge-config.php';
+    }
+
+    /**
+     * Vrací cestu ke stub souboru security-config.php v balíčku.
+     * Používá se jako zdroj při publikování bezpečnostní konfigurace.
+     */
+    public function stubSecurityConfigFile(): string
+    {
+        return $this->packageStubsPath() . '/security-config.php';
+    }
+
+    /**
+     * Vrací cestu ke stub souboru api.php v balíčku.
+     * Používá se jako zdroj při publikování API endpointu.
+     */
+    public function stubApiFile(): string
+    {
+        return $this->packageStubsPath() . '/api.php';
+    }
+
+    /**
      * Vrací absolutní cestu ke kořeni hostitelské aplikace (projektu).
      * V vendor režimu je to 3 úrovně nad balíčkem, v standalone režimu shodné s packageRoot.
      */
@@ -166,13 +193,12 @@ final class PathResolver
     }
 
     /**
-     * Vrací cestu ke složce pro dev API endpoint.
-     * Typicky: {packageRoot}/resources/stubs
-     * Používá se POUZE ve standalone režimu (localhost/dev).
+     * Vrací cestu k publikovanému API endpointu v hostitelské aplikaci.
+     * Typicky: {projectRoot}/public/platformbridge/api.php
      */
-    public function devApiPath(): string
+    public function publicApiFile(): string
     {
-        return $this->packageRoot . '/resources/stubs';
+        return $this->publicAssetsPath() . '/api.php';
     }
 
     /**
@@ -198,6 +224,20 @@ final class PathResolver
     }
 
     /**
+     * Vrátí resolved cestu k uživatelské konfiguraci podle běhového režimu.
+     *
+     * Vendor režim:     {projectRoot}/config/platform-bridge (uživatel může overridovat)
+     * Standalone režim: {packageRoot}/resources/config (výchozí stubs pro dev)
+     */
+    public function resolvedUserConfigPath(): string
+    {
+        if ($this->isVendor) {
+            return $this->userConfigPath();
+        }
+        return $this->packageConfigPath();
+    }
+
+    /**
      * Vrátí cestu k bridge-config.php s fallbackem.
      * Priorita:
      *   1. Vendor: {projectRoot}/public/bridge-config.php (publikován install příkazem)
@@ -209,7 +249,7 @@ final class PathResolver
         if (file_exists($userFile)) {
             return $userFile;
         }
-        return $this->packageStubsPath() . '/bridge-config.php';
+        return $this->stubBridgeConfigFile();
     }
 
     /**
@@ -224,7 +264,7 @@ final class PathResolver
         if (file_exists($userFile)) {
             return $userFile;
         }
-        return $this->packageStubsPath() . '/security-config.php';
+        return $this->stubSecurityConfigFile();
     }
 
     public function isVendor(): bool

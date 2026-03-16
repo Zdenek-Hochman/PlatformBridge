@@ -111,20 +111,6 @@ final class ConfigResolver
         return $this->resolveGenerator($generatorId);
     }
 
-    /**
-     * Resolve všech generators definovaných v konfiguraci.
-     *
-     * @return array<string, array> Pole resolved generators (ID => struktura)
-     */
-    public function resolveAllGenerators(): array
-    {
-        foreach (array_keys($this->generators) as $id) {
-            $this->resolveGenerator($id);
-        }
-
-        return $this->resolvedGenerators;
-    }
-
     // =========================================================================
     // LAYOUTS
     // =========================================================================

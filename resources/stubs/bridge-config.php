@@ -1,4 +1,5 @@
 <?php
+
 /**
  * PlatformBridge – Konfigurace API připojení
  *
@@ -35,5 +36,6 @@ return [
     'max_retries' => 3,
 
     // URL AI API endpointu, kam se odesílají AJAX požadavky
-    'base_url'    => $baseHost . '/api/ai',
+    'base_url'    => $baseHost . '/ai/src/PlatformBridge/AI/TEST/',
+	// 'base_url'    => $baseHost . '/Test/vendor/zoom/platform-bridge/src/PlatformBridge/AI/TEST/',
 ];

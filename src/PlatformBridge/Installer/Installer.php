@@ -77,14 +77,8 @@ final class Installer
             return;
         }
 
-        $stub = $this->paths->packageStubsPath() . '/bridge-config.php';
+        $stub = $this->paths->stubBridgeConfigFile();
         $target = $this->paths->userBridgeConfigFile();
-
-        // Zajistí existenci public/ složky
-        $targetDir = dirname($target);
-        if (!is_dir($targetDir)) {
-            mkdir($targetDir, 0755, true);
-        }
 
         $written = $this->publisher->publish($stub, $target, overwrite: false);
         $this->info($written
@@ -108,14 +102,8 @@ final class Installer
             return;
         }
 
-        $stub = $this->paths->packageStubsPath() . '/security-config.php';
+        $stub = $this->paths->stubSecurityConfigFile();
         $target = $this->paths->userSecurityConfigFile();
-
-        // Zajistí existenci config/ složky
-        $targetDir = dirname($target);
-        if (!is_dir($targetDir)) {
-            mkdir($targetDir, 0755, true);
-        }
 
         $written = $this->publisher->publish($stub, $target, overwrite: false);
         $this->info($written
@@ -192,8 +180,8 @@ final class Installer
             return;
         }
 
-        $stub = $this->paths->packageStubsPath() . '/api.php';
-        $target = $this->paths->publicAssetsPath() . '/api.php';
+        $stub = $this->paths->stubApiFile();
+        $target = $this->paths->publicApiFile();
         $label = 'public/platformbridge/api.php';
 
         $written = $this->publisher->publish($stub, $target, overwrite: false);

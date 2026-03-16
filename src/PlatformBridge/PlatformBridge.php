@@ -8,7 +8,6 @@ use Zoom\PlatformBridge\Asset\AssetManager;
 use Zoom\PlatformBridge\Config\ConfigManager;
 use Zoom\PlatformBridge\Config\ConfigLoader;
 use Zoom\PlatformBridge\Config\ConfigValidator;
-use Zoom\PlatformBridge\Config\PathResolver;
 use Zoom\PlatformBridge\Handler\HandlerRegistry;
 use Zoom\PlatformBridge\Handler\FieldFactory;
 use Zoom\PlatformBridge\Template\Engine;
@@ -75,67 +74,98 @@ final class PlatformBridge
     }
 
     /**
-     * Inicializuje všechny komponenty knihovny.
-     *
-     * @return void
-     */
-    /**
      * Inicializuje všechny hlavní komponenty knihovny PlatformBridge.
-     * Provádí registraci error handleru, načtení konfigurace, inicializaci šablonovacího enginu,
-     * registraci handlerů, vytvoření rendereru formulářů, asset manageru a podepisování parametrů.
+     *
+     * Orchestrátor, který deleguje na specializované boot metody.
+     * Pořadí volání je důležité – pozdější kroky závisí na předchozích.
      */
     private function boot(): void
     {
-        // 1. Registrace globálního error handleru pro lepší zachytávání chyb v rámci knihovny
+        $this->bootErrorHandler();
+        $this->bootConfig();
+        $this->bootTemplateEngine();
+        $this->bootHandlers();
+        $this->bootFormRenderer();
+        $this->bootAssetManager();
+        $this->bootSecurity();
+    }
+
+    /**
+     * 1. Registrace globálního error handleru pro lepší zachytávání chyb v rámci knihovny.
+     */
+    private function bootErrorHandler(): void
+    {
         (new ErrorHandler())->register();
+    }
 
-        // 2. Inicializace překladů (zatím zakomentováno, připraveno pro budoucí použití)
-        // $this->translator = new Translator($this->config->getTranslationsPath(), $this->config->getLocale());
+    /**
+     * 2. Načtení konfigurace (bloky, layouty, generátory) s validací.
+     *
+     * Cesty se řeší centrálně přes PathResolver:
+     *   - Standalone (dev): userConfigPath = resources/config
+     *   - Vendor (produkce): userConfigPath = {projectRoot}/config/platform-bridge
+     */
+    private function bootConfig(): void
+    {
+        $paths = $this->config->getPathResolver();
 
-        // 3. Vytvoření resolveru cest pro správné určení umístění konfiguračních a dalších souborů
-        $paths = new PathResolver(dirname(__DIR__, 2));
-
-        // 4. Načtení konfigurace (bloky, layouty, generátory) s validací
-        // Standalone (localhost): konfigurace se načítá z resources/stubs/
-        // Vendor (produkce): bridge-config.php z {projectRoot}/public/, security-config.php z {projectRoot}/config/
-        $userConfigPath = $paths->userConfigPath();
-        $packageDefaultsPath = $paths->packageDefaultsPath();
-        if (!$paths->isVendor()) {
-            // Standalone režim: userConfigPath je resources/config
-            $userConfigPath = $paths->packageRoot() . '/resources/config';
-        }
         $loader = new ConfigLoader(
-            $userConfigPath,
-            $packageDefaultsPath,
+            $paths->resolvedUserConfigPath(),
+            $paths->packageDefaultsPath(),
             new ConfigValidator()
         );
 
         $this->configManager = new ConfigManager($loader);
         $this->configManager->load();
+    }
 
-        // 5. Inicializace šablonovacího enginu s cestami k šablonám a cache
+    /**
+     * 3. Inicializace šablonovacího enginu s cestami k šablonám a cache.
+     */
+    private function bootTemplateEngine(): void
+    {
         $this->templateEngine = new Engine([
-            'tpl_dir' => $this->config->getViewsPath(),   // Cesta k view šablonám
-            'cache_dir' => $this->config->getCachePath(), // Cesta ke cache
-            'debug' => false,
+            'tpl_dir'   => $this->config->getViewsPath(),
+            'cache_dir' => $this->config->getCachePath(),
+            'debug'     => false,
         ]);
+    }
 
-        // 6. Registrace handlerů a vytvoření továrny na pole (FieldFactory)
+    /**
+     * 4. Registrace handlerů a vytvoření továrny na pole (FieldFactory).
+     */
+    private function bootHandlers(): void
+    {
         $this->handlerRegistry = $this->createHandlerRegistry();
         $this->fieldFactory = new FieldFactory($this->handlerRegistry);
+    }
 
-        // 7. Inicializace rendereru formulářů s továrnou, konfigurací a šablonovacím enginem
+    /**
+     * 5. Inicializace rendereru formulářů s továrnou, konfigurací a šablonovacím enginem.
+     */
+    private function bootFormRenderer(): void
+    {
         $this->formRenderer = new FormRenderer(
             $this->fieldFactory,
             $this->configManager,
             $this->templateEngine
         );
+    }
 
-        // 8. Inicializace asset manageru pro správu a generování HTML assetů (CSS/JS)
-        // URL se detekuje automaticky podle režimu (standalone vs vendor)
+    /**
+     * 6. Inicializace asset manageru pro správu a generování HTML assetů (CSS/JS).
+     * URL se detekuje automaticky podle režimu (standalone vs vendor).
+     */
+    private function bootAssetManager(): void
+    {
         $this->assetManager = new AssetManager($this->config->getAssetUrl());
+    }
 
-        // 9. Inicializace podepisování parametrů, pokud je nastaven secret key
+    /**
+     * 7. Inicializace podepisování parametrů, pokud je nastaven secret key.
+     */
+    private function bootSecurity(): void
+    {
         $secretKey = $this->config->getSecretKey();
 
         if ($secretKey !== null) {
@@ -207,12 +237,9 @@ final class PlatformBridge
             'data'         => $sections,
             'signedParams' => $this->buildSignedParams($params),
             'params'       => $this->buildRawParams($params),
+            //TODO: Přidat hash téhle adresy
             'apiUrl'       => $this->config->getApiUrl(),
         ];
-
-		echo "<pre>";
-		// \var_dump($template);
-		echo "</pre>";
 
         $html = $this->templateEngine->assign($template)->render('/Atoms/Wrapper');
 
@@ -274,27 +301,6 @@ final class PlatformBridge
     }
 
     /**
-     * Vrátí informace o generátoru z konfigurace.
-     *
-     * @param string $generatorId ID generátoru
-     * @return array Informace o generátoru
-     */
-    public function getGenerator(string $generatorId): array
-    {
-        return $this->configManager->getGenerator($generatorId);
-    }
-
-    /**
-     * Vrátí překladač pro vlastní překlady.
-     *
-     * @return Translator
-     */
-    // public function getTranslator(): Translator
-    // {
-    //     // return $this->translator;
-    // }
-
-    /**
      * Vrátí instanci šablonovacího enginu pro vlastní renderování.
      *
      * @return Engine Instance šablonovacího enginu
@@ -313,10 +319,6 @@ final class PlatformBridge
     {
         return $this->config;
     }
-
-    // =========================================================================
-    // ASSETS API
-    // =========================================================================
 
     /**
      * Vrátí všechny assety (CSS + JS).

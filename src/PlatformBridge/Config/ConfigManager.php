@@ -32,40 +32,23 @@ final class ConfigManager
     /** @var array<string, array> */
     private array $generators = [];
 
-    private ConfigValidator $validator;
     private ConfigResolver $resolver;
 
     /**
      * @param ConfigLoader $loader Loader s fallback mechanikou
      */
-    public function __construct(private readonly ConfigLoader $loader) {
-        $this->validator = new ConfigValidator();
+    public function __construct(private readonly ConfigLoader $loader)
+    {
         $this->resolver = new ConfigResolver();
     }
 
     /**
-     * Tovární metoda - vytvoří a načte konfiguraci.
-     *
-     * @param string $userConfigPath     Cesta k uživatelským JSON souborům
-     * @param string $packageDefaultsPath Cesta k výchozím JSON souborům balíčku
-     */
-    public static function create(string $userConfigPath, string $packageDefaultsPath): self
-    {
-        $validator = new ConfigValidator();
-        $loader = new ConfigLoader($userConfigPath, $packageDefaultsPath, $validator);
-        $manager = new self($loader);
-        $manager->load();
-        return $manager;
-    }
-
-    // =========================================================================
-    // LIFECYCLE
-    // =========================================================================
-
-    /**
      * Načte konfiguraci ze souborů a předá data resolveru.
      *
-     * @throws ConfigException
+     * Metoda provádí lazy loading konfigurace. Pokud již byla konfigurace načtena,
+     * metoda se ukončí. Jinak načte data pomocí loaderu, uloží je do příslušných
+     * vlastností a předá je resolveru pro další zpracování. Nakonec nastaví příznak
+     * $loaded na true, aby zabránila opakovanému načítání.
      */
     public function load(): void
     {
@@ -79,15 +62,9 @@ final class ConfigManager
         $this->layouts = $data['layouts'];
         $this->generators = $data['generators'];
 
-        // Předání surových dat resolveru
         $this->resolver->setData($this->blocks, $this->layouts, $this->generators);
 
         $this->loaded = true;
-    }
-
-    public function isLoaded(): bool
-    {
-        return $this->loaded;
     }
 
     private function ensureLoaded(): void
@@ -97,13 +74,15 @@ final class ConfigManager
         }
     }
 
-    // =========================================================================
-    // GENERATORS
-    // =========================================================================
-
     /**
-     * Vrátí rozřešený generátor podle ID.
+     * Vrátí rozřešený generátor podle zadaného ID.
      *
+     * Metoda zajistí, že konfigurace je načtena (lazy loading),
+     * a následně vrátí rozřešený generátor pomocí resolveru.
+     * Pokud generátor neexistuje, vyvolá výjimku ConfigException.
+     *
+     * @param string $generatorId ID generátoru
+     * @return array Rozřešený generátor
      * @throws ConfigException Pokud generátor neexistuje
      */
     public function getGenerator(string $generatorId): array
@@ -113,7 +92,14 @@ final class ConfigManager
     }
 
     /**
-     * Vrátí rozřešený generátor nebo null.
+     * Vyhledá a vrátí rozřešený generátor podle zadaného ID.
+     *
+     * Metoda zajistí, že konfigurace je načtena (lazy loading),
+     * a následně vrátí rozřešený generátor pomocí resolveru.
+     * Pokud generátor neexistuje, vrací null místo vyvolání výjimky.
+     *
+     * @param string $generatorId ID generátoru
+     * @return array|null Rozřešený generátor nebo null, pokud neexistuje
      */
     public function findGenerator(string $generatorId): ?array
     {
@@ -122,33 +108,15 @@ final class ConfigManager
     }
 
     /**
-     * Vrátí všechny rozřešené generátory.
+     * Vrátí konfigurační data generátoru podle zadaného ID.
      *
-     * @return array<string, array>
-     */
-    public function getAllGenerators(): array
-    {
-        $this->ensureLoaded();
-        return $this->resolver->resolveAllGenerators();
-    }
-
-    /**
-     * Vrátí raw generátory (bez rozřešení).
+     * Metoda vyhledá rozřešený generátor a vrátí jeho konfigurační sekci,
+     * pokud existuje. Pokud generátor nebo jeho konfigurace neexistuje,
+     * vrací null.
      *
-     * @return array<string, array>
+     * @param string $generatorId ID generátoru
+     * @return array|null Konfigurace generátoru nebo null, pokud neexistuje
      */
-    public function getGenerators(): array
-    {
-        $this->ensureLoaded();
-        return $this->generators;
-    }
-
-    public function getGeneratorLabel(string $generatorId): ?string
-    {
-        $generator = $this->findGenerator($generatorId);
-        return $generator[ConfigKeys::LABEL->value] ?? null;
-    }
-
     public function getGeneratorConfig(string $generatorId): ?array
     {
         $generator = $this->findGenerator($generatorId);
@@ -156,9 +124,16 @@ final class ConfigManager
     }
 
     /**
-     * Vrátí hodnotu z konfigurace generátoru podle cesty.
+     * Vrátí hodnotu z konfigurace generátoru podle zadané cesty.
      *
-     * @param string $path Cesta oddělená tečkami (např. "ai.model")
+     * Metoda prochází konfigurační pole generátoru podle cesty oddělené tečkami
+     * (např. "ai.model") a vrací nalezenou hodnotu. Pokud cesta neexistuje nebo
+     * konfigurace není pole, vrací výchozí hodnotu.
+     *
+     * @param string $generatorId ID generátoru
+     * @param string $path Cesta v konfiguraci oddělená tečkami (např. "ai.model")
+     * @param mixed $default Výchozí hodnota, pokud cesta neexistuje
+     * @return mixed Hodnota z konfigurace nebo výchozí hodnota
      */
     public function getConfigValue(string $generatorId, string $path, mixed $default = null): mixed
     {
@@ -178,58 +153,14 @@ final class ConfigManager
         return $config;
     }
 
-    public function hasGenerator(string $generatorId): bool
-    {
-        $this->ensureLoaded();
-        return isset($this->generators[$generatorId]);
-    }
-
     /**
-     * @return string[]
-     */
-    public function getGeneratorIds(): array
-    {
-        $this->ensureLoaded();
-        return array_keys($this->generators);
-    }
-
-    // =========================================================================
-    // LAYOUTS
-    // =========================================================================
-
-    /**
-     * Vrátí rozřešený layout podle ID.
+     * Vrátí sekce rozřešeného layoutu podle zadaného ID.
      *
-     * @throws ConfigException Pokud layout neexistuje
-     */
-    public function getLayout(string $layoutId): array
-    {
-        $this->ensureLoaded();
-        return $this->resolver->resolveLayout($layoutId);
-    }
-
-    /**
-     * Vrátí rozřešený layout nebo null.
-     */
-    public function findLayout(string $layoutId): ?array
-    {
-        $this->ensureLoaded();
-        return $this->resolver->findResolvedLayout($layoutId);
-    }
-
-    /**
-     * Vrátí raw layouty (bez rozřešení).
+     * Metoda zajistí, že konfigurace je načtena (lazy loading),
+     * a následně vrátí pole sekcí rozřešeného layoutu pomocí resolveru.
      *
-     * @return array<string, array>
-     */
-    public function getLayouts(): array
-    {
-        $this->ensureLoaded();
-        return $this->layouts;
-    }
-
-    /**
-     * Vrátí sekce rozřešeného layoutu.
+     * @param string $layoutId ID layoutu
+     * @return array Pole sekcí rozřešeného layoutu
      */
     public function getResolvedSections(string $layoutId): array
     {
@@ -238,21 +169,14 @@ final class ConfigManager
     }
 
     /**
-     * Vrátí raw sekce layoutu (bez rozřešení bloků).
-     */
-    public function getSections(string $layoutId): array
-    {
-        $this->ensureLoaded();
-
-        if (!isset($this->layouts[$layoutId])) {
-            return [];
-        }
-
-        return $this->layouts[$layoutId][ConfigKeys::SECTIONS->value] ?? [];
-    }
-
-    /**
-     * Vrátí bloky v sekci layoutu podle ID sekce.
+     * Vrátí bloky v sekci layoutu podle zadaného ID sekce.
+     *
+     * Metoda vyhledá sekci v rozřešeném layoutu podle ID a vrátí pole bloků,
+     * které jsou v této sekci. Pokud sekce neexistuje, vrací prázdné pole.
+     *
+     * @param string $layoutId ID layoutu
+     * @param string $sectionId ID sekce v layoutu
+     * @return array Pole bloků v dané sekci
      */
     public function getSectionBlocks(string $layoutId, string $sectionId): array
     {
@@ -266,132 +190,4 @@ final class ConfigManager
 
         return [];
     }
-
-    /**
-     * Vrátí bloky v sekci layoutu podle indexu.
-     */
-    public function getSectionBlocksByIndex(string $layoutId, int $sectionIndex): array
-    {
-        $sections = $this->getResolvedSections($layoutId);
-
-        if (!isset($sections[$sectionIndex])) {
-            return [];
-        }
-
-        return $sections[$sectionIndex][ConfigKeys::BLOCKS->value] ?? [];
-    }
-
-    /**
-     * Najde index sekce podle ID.
-     */
-    public function findSectionIndex(string $layoutId, string $sectionId): ?int
-    {
-        $sections = $this->getResolvedSections($layoutId);
-
-        foreach ($sections as $index => $section) {
-            if (($section[ConfigKeys::ID->value] ?? null) === $sectionId) {
-                return $index;
-            }
-        }
-
-        return null;
-    }
-
-    public function hasLayout(string $layoutId): bool
-    {
-        $this->ensureLoaded();
-        return isset($this->layouts[$layoutId]);
-    }
-
-    /**
-     * @return string[]
-     */
-    public function getLayoutIds(): array
-    {
-        $this->ensureLoaded();
-        return array_keys($this->layouts);
-    }
-
-    // =========================================================================
-    // BLOCKS
-    // =========================================================================
-
-    /**
-     * Vrátí blok podle ID.
-     *
-     * @throws ConfigException Pokud blok neexistuje
-     */
-    public function getBlock(string $blockId): array
-    {
-        $this->ensureLoaded();
-
-        if (!isset($this->blocks[$blockId])) {
-            throw ConfigException::invalidReference('block', $blockId);
-        }
-
-        return $this->blocks[$blockId];
-    }
-
-    /**
-     * Vrátí blok nebo null.
-     */
-    public function findBlock(string $blockId): ?array
-    {
-        $this->ensureLoaded();
-        return $this->blocks[$blockId] ?? null;
-    }
-
-    /**
-     * Vrátí všechny bloky.
-     *
-     * @return array<string, array>
-     */
-    public function getBlocks(): array
-    {
-        $this->ensureLoaded();
-        return $this->blocks;
-    }
-
-    /**
-     * Vrátí všechny rozřešené bloky napříč layouty.
-     */
-    public function getAllResolvedBlocks(): array
-    {
-        $this->ensureLoaded();
-        $result = [];
-
-        foreach (array_keys($this->layouts) as $layoutId) {
-            $sections = $this->getResolvedSections($layoutId);
-
-            foreach ($sections as $sectionIndex => $section) {
-                $blocks = $section[ConfigKeys::BLOCKS->value] ?? [];
-
-                foreach ($blocks as $block) {
-                    $result[] = [
-                        'layout' => $layoutId,
-                        'section' => $sectionIndex,
-                        'block' => $block,
-                    ];
-                }
-            }
-        }
-
-        return $result;
-    }
-
-    public function hasBlock(string $blockId): bool
-    {
-        $this->ensureLoaded();
-        return isset($this->blocks[$blockId]);
-    }
-
-    /**
-     * @return string[]
-     */
-    public function getBlockIds(): array
-    {
-        $this->ensureLoaded();
-        return array_keys($this->blocks);
-    }
-
 }

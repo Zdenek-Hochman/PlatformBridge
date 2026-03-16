@@ -11,8 +11,7 @@ use Zoom\PlatformBridge\Config\PathResolver;
  *
  * Umožňuje fluent konfiguraci všech cest a nastavení před sestavením immutable objektu PlatformBridgeConfig.
  *
- * Typické použití:
- *
+ * @example
  * ```php
  * $bridge = PlatformBridgeBuilder::create()
  *     ->withConfigPath('/path/to/config')
@@ -23,19 +22,16 @@ use Zoom\PlatformBridge\Config\PathResolver;
  *     ->build();
  * ```
  *
+ * Cesta k security-config.php se nastavuje automaticky přes PathResolver
+ * a nelze ji uživatelsky přepsat.
+ *
  * @see PlatformBridgeConfig
  */
 final class PlatformBridgeBuilder
 {
     private ?string $configPath = null;
     private ?string $viewsPath = null;
-    private ?string $cachePath = null;
-    private ?string $translationsPath = null;
     private string $locale = 'cs';
-    private ?string $bridgeConfigPath = null;
-    private ?string $securityConfigPath = null;
-    private ?string $assetUrl = null;
-    private ?string $apiUrl = null;
     private bool $useHmac = false;
     private ?int $paramsTtl = null;
 
@@ -73,30 +69,6 @@ final class PlatformBridgeBuilder
     }
 
     /**
-     * Nastaví cestu ke složce pro cache šablon.
-     *
-     * @param string $path Absolutní nebo relativní cesta
-     * @return self
-     */
-    public function withCachePath(string $path): self
-    {
-        $this->cachePath = $this->normalizePath($path);
-        return $this;
-    }
-
-    /**
-     * Nastaví cestu ke složce s překlady (translations).
-     *
-     * @param string $path Absolutní nebo relativní cesta
-     * @return self
-     */
-    public function withTranslationsPath(string $path): self
-    {
-        $this->translationsPath = $this->normalizePath($path);
-        return $this;
-    }
-
-    /**
      * Nastaví jazyk aplikace (locale).
      *
      * @param string $locale Kód jazyka (např. 'cs', 'en')
@@ -105,65 +77,6 @@ final class PlatformBridgeBuilder
     public function withLocale(string $locale): self
     {
         $this->locale = $locale;
-        return $this;
-    }
-
-    /**
-     * Nastaví cestu ke konfiguračnímu souboru bridge-config.php.
-     * Tento soubor obsahuje nastavení API připojení (base_url, api_key, atd.).
-     *
-     * @param string $path Absolutní nebo relativní cesta
-     * @return self
-     */
-    public function withBridgeConfigPath(string $path): self
-    {
-        $this->bridgeConfigPath = $this->normalizePath($path);
-        return $this;
-    }
-
-    /**
-     * Nastaví cestu k bezpečnostnímu konfiguračnímu souboru security-config.php.
-     * Tento soubor obsahuje secretKey a TTL pro HMAC podepisování.
-     * Musí být umístěn MIMO public/ složku.
-     *
-     * @param string $path Absolutní nebo relativní cesta
-     * @return self
-     */
-    public function withSecurityConfigPath(string $path): self
-    {
-        $this->securityConfigPath = $this->normalizePath($path);
-        return $this;
-    }
-
-    /**
-     * Nastaví URL pro načítání assetů (JS/CSS).
-     *
-     * Pokud není nastaveno, automaticky se detekuje:
-     *   - Standalone (dev): '/dist' (build output)
-     *   - Vendor (prod): '/platformbridge' nebo '/public/platformbridge'
-     *
-     * @param string $url URL ke složce s js/ a css/ podsložkami
-     * @return self
-     */
-    public function withAssetUrl(string $url): self
-    {
-        $this->assetUrl = $url;
-        return $this;
-    }
-
-    /**
-     * Nastaví URL k API endpointu.
-     *
-     * Pokud není nastaveno, automaticky se detekuje:
-     *   - Standalone (dev): '/resources/stubs/api.php'
-     *   - Vendor (prod): '/public/platformbridge/api.php'
-     *
-     * @param string $url URL k API endpointu
-     * @return self
-     */
-    public function withApiUrl(string $url): self
-    {
-        $this->apiUrl = $url;
         return $this;
     }
 
@@ -206,16 +119,16 @@ final class PlatformBridgeBuilder
     public function build(): PlatformBridge
     {
         $config = new PlatformBridgeConfig(
-            configPath:         $this->configPath       ?? $this->paths->resolvedConfigPath(),
-            viewsPath:          $this->viewsPath        ?? $this->paths->packageViewsPath(),
-            cachePath:          $this->cachePath         ?? $this->paths->cachePath(),
+            configPath:         $this->configPath ?? $this->paths->resolvedConfigPath(),
+            viewsPath:          $this->viewsPath ?? $this->paths->packageViewsPath(),
+            cachePath:          $this->paths->cachePath(),
+            assetUrl:           $this->resolveAssetUrl(),
+            apiUrl:             $this->resolveApiUrl(),
+            securityConfigPath: $this->paths->resolvedSecurityConfigFile(),
             locale:             $this->locale,
-            bridgeConfigPath:   $this->bridgeConfigPath  ?? $this->paths->resolvedBridgeConfigFile(),
-            securityConfigPath: $this->securityConfigPath ?? $this->paths->resolvedSecurityConfigFile(),
-            assetUrl:           $this->assetUrl          ?? $this->resolveAssetUrl(),
-            apiUrl:             $this->apiUrl            ?? $this->resolveApiUrl(),
             useHmac:            $this->useHmac,
             paramsTtl:          $this->paramsTtl,
+            pathResolver:       $this->paths,
         );
 
         return PlatformBridge::fromConfig($config);
@@ -230,14 +143,6 @@ final class PlatformBridgeBuilder
     private function normalizePath(string $path): string
     {
         return rtrim($path, DIRECTORY_SEPARATOR . '/\\');
-    }
-
-    /**
-     * Vrátí PathResolver pro přístup k cestám.
-     */
-    public function getPathResolver(): PathResolver
-    {
-        return $this->paths;
     }
 
     /**

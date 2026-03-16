@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Zoom\PlatformBridge;
 
+use Zoom\PlatformBridge\Config\PathResolver;
+
 /**
  * Konfigurační objekt pro PlatformBridge.
  *
@@ -11,7 +13,7 @@ namespace Zoom\PlatformBridge;
  *
  * @see PlatformBridgeBuilder Pro doporučený způsob vytváření konfigurace
  */
-final  class PlatformBridgeConfig
+final class PlatformBridgeConfig
 {
     private ?string $secretKey;
     private ?int $resolvedTtl;
@@ -20,20 +22,27 @@ final  class PlatformBridgeConfig
         private string $configPath,
         private string $viewsPath,
         private string $cachePath,
-        private string $locale,
-        private string $bridgeConfigPath,
-        private string $securityConfigPath,
         private string $assetUrl,
         private string $apiUrl,
+        private string $securityConfigPath,
+        private string $locale,
         private bool $useHmac = false,
         private ?int $paramsTtl = null,
+        private ?PathResolver $pathResolver = null,
     ) {
         $this->validatePaths();
         [$this->secretKey, $this->resolvedTtl] = $this->loadSecurityConfig();
     }
 
     /**
-     * Načte bezpečnostní konfiguraci ze security-config.php.
+     * Načte bezpečnostní konfiguraci ze security-config.php a vrátí secretKey a TTL.
+     *
+     * Pokud je HMAC vypnutý, vrací [null, null].
+     * Jinak načte konfigurační pole ze souboru, zkontroluje přítomnost 'secretKey',
+     * a TTL vezme buď z parametru builderu, nebo z configu (pokud není nastaveno).
+     *
+     * @return array{0: string|null, 1: int|null} Secret key a TTL
+     * @throws \InvalidArgumentException Pokud chybí 'secretKey' v configu
      */
     private function loadSecurityConfig(): array
     {
@@ -43,8 +52,7 @@ final  class PlatformBridgeConfig
 
         $config = $this->requireSecurityConfig();
 
-        $secretKey = $config['secretKey']
-            ?? throw new \InvalidArgumentException("Security config must contain 'secretKey'.");
+        $secretKey = $config['secretKey'] ?? throw new \InvalidArgumentException("Security config must contain 'secretKey'.");
 
         $ttl = $this->paramsTtl ?? ($config['ttl'] ?? null);
 
@@ -52,10 +60,13 @@ final  class PlatformBridgeConfig
     }
 
     /**
-     * Načte security-config.php a vrátí pole.
-     * Soubor se načítá:
-     *   - Standalone (localhost): z resources/stubs/security-config.php
-     *   - Vendor (produkce): z {projectRoot}/config/security-config.php
+     * Načte a vrátí pole z konfiguračního souboru security-config.php.
+     *
+     * Ověří existenci souboru, nastaví konstantu BRIDGE_BOOTSTRAPPED (pokud ještě není),
+     * a vyžádá soubor. Pokud soubor neexistuje nebo nevrací pole, vyhodí výjimku.
+     *
+     * @return array Konfigurační pole se security nastavením
+     * @throws \InvalidArgumentException Pokud soubor neexistuje nebo nevrací pole
      */
     private function requireSecurityConfig(): array
     {
@@ -85,8 +96,6 @@ final  class PlatformBridgeConfig
      */
     private function validatePaths(): void
     {
-		// TODO: Odamzat hardcode přepsát na cesty z builderu, které se sem předávají
-		// $this->configPath = "resources/defaults";
         if (!is_dir($this->configPath)) {
             throw new \InvalidArgumentException(
                 "Config path does not exist: {$this->configPath}"
@@ -103,7 +112,8 @@ final  class PlatformBridgeConfig
     /**
      * Vrátí URL pro načítání assetů (JS/CSS).
      *
-     * @return string URL k asset složce (např. '/public/platformbridge' nebo '/platformbridge')
+     * @return string URL k asset složce
+     * @internal
      */
     public function getAssetUrl(): string
     {
@@ -113,9 +123,8 @@ final  class PlatformBridgeConfig
     /**
      * Vrátí URL k API endpointu.
      *
-     * URL se resolvuje samostatně od asset URL:
-     *   - Standalone (dev): '/resources/stubs/api.php'
-     *   - Vendor (prod): '/public/platformbridge/api.php'
+     * @return string URL k API endpointu
+     * @internal
      */
     public function getApiUrl(): string
     {
@@ -123,17 +132,10 @@ final  class PlatformBridgeConfig
     }
 
     /**
-     * Vrátí cestu ke složce s konfiguracemi.
-     */
-    public function getConfigPath(): string
-    {
-        return $this->configPath;
-    }
-
-    /**
      * Vrátí cestu ke složce se šablonami (views).
      *
      * @return string Absolutní cesta k šablonám.
+     * @internal
      */
     public function getViewsPath(): string
     {
@@ -144,12 +146,25 @@ final  class PlatformBridgeConfig
      * Vrátí cestu ke složce pro cache šablon.
      *
      * @return string Absolutní cesta ke cache.
+     * @internal
      */
     public function getCachePath(): string
     {
         return $this->cachePath;
     }
 
+    /**
+     * Vrátí instanci PathResolver pro centrální resolverování cest.
+     *
+     * @return PathResolver
+     * @internal
+     */
+    public function getPathResolver(): PathResolver
+    {
+        return $this->pathResolver ??= new PathResolver(dirname(__DIR__, 2));
+    }
+
+    //TODO: Dodělat
     // public function getLocale(): string
     // {
     //     return $this->locale;
@@ -160,6 +175,7 @@ final  class PlatformBridgeConfig
      * Načítá se ze security-config.php pokud je HMAC zapnutý.
      *
      * @return string|null Tajný klíč nebo null, pokud není nastaven nebo je HMAC vypnutý.
+     * @internal
      */
     public function getSecretKey(): ?string
     {
@@ -171,20 +187,11 @@ final  class PlatformBridgeConfig
      * Pokud není nastaveno, parametry nikdy neexpirují.
      *
      * @return int|null TTL v sekundách nebo null
+     * @internal
      */
     public function getParamsTtl(): ?int
     {
         return $this->resolvedTtl;
-    }
-
-    /**
-     * Vrátí, zda je HMAC podepisování zapnuté.
-     *
-     * @return bool True pokud je HMAC zapnutý, jinak false.
-     */
-    public function isHmacEnabled(): bool
-    {
-        return $this->useHmac;
     }
 
     /**
