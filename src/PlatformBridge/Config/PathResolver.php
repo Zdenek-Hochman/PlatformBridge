@@ -33,13 +33,17 @@ final class PathResolver
     /**
      * Konstruktor nastaví cesty podle režimu použití.
      * @param string|null $packageRoot Volitelně lze předat kořen balíčku (pro testy nebo speciální případy)
+     * @param bool|null $forceVendor Explicitně vynutí vendor (true) nebo standalone (false) režim.
+     *                               null = autodetekce podle složkové struktury.
+     *                               Užitečné v CI/CD (TeamCity), kde složková struktura neodpovídá
+     *                               standardní Composer instalaci.
      */
-    public function __construct(?string $packageRoot = null)
+    public function __construct(?string $packageRoot = null, ?bool $forceVendor = null)
     {
         // Pokud není zadán, vezme 3 úrovně nad aktuální složkou (tj. kořen balíčku)
         $this->packageRoot = $packageRoot ?? dirname(__DIR__, 3);
-        // Zjistí, zda jsme ve vendor režimu (balíček je nainstalován přes Composer)
-        $this->isVendor = $this->detectVendorMode();
+        // Zjistí, zda jsme ve vendor režimu: explicitně nastaveno → použij, jinak autodetekce
+        $this->isVendor = $forceVendor ?? $this->detectVendorMode();
         // Pokud jsme ve vendor režimu, projectRoot je 3 úrovně nad balíčkem (tj. kořen hostitelské aplikace), jinak je shodný s packageRoot
         $this->projectRoot = $this->isVendor ? dirname($this->packageRoot, 3) : $this->packageRoot;
     }

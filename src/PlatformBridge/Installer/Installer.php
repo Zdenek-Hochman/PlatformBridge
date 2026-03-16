@@ -7,44 +7,162 @@ namespace Zoom\PlatformBridge\Installer;
 use Zoom\PlatformBridge\Config\PathResolver;
 
 /**
- * Instalátor PlatformBridge balíčku.
+ * Instalátor PlatformBridge balíčku (vendor-only).
  *
  * Zajišťuje publikování assetů (JS/CSS), API endpointu a konfigurace
- * do hostující aplikace. Podporuje jak standalone režim (vývoj),
- * tak vendor režim (produkce).
+ * do hostující aplikace. Funguje POUZE ve vendor režimu – v standalone/dev
+ * režimu není instalace potřeba, vše se čte přímo ze zdrojových složek.
  *
  * Použití:
- *   - CLI: php vendor/bin/platformbridge install
+ *   - CLI: php vendor/bin/platformbridge install [--force] [--only=assets,config,...]
  *   - Programově: (new Installer())->install()
+ *
+ * CLI parametry:
+ *   --force           Přepíše i existující konfigurační soubory
+ *   --vendor          Vynutí vendor režim (obejde autodetekci podle složkové struktury).
+ *                     Užitečné v CI/CD (TeamCity), kde složková struktura neodpovídá
+ *                     standardní Composer instalaci.
+ *   --only=<kroky>    Spustí jen vybrané kroky (čárkou oddělené):
+ *                       assets, api, config, security, json, cache
  */
 final class Installer
 {
     private PathResolver $paths;
     private StubPublisher $publisher;
 
-    public function __construct(?string $packageRoot = null)
+    /** Přepsat i existující konfigurační soubory */
+    private bool $force = false;
+
+    /** Vynutit vendor režim (obejde autodetekci) */
+    private ?bool $forceVendor = null;
+
+    /** Pokud neprázdné, spustí jen vybrané kroky */
+    private array $only = [];
+
+    /** @var list<string> Povolené názvy kroků pro --only */
+    private const ALLOWED_STEPS = ['assets', 'api', 'config', 'security', 'json', 'cache'];
+
+    public function __construct(?string $packageRoot = null, ?bool $forceVendor = null)
     {
-        $this->paths = new PathResolver($packageRoot);
+        $this->forceVendor = $forceVendor;
+        $this->paths = new PathResolver($packageRoot, $forceVendor);
         $this->publisher = new StubPublisher();
     }
 
+    // ─── CLI options ─────────────────────────────────────────
+
+    /**
+     * Nastaví --force (přepíše i existující konfigurační soubory).
+     */
+    public function setForce(bool $force): self
+    {
+        $this->force = $force;
+        return $this;
+    }
+
+    /**
+     * Vynutí vendor režim bez ohledu na autodetekci složkové struktury.
+     * Užitečné v CI/CD prostředích (TeamCity), kde složková struktura
+     * neodpovídá standardní Composer instalaci a autodetekce selhává.
+     */
+    public function setVendorMode(bool $vendor): self
+    {
+        $this->forceVendor = $vendor;
+        // Přebuduj PathResolver s novým nastavením
+        $this->paths = new PathResolver($this->paths->packageRoot(), $vendor);
+        return $this;
+    }
+
+    /**
+     * Nastaví --only filtr (spustí jen vybrané kroky).
+     *
+     * @param list<string> $steps Názvy kroků: assets, api, config, security, json, cache
+     * @throws \InvalidArgumentException Pokud obsahuje neplatný krok
+     */
+    public function setOnly(array $steps): self
+    {
+        $invalid = array_diff($steps, self::ALLOWED_STEPS);
+        if ($invalid !== []) {
+            throw new \InvalidArgumentException(
+                'Unknown install steps: ' . implode(', ', $invalid)
+                . '. Allowed: ' . implode(', ', self::ALLOWED_STEPS)
+            );
+        }
+        $this->only = $steps;
+        return $this;
+    }
+
+    /**
+     * Parsuje CLI argumenty z $argv a nastaví příslušné options.
+     *
+     * @param list<string> $argv Argumenty příkazové řádky (bez názvu skriptu a příkazu)
+     */
+    public function applyCliOptions(array $argv): self
+    {
+        foreach ($argv as $arg) {
+            if ($arg === '--force') {
+                $this->setForce(true);
+                continue;
+            }
+
+            if ($arg === '--vendor') {
+                $this->setVendorMode(true);
+                continue;
+            }
+
+            if (str_starts_with($arg, '--only=')) {
+                $value = substr($arg, strlen('--only='));
+                $steps = array_filter(array_map('trim', explode(',', $value)));
+                $this->setOnly($steps);
+                continue;
+            }
+        }
+
+        return $this;
+    }
+
+    // ─── Install / Update ────────────────────────────────────
+
     /**
      * Kompletní instalace – assety + API + konfigurace.
-     * Konfigurace se NEPŘEPÍŠE pokud existuje.
+     * Konfigurace se NEPŘEPÍŠE pokud existuje (pokud není --force).
+     *
+     * V standalone režimu instalace není potřeba – skript ukončí s upozorněním.
      */
     public function install(): void
     {
         $this->info("PlatformBridge Installer");
         $this->info("========================");
-        $this->info("Mode: " . ($this->paths->isVendor() ? 'vendor' : 'standalone'));
+
+        if (!$this->paths->isVendor()) {
+            $this->info("");
+            $this->info("  ⚠️  Standalone (dev) režim – instalace není potřeba.");
+            $this->info("     V localhost se vše čte přímo ze zdrojových složek.");
+            $this->info("     Installer je určen pro vendor režim (produkce).");
+            $this->info("");
+            $this->info("  Tip: Přepni do vendor režimu nebo spusť z hostitelské aplikace:");
+            $this->info("       php vendor/bin/platformbridge install");
+            $this->info("");
+            $this->info("  V CI/CD prostředí použij --vendor pro vynucení vendor režimu:");
+            $this->info("       php vendor/bin/platformbridge install --vendor");
+            return;
+        }
+
+        $this->info("Mode: vendor");
+        if ($this->force) {
+            $this->info("Flag: --force (overwrite configs)");
+        }
+        if ($this->only !== []) {
+            $this->info("Flag: --only=" . implode(',', $this->only));
+        }
         $this->info("");
 
-        $this->publishAssets();
-        $this->publishApiEndpoint();
-        $this->publishConfig();
-        $this->publishSecurityConfig();
-        $this->publishJson();
-        $this->ensureCacheDir();
+        $this->runStep('assets', $this->publishAssets(...));
+        $this->runStep('api', $this->publishApiEndpoint(...));
+        $this->runStep('config', $this->publishConfig(...));
+        $this->runStep('security', $this->publishSecurityConfig(...));
+        $this->runStep('json', $this->publishJson(...));
+        $this->runStep('cache', $this->ensureCacheDir(...));
 
         $this->info("\n✅ PlatformBridge installed successfully!");
     }
@@ -57,30 +175,34 @@ final class Installer
         $this->info("PlatformBridge Updater");
         $this->info("======================");
 
-        $this->publishAssets();
-        $this->publishApiEndpoint();
+        if (!$this->paths->isVendor()) {
+            $this->info("");
+            $this->info("  ⚠️  Standalone (dev) režim – update není potřeba.");
+            $this->info("     V localhost se vše čte přímo ze zdrojových složek.");
+            $this->info("");
+            $this->info("  V CI/CD prostředí použij --vendor pro vynucení vendor režimu:");
+            $this->info("       php vendor/bin/platformbridge update --vendor");
+            return;
+        }
+
+        $this->runStep('assets', $this->publishAssets(...));
+        $this->runStep('api', $this->publishApiEndpoint(...));
 
         $this->info("\n✅ PlatformBridge updated!");
     }
 
+    // ─── Publish kroky ───────────────────────────────────────
+
     /**
-     * Publikuje bridge-config.php do hostující aplikace (bez přepisu).
-     * V standalone režimu se přeskočí – dev používá resources/stubs/ přímo.
-     *
-     * Vendor: {projectRoot}/public/bridge-config.php
-     * Standalone: resources/stubs/bridge-config.php (bez kopírování)
+     * Publikuje bridge-config.php do hostující aplikace.
+     * Bez --force se existující soubor nepřepisuje.
      */
     public function publishConfig(): void
     {
-        if (!$this->paths->isVendor()) {
-            $this->info("  ⏭️  Standalone mode: using resources/stubs/bridge-config.php directly (skipped)");
-            return;
-        }
-
         $stub = $this->paths->stubBridgeConfigFile();
         $target = $this->paths->userBridgeConfigFile();
 
-        $written = $this->publisher->publish($stub, $target, overwrite: false);
+        $written = $this->publisher->publish($stub, $target, overwrite: $this->force);
         $this->info($written
             ? "  ✅ Published: public/bridge-config.php"
             : "  ⏭️  Skipped:   public/bridge-config.php (exists)"
@@ -88,24 +210,16 @@ final class Installer
     }
 
     /**
-     * Publikuje security-config.php do hostující aplikace (bez přepisu).
+     * Publikuje security-config.php do hostující aplikace.
      * Soubor se umístí MIMO public/ složku – přístupný pouze internímu jádru.
-     * V standalone režimu se přeskočí – dev používá resources/stubs/ přímo.
-     *
-     * Vendor: {projectRoot}/config/security-config.php
-     * Standalone: resources/stubs/security-config.php (bez kopírování)
+     * Bez --force se existující soubor nepřepisuje.
      */
     public function publishSecurityConfig(): void
     {
-        if (!$this->paths->isVendor()) {
-            $this->info("  ⏭️  Standalone mode: using resources/stubs/security-config.php directly (skipped)");
-            return;
-        }
-
         $stub = $this->paths->stubSecurityConfigFile();
         $target = $this->paths->userSecurityConfigFile();
 
-        $written = $this->publisher->publish($stub, $target, overwrite: false);
+        $written = $this->publisher->publish($stub, $target, overwrite: $this->force);
         $this->info($written
             ? "  ✅ Published: config/security-config.php"
             : "  ⏭️  Skipped:   config/security-config.php (exists)"
@@ -113,7 +227,7 @@ final class Installer
     }
 
     /**
-     * Publikuje JSON soubory (bez přepisu).
+     * Publikuje JSON soubory. Bez --force se existující nepřepisují.
      */
     public function publishJson(): void
     {
@@ -123,7 +237,6 @@ final class Installer
         foreach (['blocks.json', 'layouts.json', 'generators.json'] as $file) {
             $source = $defaults . '/' . $file;
 
-            // Pokud zdrojový soubor neexistuje, přeskoč
             if (!file_exists($source)) {
                 $this->info("  ⚠️  Source not found: {$file} (skipped)");
                 continue;
@@ -132,7 +245,7 @@ final class Installer
             $written = $this->publisher->publish(
                 $source,
                 $target . '/' . $file,
-                overwrite: false
+                overwrite: $this->force
             );
             $this->info($written
                 ? "  ✅ Published: config/platform-bridge/{$file}"
@@ -143,15 +256,9 @@ final class Installer
 
     /**
      * Publikuje dist/ assety do public/platformbridge/ (VŽDY přepíše).
-     * V standalone režimu se přeskočí – dev používá dist/ přímo.
      */
     private function publishAssets(): void
     {
-        if (!$this->paths->isVendor()) {
-            $this->info("  ⏭️  Standalone mode: assets served from dist/ directly (skipped)");
-            return;
-        }
-
         $distPath = $this->paths->packageDistPath();
         $targetPath = $this->paths->publicAssetsPath();
 
@@ -168,23 +275,16 @@ final class Installer
     }
 
     /**
-     * Publikuje API endpoint (bez přepisu).
-     *
-     * Vendor: {projectRoot}/public/platformbridge/api.php
-     * Standalone: používá přímo resources/stubs/api.php (bez kopírování)
+     * Publikuje API endpoint do public/platformbridge/api.php.
+     * Bez --force se existující soubor nepřepisuje.
      */
     private function publishApiEndpoint(): void
     {
-        if (!$this->paths->isVendor()) {
-            $this->info("  ⏭️  Standalone mode: using resources/stubs/api.php directly (skipped)");
-            return;
-        }
-
         $stub = $this->paths->stubApiFile();
         $target = $this->paths->publicApiFile();
         $label = 'public/platformbridge/api.php';
 
-        $written = $this->publisher->publish($stub, $target, overwrite: false);
+        $written = $this->publisher->publish($stub, $target, overwrite: $this->force);
         $this->info($written
             ? "  ✅ Published: {$label}"
             : "  ⏭️  Skipped:   {$label} (exists)"
@@ -198,6 +298,19 @@ final class Installer
             mkdir($cache, 0755, true);
             $this->info("  ✅ Created: var/cache/");
         }
+    }
+
+    // ─── Helpers ─────────────────────────────────────────────
+
+    /**
+     * Spustí krok pouze pokud je v --only filteru (nebo pokud filtr není nastaven).
+     */
+    private function runStep(string $name, \Closure $callback): void
+    {
+        if ($this->only !== [] && !in_array($name, $this->only, true)) {
+            return;
+        }
+        $callback();
     }
 
     private function info(string $message): void

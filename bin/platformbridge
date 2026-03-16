@@ -1,18 +1,31 @@
 #!/usr/bin/env php
-chmod +x bin/platformbridge
 <?php
 
 /**
  * PlatformBridge CLI
  *
- * Instalace a aktualizace assetů a konfigurace.
+ * Instalace a aktualizace assetů a konfigurace (vendor-only).
+ * V standalone/dev režimu instalace není potřeba – vše se čte přímo ze zdrojových složek.
  *
  * Usage:
- *   php vendor/bin/platformbridge install                - Kompletní instalace (assety + API + config + JSON)
- *   php vendor/bin/platformbridge update                 - Aktualizace assetů a API endpointu
- *   php vendor/bin/platformbridge publish:config         - Publikuje bridge-config.php (API nastavení)
- *   php vendor/bin/platformbridge publish:security-config - Publikuje security-config.php (HMAC klíče)
- *   php vendor/bin/platformbridge publish:json           - Publikuje POUZE JSON soubory
+ *   php vendor/bin/platformbridge install [options]      - Kompletní instalace
+ *   php vendor/bin/platformbridge update [options]       - Aktualizace assetů a API
+ *   php vendor/bin/platformbridge publish:config         - Publikuje bridge-config.php
+ *   php vendor/bin/platformbridge publish:security-config - Publikuje security-config.php
+ *   php vendor/bin/platformbridge publish:json           - Publikuje JSON soubory
+ *
+ * Options:
+ *   --force           Přepíše i existující konfigurační soubory
+ *   --vendor          Vynutí vendor režim (obejde autodetekci složkové struktury)
+ *   --only=<kroky>    Spustí jen vybrané kroky (čárkou oddělené):
+ *                       assets, api, config, security, json, cache
+ *
+ * Examples:
+ *   php vendor/bin/platformbridge install                - Nainstaluje vše
+ *   php vendor/bin/platformbridge install --force        - Nainstaluje vše, přepíše konfigurace
+ *   php vendor/bin/platformbridge install --only=assets  - Nainstaluje pouze assety
+ *   php vendor/bin/platformbridge install --only=config,security - Pouze konfiguraci
+ *   php vendor/bin/platformbridge install --vendor       - Vynutí vendor režim (CI/CD)
  *
  * @see \Zoom\PlatformBridge\Installer\Installer
  */
@@ -39,8 +52,18 @@ if (!$autoloaderFound) {
 
 use Zoom\PlatformBridge\Installer\Installer;
 
-$command = $argv[1] ?? 'install';
+// Parsování příkazu a CLI argumentů
+$command = $argv[1] ?? null;
+$cliArgs = array_slice($argv, 2); // Argumenty za příkazem (--force, --only=...)
+
+// Help / žádný příkaz
+if ($command === null || $command === '--help' || $command === '-h') {
+    printUsage();
+    exit(0);
+}
+
 $installer = new Installer();
+$installer->applyCliOptions($cliArgs);
 
 switch ($command) {
     case 'install':
@@ -52,26 +75,62 @@ switch ($command) {
         break;
 
     case 'publish:config':
+        $installer->applyCliOptions($cliArgs);
         $installer->publishConfig();
         break;
 
     case 'publish:security-config':
+        $installer->applyCliOptions($cliArgs);
         $installer->publishSecurityConfig();
         break;
 
     case 'publish:json':
+        $installer->applyCliOptions($cliArgs);
         $installer->publishJson();
         break;
 
     default:
-        fwrite(STDERR, "Unknown command: {$command}\n");
-        fwrite(STDERR, "Usage: platformbridge [install|update|publish:config|publish:security-config|publish:json]\n");
-        fwrite(STDERR, "\n");
-        fwrite(STDERR, "Commands:\n");
-        fwrite(STDERR, "  install                 Publish assets, API endpoint, config and JSON files\n");
-        fwrite(STDERR, "  update                  Update assets and API endpoint (keeps config)\n");
-        fwrite(STDERR, "  publish:config          Publish bridge-config.php to public/ (API settings)\n");
-        fwrite(STDERR, "  publish:security-config Publish security-config.php to config/ (HMAC keys)\n");
-        fwrite(STDERR, "  publish:json            Publish JSON config files (skip if exists)\n");
+        fwrite(STDERR, "Unknown command: {$command}\n\n");
+        printUsage();
         exit(1);
+}
+
+function printUsage(): void
+{
+    $usage = <<<'USAGE'
+PlatformBridge CLI – Installer & Updater (vendor-only)
+
+Usage:
+  platformbridge <command> [options]
+
+Commands:
+  install                 Publish assets, API endpoint, config and JSON files
+  update                  Update assets and API endpoint (keeps config)
+  publish:config          Publish bridge-config.php to public/ (API settings)
+  publish:security-config Publish security-config.php to config/ (HMAC keys)
+  publish:json            Publish JSON config files
+
+Options:
+  --force                 Overwrite existing config files (default: skip if exists)
+  --vendor                Force vendor mode (bypass folder-based auto-detection).
+                          Useful in CI/CD (TeamCity) where folder structure differs
+                          from standard Composer layout.
+  --only=<steps>          Run only specific steps (comma-separated):
+                            assets, api, config, security, json, cache
+  --help, -h              Show this help
+
+Examples:
+  platformbridge install                        Full install
+  platformbridge install --force                Full install, overwrite configs
+  platformbridge install --only=assets          Install only JS/CSS assets
+  platformbridge install --only=config,security Install only config files
+  platformbridge install --vendor               Force vendor mode (CI/CD)
+
+Note:
+  In standalone/dev mode the installer is not needed – all files are read
+  directly from source folders. The installer is designed for vendor mode
+  (when installed via Composer into a host application).
+USAGE;
+
+    echo $usage . PHP_EOL;
 }
