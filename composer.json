@@ -21,10 +21,10 @@
     },
     "scripts": {
         "post-install-cmd": [
-			"@php vendor/zoom/platform-bridge/bin/platformbridge install"
+			"@php bin/platformbridge install"
         ],
         "post-update-cmd": [
-            "@php vendor/zoom/platform-bridge/bin/platformbridge update"
+            "@php bin/platformbridge update"
         ]
     },
     "extra": {
