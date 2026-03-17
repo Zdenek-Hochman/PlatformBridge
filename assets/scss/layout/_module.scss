@@ -1,35 +1,35 @@
 // ─── Module Layout ─────────────────────────────────────────────
-// Hlavní layout formuláře AI modulu (.ai-module).
+// Hlavní layout formuláře AI modulu (.pb-module).
 
 @use "../common/mixins" as m;
 
-$ai-module: ".ai-module";
+$pb-module: ".pb-module";
 
-#{$ai-module} {
-	padding: var(--module-spacing);
+#{$pb-module} {
+	padding: var(--pb-module-spacing);
 
 	&__title {
-		font-weight: var(--font-weight-bold);
-		margin-bottom: var(--space-3);
+		font-weight: var(--pb-font-weight-bold);
+		margin-bottom: var(--pb-space-3);
 	}
 
 	&__form {
-		background: var(--module-bg);
-		border-radius: var(--radius);
-		padding: var(--module-spacing);
-		@include m.flex(column, stretch, stretch, nowrap, var(--space-3));
+		background: var(--pb-module-bg);
+		border-radius: var(--pb-radius);
+		padding: var(--pb-module-spacing);
+		@include m.flex(column, stretch, stretch, nowrap, var(--pb-space-3));
 	}
 
 	&__wrapper {
-		background: var(--wrapper-bg);
-		border: var(--border);
-		border-radius: var(--radius);
-		padding: var(--space-5);
+		background: var(--pb-wrapper-bg);
+		border: var(--pb-border);
+		border-radius: var(--pb-radius);
+		padding: var(--pb-space-5);
 	}
 
 	&__section {
 		position: relative;
-		gap: var(--space-3);
+		gap: var(--pb-space-3);
 	}
 
 	&__block {
@@ -42,20 +42,20 @@ $ai-module: ".ai-module";
 			display: none;
 		}
 
-		& > #{$ai-module}__label + * {
+		& > #{$pb-module}__label + * {
 			margin-left: m.rem(10px);
 		}
-		& > #{$ai-module}__label:not(:has(select)) * + * {
-			margin-inline-start: var(--space-2);
+		& > #{$pb-module}__label:not(:has(select)) * + * {
+			margin-inline-start: var(--pb-space-2);
 		}
 	}
 
 	&__result {
-		margin-top: var(--space-4);
+		margin-top: var(--pb-space-4);
 
 		&-title {
-			font-weight: var(--font-weight-bold);
-			margin-bottom: var(--space-3);
+			font-weight: var(--pb-font-weight-bold);
+			margin-bottom: var(--pb-space-3);
 		}
 	}
 }

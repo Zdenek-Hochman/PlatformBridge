@@ -1,1 +1,1 @@
-<small class="ai-module__small {$small.class}">{$small.text}</small>
+<small class="pb-module__small {$small.class}">{$small.text}</small>

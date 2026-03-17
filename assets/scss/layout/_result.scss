@@ -1,18 +1,18 @@
 // ─── Result Layout ─────────────────────────────────────────────
-// Layout pro zobrazení AI výsledků (.ai-result).
+// Layout pro zobrazení AI výsledků (.pb-result).
 
 @use "../common/mixins" as m;
 
-.ai-result {
+.pb-result {
 	@include m.flex(column, stretch, stretch, wrap);
 
 	&__item {
-		background: var(--result-bg);
-		border-radius: var(--radius);
-		border: var(--border);
-		padding: var(--space-5);
-		margin-bottom: var(--space-3);
-		@include m.flex(column, stretch, stretch, wrap, var(--space-3));
+		background: var(--pb-result-bg);
+		border-radius: var(--pb-radius);
+		border: var(--pb-border);
+		padding: var(--pb-space-5);
+		margin-bottom: var(--pb-space-3);
+		@include m.flex(column, stretch, stretch, wrap, var(--pb-space-3));
 		@include m.transition(opacity, transform);
 	}
 
@@ -22,9 +22,9 @@
 	}
 
 	&__label {
-		font-weight: var(--font-weight-semibold);
-		font-size: var(--text-sm);
-		color: var(--color-text-secondary);
+		font-weight: var(--pb-font-weight-semibold);
+		font-size: var(--pb-text-sm);
+		color: var(--pb-color-text-secondary);
 		text-transform: uppercase;
 		letter-spacing: 0.5px;
 	}
@@ -32,8 +32,8 @@
 	&__content {
 		grid-row: 2;
 		align-self: center;
-		font-size: var(--text-md);
-		color: var(--color-text-primary);
+		font-size: var(--pb-text-md);
+		color: var(--pb-color-text-primary);
 	}
 
 	&__actions {
@@ -44,14 +44,14 @@
 	}
 
 	&__action {
-		padding: var(--space-1);
-		border-radius: var(--radius-sm);
-		color: var(--color-text-secondary);
+		padding: var(--pb-space-1);
+		border-radius: var(--pb-radius-sm);
+		color: var(--pb-color-text-secondary);
 		@include m.transition(color, background-color);
 
 		&:hover {
-			color: var(--color-primary);
-			background-color: var(--color-bg-hover);
+			color: var(--pb-color-primary);
+			background-color: var(--pb-color-bg-hover);
 		}
 	}
 
@@ -62,17 +62,17 @@
 
 	&__use {
 		margin-left: auto;
-		padding: var(--space-1) var(--space-3);
-		background: var(--color-primary);
-		color: var(--color-text-inverse);
-		border-radius: var(--radius-sm);
-		font-weight: var(--font-weight-semibold);
-		font-size: var(--text-sm);
+		padding: var(--pb-space-1) var(--pb-space-3);
+		background: var(--pb-color-primary);
+		color: var(--pb-color-text-inverse);
+		border-radius: var(--pb-radius-sm);
+		font-weight: var(--pb-font-weight-semibold);
+		font-size: var(--pb-text-sm);
 		cursor: pointer;
 		@include m.transition(background-color);
 
 		&:hover {
-			background: color-mix(in srgb, var(--color-primary), white 10%);
+			background: color-mix(in srgb, var(--pb-color-primary), white 10%);
 		}
 	}
 }

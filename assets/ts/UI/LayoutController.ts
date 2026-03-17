@@ -1,4 +1,5 @@
 import { Dom, DomNode } from 'assets/ts/Core';
+import { MODULE } from 'assets/ts/Const';
 
 /**
  * LayoutController – JS controller pro CSS Grid layout řízený data atributy.
@@ -30,7 +31,7 @@ export class LayoutController {
     private static readonly GRID_ROW_SELECTOR = '[data-layout-grid-row]';
 
     /** CSS class přidaná sekcím s aktivním grid layoutem */
-    private static readonly GRID_ACTIVE_CLASS = 'ai-module__section--grid';
+    private static readonly GRID_ACTIVE_CLASS = MODULE.SECTION_GRID;
 
     /** Root element */
     private root: DomNode<HTMLElement>;

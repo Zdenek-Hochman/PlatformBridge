@@ -63,7 +63,7 @@
 	$result: ();
 
 	@each $prop in $properties {
-		$result: list.append($result, #{$prop} var(--transition-base), comma);
+		$result: list.append($result, #{$prop} var(--pb-transition-base), comma);
 	}
 
 	transition: $result;
@@ -118,7 +118,7 @@
 @mixin focus-ring {
 	&:focus-visible {
 		outline: none;
-		box-shadow: var(--focus-ring);
+		box-shadow: var(--pb-focus-ring);
 	}
 }
 
@@ -151,11 +151,11 @@
 
 @mixin shadow($level: md) {
 	@if $level == sm {
-		box-shadow: var(--shadow-sm);
+		box-shadow: var(--pb-shadow-sm);
 	} @else if $level == md {
-		box-shadow: var(--shadow-md);
+		box-shadow: var(--pb-shadow-md);
 	} @else if $level == lg {
-		box-shadow: var(--shadow-lg);
+		box-shadow: var(--pb-shadow-lg);
 	}
 }
 

@@ -1,100 +1,101 @@
 // ─── Design Tokens ─────────────────────────────────────────────
 // Centrální definice všech CSS custom properties a SCSS proměnných.
+// Všechny custom properties mají prefix --pb- pro izolaci od jiných aplikací.
 
 :root {
 	// ── Font ───────────────────────────────────────────────
-	--font-primary: "Inter", "Segoe UI", system-ui, sans-serif;
-	--base-font-size: 10px;
+	--pb-font-primary: "Inter", "Segoe UI", system-ui, sans-serif;
+	--pb-base-font-size: 10px;
 
 	// ── Spacing scale ─────────────────────────────────────
-	--space-1: 0.25rem;
-	--space-2: 0.5rem;
-	--space-3: 0.75rem;
-	--space-4: 1rem;
-	--space-5: 1.5rem;
-	--space-6: 2rem;
+	--pb-space-1: 0.25rem;
+	--pb-space-2: 0.5rem;
+	--pb-space-3: 0.75rem;
+	--pb-space-4: 1rem;
+	--pb-space-5: 1.5rem;
+	--pb-space-6: 2rem;
 
 	// ── Typography scale ──────────────────────────────────
-	--text-xs: 0.75rem;
-	--text-sm: 0.875rem;
-	--text-md: 1rem;
-	--text-lg: 1.25rem;
-	--text-xl: 1.5rem;
-	--text-2xl: 2rem;
+	--pb-text-xs: 0.75rem;
+	--pb-text-sm: 0.875rem;
+	--pb-text-md: 1rem;
+	--pb-text-lg: 1.25rem;
+	--pb-text-xl: 1.5rem;
+	--pb-text-2xl: 2rem;
 
-	--font-weight-regular: 400;
-	--font-weight-medium: 500;
-	--font-weight-semibold: 600;
-	--font-weight-bold: 700;
+	--pb-font-weight-regular: 400;
+	--pb-font-weight-medium: 500;
+	--pb-font-weight-semibold: 600;
+	--pb-font-weight-bold: 700;
 
-	--line-height-tight: 1.2;
-	--line-height-normal: 1.5;
-	--line-height-relaxed: 1.7;
+	--pb-line-height-tight: 1.2;
+	--pb-line-height-normal: 1.5;
+	--pb-line-height-relaxed: 1.7;
 
 	// ── Headings ──────────────────────────────────────────
-	--h1-size: var(--text-2xl);
-	--h2-size: var(--text-xl);
-	--h3-size: var(--text-lg);
-	--h4-size: var(--text-md);
-	--h5-size: var(--text-sm);
-	--h6-size: var(--text-xs);
+	--pb-h1-size: var(--pb-text-2xl);
+	--pb-h2-size: var(--pb-text-xl);
+	--pb-h3-size: var(--pb-text-lg);
+	--pb-h4-size: var(--pb-text-md);
+	--pb-h5-size: var(--pb-text-sm);
+	--pb-h6-size: var(--pb-text-xs);
 
-	--h1-fluid: clamp(var(--text-lg), 2vw, var(--text-2xl));
-	--h2-fluid: clamp(var(--text-md), 2vw, var(--text-xl));
+	--pb-h1-fluid: clamp(var(--pb-text-lg), 2vw, var(--pb-text-2xl));
+	--pb-h2-fluid: clamp(var(--pb-text-md), 2vw, var(--pb-text-xl));
 
 	// ── Colors ────────────────────────────────────────────
-	--color-primary: #159ad8;
-	--color-secondary: #34bfa3;
-	--color-success: #34bfa3;
-	--color-warning: #f5a623;
-	--color-danger: #e74c3c;
-	--color-info: #159ad8;
+	--pb-color-primary: #159ad8;
+	--pb-color-secondary: #34bfa3;
+	--pb-color-success: #34bfa3;
+	--pb-color-warning: #f5a623;
+	--pb-color-danger: #e74c3c;
+	--pb-color-info: #159ad8;
 
-	--color-bg-primary: #f7f7f7;
-	--color-bg-secondary: #f0f9fc;
-	--color-bg-input: #fff;
-	--color-bg-hover: #f2f4f7;
-	--color-bg-selected: #eef2ff;
+	--pb-color-bg-primary: #f7f7f7;
+	--pb-color-bg-secondary: #f0f9fc;
+	--pb-color-bg-input: #fff;
+	--pb-color-bg-hover: #f2f4f7;
+	--pb-color-bg-selected: #eef2ff;
 
-	--color-text-primary: #222d32;
-	--color-text-secondary: #9699a2;
-	--color-text-inverse: #fff;
-	--color-text-danger: #e74c3c;
+	--pb-color-text-primary: #222d32;
+	--pb-color-text-secondary: #9699a2;
+	--pb-color-text-inverse: #fff;
+	--pb-color-text-danger: #e74c3c;
 
 	// ── Borders ───────────────────────────────────────────
-	--color-border: #e3e7eb;
-	--color-border-hover: #98a2b3;
-	--border: 1px solid var(--color-border);
+	--pb-color-border: #e3e7eb;
+	--pb-color-border-hover: #98a2b3;
+	--pb-border: 1px solid var(--pb-color-border);
 
-	--radius: 1rem;
-	--radius-sm: 0.4rem;
-	--radius-round: 50%;
+	--pb-radius: 1rem;
+	--pb-radius-sm: 0.4rem;
+	--pb-radius-round: 50%;
 
 	// ── Shadows ───────────────────────────────────────────
-	--shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.06);
-	--shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08);
-	--shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.12);
+	--pb-shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.06);
+	--pb-shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08);
+	--pb-shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.12);
 
 	// ── Transitions ───────────────────────────────────────
-	--transition-fast: 0.15s ease;
-	--transition-base: 0.2s ease;
-	--transition-slow: 0.3s ease-in-out;
+	--pb-transition-fast: 0.15s ease;
+	--pb-transition-base: 0.2s ease;
+	--pb-transition-slow: 0.3s ease-in-out;
 
 	// ── Focus & States ────────────────────────────────────
-	--focus-ring: 0 0 0 3px rgba(21, 154, 216, 0.25);
-	--disabled-opacity: 0.5;
+	--pb-focus-ring: 0 0 0 3px rgba(21, 154, 216, 0.25);
+	--pb-disabled-opacity: 0.5;
 
 	// ── Module-specific ───────────────────────────────────
-	--module-spacing: var(--space-6);
-	--module-bg: var(--color-bg-primary);
-	--wrapper-bg: white;
-	--result-bg: var(--color-bg-secondary);
-	--button-space: 0.5rem 3rem;
+	--pb-module-spacing: var(--pb-space-6);
+	--pb-module-bg: var(--pb-color-bg-primary);
+	--pb-wrapper-bg: white;
+	--pb-result-bg: var(--pb-color-bg-secondary);
+	--pb-button-space: 0.5rem 3rem;
 
 	// ── Z-Index scale ─────────────────────────────────────
-	--z-dropdown: 100;
-	--z-notification: 200;
-	--z-loader: 300;
+	--pb-z-dropdown: 100;
+	--pb-z-notification: 200;
+	--pb-z-loader: 300;
 }
 
 // ── SCSS Variables ────────────────────────────────────────────

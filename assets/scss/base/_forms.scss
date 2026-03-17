@@ -1,46 +1,46 @@
 // ─── Form Base Styles ──────────────────────────────────────────
 // Základní formulářové styly aplikované na HTML elementy.
 
-.ai-module input[type="radio"],
-.ai-module input[type="checkbox"] {
+.pb-module input[type="radio"],
+.pb-module input[type="checkbox"] {
 	vertical-align: middle;
-	accent-color: var(--color-primary);
+	accent-color: var(--pb-color-primary);
 	cursor: pointer;
 }
 
-.ai-module input[type="text"],
-.ai-module input[type="email"],
-.ai-module input[type="number"],
-.ai-module input[type="search"],
-.ai-module textarea {
+.pb-module input[type="text"],
+.pb-module input[type="email"],
+.pb-module input[type="number"],
+.pb-module input[type="search"],
+.pb-module textarea {
 	width: 100%;
-	padding: var(--space-2) var(--space-3);
-	border: var(--border);
-	border-radius: var(--radius-sm);
-	background: var(--color-bg-input);
-	color: var(--color-text-primary);
-	transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+	padding: var(--pb-space-2) var(--pb-space-3);
+	border: var(--pb-border);
+	border-radius: var(--pb-radius-sm);
+	background: var(--pb-color-bg-input);
+	color: var(--pb-color-text-primary);
+	transition: border-color var(--pb-transition-fast), box-shadow var(--pb-transition-fast);
 
 	&::placeholder {
-		color: var(--color-text-secondary);
+		color: var(--pb-color-text-secondary);
 	}
 
 	&:focus {
-		border-color: var(--color-primary);
-		box-shadow: var(--focus-ring);
+		border-color: var(--pb-color-primary);
+		box-shadow: var(--pb-focus-ring);
 	}
 
 	&:disabled {
-		opacity: var(--disabled-opacity);
+		opacity: var(--pb-disabled-opacity);
 		cursor: not-allowed;
 	}
 }
 
-.ai-module textarea {
+.pb-module textarea {
 	resize: vertical;
 	min-height: 6rem;
 }
 
-.ai-module label {
+.pb-module label {
 	cursor: pointer;
 }

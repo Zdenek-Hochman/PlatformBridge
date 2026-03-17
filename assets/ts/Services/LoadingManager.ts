@@ -8,6 +8,7 @@
  */
 
 import { EventBus } from '../Core/EventBus';
+import { MODULE } from 'assets/ts/Const';
 
 export interface LoadingOptions {
 	/** CSS třída pro loading stav na wrapperu */
@@ -25,11 +26,11 @@ export interface LoadingOptions {
 }
 
 const DEFAULTS: Required<LoadingOptions> = {
-	loadingClass: 'ai-module--loading',
-	buttonLoadingClass: 'ai-module__submit--loading',
+	loadingClass: MODULE.LOADING,
+	buttonLoadingClass: MODULE.SUBMIT_LOADING,
 	buttonLoadingText: 'Generuji...',
 	showOverlay: true,
-	overlayClass: 'ai-module__overlay',
+	overlayClass: MODULE.OVERLAY,
 	disableForm: true,
 };
 

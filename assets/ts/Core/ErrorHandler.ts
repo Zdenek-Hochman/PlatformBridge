@@ -12,6 +12,7 @@
 import { EventBus } from './EventBus';
 import { type AiBridgeError, type ServerResponse, type ApiError } from 'assets/ts/Types';
 import { Dom } from "./Dom";
+import { MODULE, ERROR_ALERT } from 'assets/ts/Const';
 
 export interface ErrorHandlerOptions {
 	/** Selektor kontejneru pro error hlášky */
@@ -27,8 +28,8 @@ export interface ErrorHandlerOptions {
 }
 
 const DEFAULTS: Required<ErrorHandlerOptions> = {
-	errorContainerSelector: '.ai-module',
-	errorAlertClass: 'ai-error-alert',
+	errorContainerSelector: `.${MODULE.ROOT}`,
+	errorAlertClass: ERROR_ALERT.ROOT,
 	autoHideDelay: 10000,
 	verbose: false,
 	httpMessages: {

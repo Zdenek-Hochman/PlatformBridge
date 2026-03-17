@@ -22,6 +22,7 @@
 
 import { EventBus } from '../Core/EventBus';
 import { Dom, DomNode } from '../Core/Dom';
+import { PROGRESS } from 'assets/ts/Const';
 import type { SseProgressEvent, SseResultEvent, SseCompleteEvent, SseErrorEvent } from 'assets/ts/Types';
 
 // ─── Konfigurace ───────────────────────────────────────────────
@@ -40,7 +41,7 @@ export interface ProgressLoaderOptions {
 }
 
 const DEFAULTS: Required<ProgressLoaderOptions> = {
-	cssPrefix: 'ai-progress',
+	cssPrefix: PROGRESS.ROOT,
 	animateResults: true,
 	animationDelay: 150,
 	showTimer: true,

@@ -19,7 +19,7 @@ import {
  *
  * @example
  * Cílová aplikace
- * window.addEventListener('ai:success', (e: CustomEvent) => {
+ * window.addEventListener('pb:success', (e: CustomEvent) => {
  *     console.log(e.detail); // { data, endpoint, duration }
  * });
  */
@@ -53,7 +53,7 @@ export class EventBus {
 	private target: EventTarget;
 
 	/** Prefix pro DOM eventy */
-	private readonly DOM_PREFIX = 'ai';
+	private readonly DOM_PREFIX = 'pb';
 
 	constructor(target: EventTarget = window) {
 		this.target = target;
@@ -116,7 +116,7 @@ export class EventBus {
 	 * Publikuje (emitne) event interně i jako DOM CustomEvent.
 	 *
 	 * 1) Zavolá všechny interní listenery registrované přes subscribe/once.
-	 * 2) Vytvoří a dispatchuje DOM CustomEvent s prefixem (např. "ai:success"),
+	 * 2) Vytvoří a dispatchuje DOM CustomEvent s prefixem (např. "pb:success"),
 	 *    který mohou poslouchat i externí aplikace přes addEventListener.
 	 *
 	 * Pokud některý listener vyhodí výjimku, je zachycena a zalogována do konzole,

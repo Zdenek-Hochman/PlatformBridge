@@ -1,7 +1,7 @@
 /**
  * VisibilityController – Podmíněné zobrazování bloků formuláře.
  *
- * Čte data-visible-if atribut z .ai-module__block wrapperů,
+ * Čte data-visible-if atribut z .pb-module__block wrapperů,
  * parsuje JSON podmínky a na základě aktuální hodnoty zdrojového
  * pole (radio, checkbox) zobrazí nebo skryje blok.
  *
@@ -19,6 +19,8 @@
  *   VisibilityController.init(formElement);   // nad konkrétním formulářem
  */
 
+import { MODULE } from 'assets/ts/Const';
+
 /** Jedna podmínka viditelnosti: název pole -> očekávaná hodnota */
 interface VisibilityCondition {
 	/** Název zdrojového pole (atribut name) */
@@ -29,7 +31,7 @@ interface VisibilityCondition {
 
 /** Interní binding – blok + jeho podmínky */
 interface VisibilityBinding {
-	/** Wrapper element bloku (.ai-module__block) */
+	/** Wrapper element bloku (.pb-module__block) */
 	block: HTMLElement;
 	/** Všechny podmínky, které musí být splněny pro zobrazení */
 	conditions: VisibilityCondition[];
@@ -41,7 +43,7 @@ export class VisibilityController {
 	private static readonly ATTR = 'data-visible-if';
 
 	/** CSS třída přidaná na skrytý blok (umožňuje animace) */
-	private static readonly HIDDEN_CLASS = 'ai-module__block--hidden';
+	private static readonly HIDDEN_CLASS = MODULE.BLOCK_HIDDEN;
 
 	/** Všechny aktivní bindingy */
 	private bindings: VisibilityBinding[] = [];

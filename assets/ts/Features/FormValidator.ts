@@ -1,4 +1,5 @@
 import { EventBus } from 'assets/ts/Core';
+import { MODULE } from 'assets/ts/Const';
 import { type ValidationError } from 'assets/ts/Types';
 
 /**
@@ -27,9 +28,9 @@ export interface ValidatorOptions {
 }
 
 const DEFAULTS: Required<ValidatorOptions> = {
-	errorClass: 'ai-module__field--error',
-	errorMessageClass: 'ai-module__error',
-	fieldWrapperSelector: '.ai-module__field',
+	errorClass: MODULE.FIELD_ERROR,
+	errorMessageClass: MODULE.ERROR_MSG,
+	fieldWrapperSelector: `.${MODULE.FIELD}`,
 	requiredOnly: true,
 	messages: {},
 	defaultMessage: 'Toto pole je povinné',

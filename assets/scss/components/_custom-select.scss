@@ -2,24 +2,24 @@
 // Stylizovatelný custom select – generováno pomocí CustomSelect.ts
 //
 // Struktura (BEM):
-//   .cs                     → wrapper (Block)
-//   .cs__native             → skrytý nativní select
-//   .cs__trigger            → tlačítko zobrazující vybranou hodnotu
-//   .cs__dropdown           → rozbalovací seznam
-//   .cs__option             → jednotlivá položka
-//   .cs__option--selected   → aktuálně vybraná (Modifier)
-//   .cs__option--focused    → fokus klávesnicí (Modifier)
-//   .cs__option--disabled   → zakázaná položka (Modifier)
-//   .cs--open               → otevřený stav (Modifier)
-//   .cs--disabled           → celý select je disabled (Modifier)
+//   .pb-select                       → wrapper (Block)
+//   .pb-select__native               → skrytý nativní select
+//   .pb-select__trigger              → tlačítko zobrazující vybranou hodnotu
+//   .pb-select__dropdown             → rozbalovací seznam
+//   .pb-select__option               → jednotlivá položka
+//   .pb-select__option--selected     → aktuálně vybraná (Modifier)
+//   .pb-select__option--focused      → fokus klávesnicí (Modifier)
+//   .pb-select__option--disabled     → zakázaná položka (Modifier)
+//   .pb-select--open                 → otevřený stav (Modifier)
+//   .pb-select--disabled             → celý select je disabled (Modifier)
 
 @use "../common/mixins" as m;
 
-.ai-module .cs {
+.pb-module .pb-select {
 	position: relative;
 	display: inline-block;
 	width: 100%;
-	font-size: var(--text-md);
+	font-size: var(--pb-text-md);
 
 	// Skrytý nativní select
 	&__native {
@@ -31,18 +31,18 @@
 	&__trigger {
 		@include m.flex(row, space-between, center, nowrap);
 		width: 100%;
-		border-radius: var(--radius-sm);
-		background: var(--color-bg-input);
-		color: var(--color-text-primary);
+		border-radius: var(--pb-radius-sm);
+		background: var(--pb-color-bg-input);
+		color: var(--pb-color-text-primary);
 		cursor: pointer;
 		text-align: left;
 		@include m.transition(border-color, box-shadow);
 		font: inherit;
 		line-height: 1;
-		padding: 0 var(--space-2);
+		padding: 0 var(--pb-space-2);
 
 		&:hover {
-			border-color: var(--color-border-hover);
+			border-color: var(--pb-color-border-hover);
 		}
 
 		@include m.focus-ring;
@@ -53,11 +53,11 @@
 			flex-shrink: 0;
 			width: 8px;
 			height: 8px;
-			margin-left: var(--space-2);
+			margin-left: var(--pb-space-2);
 			border-right: 2px solid currentColor;
 			border-bottom: 2px solid currentColor;
 			transform: rotate(45deg) translateY(-2px);
-			transition: transform var(--transition-fast);
+			transition: transform var(--pb-transition-fast);
 			opacity: 0.6;
 		}
 	}
@@ -69,24 +69,24 @@
 		top: 100%;
 		left: 0;
 		right: 0;
-		z-index: var(--z-dropdown);
+		z-index: var(--pb-z-dropdown);
 		max-height: 240px;
 		overflow-y: auto;
 		width: auto;
 		margin: 0;
-		padding: var(--space-1) 0;
+		padding: var(--pb-space-1) 0;
 		list-style: none;
-		background: var(--color-bg-input);
-		border: var(--border);
-		border-radius: var(--radius-sm);
+		background: var(--pb-color-bg-input);
+		border: var(--pb-border);
+		border-radius: var(--pb-radius-sm);
 		@include m.shadow(md);
 		opacity: 0;
 		visibility: hidden;
 		transform: translateY(-4px);
 		transition:
-			opacity var(--transition-fast),
-			transform var(--transition-fast),
-			visibility var(--transition-fast);
+			opacity var(--pb-transition-fast),
+			transform var(--pb-transition-fast),
+			visibility var(--pb-transition-fast);
 	}
 
 	// ─── Options ───────────────────────────────────────────
@@ -94,29 +94,29 @@
 	&__option {
 		display: flex;
 		align-items: center;
-		padding: var(--space-2) var(--space-3);
+		padding: var(--pb-space-2) var(--pb-space-3);
 		cursor: pointer;
-		transition: background-color var(--transition-fast);
-		color: var(--color-text-primary);
+		transition: background-color var(--pb-transition-fast);
+		color: var(--pb-color-text-primary);
 
 		&:hover {
-			background-color: var(--color-bg-hover);
+			background-color: var(--pb-color-bg-hover);
 		}
 
 		&--selected {
-			font-weight: var(--font-weight-semibold);
-			background-color: var(--color-bg-selected);
-			color: var(--color-primary);
+			font-weight: var(--pb-font-weight-semibold);
+			background-color: var(--pb-color-bg-selected);
+			color: var(--pb-color-primary);
 		}
 
 		&--focused {
-			background-color: var(--color-bg-hover);
-			outline: 2px solid var(--color-primary);
+			background-color: var(--pb-color-bg-hover);
+			outline: 2px solid var(--pb-color-primary);
 			outline-offset: -2px;
 		}
 
 		&--disabled {
-			opacity: var(--disabled-opacity);
+			opacity: var(--pb-disabled-opacity);
 			cursor: not-allowed;
 			pointer-events: none;
 		}
@@ -125,11 +125,11 @@
 	// ─── States (Modifiers) ────────────────────────────────
 
 	&--open {
-		.cs__trigger::after {
+		.pb-select__trigger::after {
 			transform: rotate(-135deg) translateY(-2px);
 		}
 
-		.cs__dropdown {
+		.pb-select__dropdown {
 			opacity: 1;
 			visibility: visible;
 			transform: translateY(0);
@@ -137,7 +137,7 @@
 	}
 
 	&--disabled {
-		opacity: var(--disabled-opacity);
+		opacity: var(--pb-disabled-opacity);
 		pointer-events: none;
 	}
 }

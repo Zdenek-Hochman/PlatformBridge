@@ -1,14 +1,14 @@
-<h1 class="ai-module__result-title">Odpověď</h1>
+<h1 class="pb-module__result-title">Odpověď</h1>
 
-<div class="ai-result" data-flag="results">
+<div class="pb-result" data-flag="results">
 	{for $response as $item on $index}
 
-		<div class="ai-result__item" data-index="{$index}">
+		<div class="pb-result__item" data-index="{$index}">
 			{for $item as $value on $key}
 
-				<div class="ai-result__wrapper" data-key="{$key}" data-index="{$index}">
-					<h2 class="ai-result__label">{$key}</h2>
-					<p class="ai-result__content" data-flag="result-content">{$value}</p>
+				<div class="pb-result__wrapper" data-key="{$key}" data-index="{$index}">
+					<h2 class="pb-result__label">{$key}</h2>
+					<p class="pb-result__content" data-flag="result-content">{$value}</p>
 
 					{include Components/Handlers.tpl, key => $key, counter => $index}
 				</div>

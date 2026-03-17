@@ -1,4 +1,5 @@
 import { DomNode, Dom } from "assets/ts/Core";
+import { SELECT } from 'assets/ts/Const';
 
 /**
  * CustomSelect – Převede nativní <select> na stylizovatelný custom select.
@@ -10,7 +11,7 @@ import { DomNode, Dom } from "assets/ts/Core";
  * - Zavření při kliknutí mimo
  *
  * Použití:
- *   CustomSelect.init('.ai-module__select'); // konkrétní selektor
+ *   CustomSelect.init('.pb-module__select'); // konkrétní selektor
  *   CustomSelect.init(); // všechny <select> na stránce
  */
 
@@ -18,19 +19,19 @@ export class CustomSelect {
     /**
      * CSS třída pro hlavní wrapper custom selectu (BEM base)
      */
-    private static readonly BASE_CLASS = 'cs';
+    private static readonly BASE_CLASS = SELECT.ROOT;
     /**
      * CSS třída pro stav otevřeného selectu
      */
-    private static readonly OPEN_CLASS = 'cs--open';
+    private static readonly OPEN_CLASS = SELECT.OPEN;
     /**
      * CSS třída pro vybranou možnost v dropdownu
      */
-    private static readonly SELECTED_CLASS = 'cs__option--selected';
+    private static readonly SELECTED_CLASS = SELECT.OPTION_SELECTED;
     /**
      * CSS třída pro stav disabled
      */
-    private static readonly DISABLED_CLASS = 'cs--disabled';
+    private static readonly DISABLED_CLASS = SELECT.DISABLED;
 
     /**
      * Pomocná metoda pro generování BEM tříd (block__element--modifier)

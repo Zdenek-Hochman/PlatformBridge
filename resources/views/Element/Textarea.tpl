@@ -1,7 +1,7 @@
 <textarea
     name="{$name}"
     id="{$id}"
-    class="ai-module__textarea ai-module__field {$class}"
+    class="pb-module__textarea pb-module__field {$class}"
     placeholder="{$placeholder}"
     rows="{$rows}"
     cols="{$cols}"

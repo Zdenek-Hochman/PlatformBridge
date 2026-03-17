@@ -184,10 +184,10 @@ export class ResultActionHandler {
 	//  * "Použít" — emituje event s klíčem a hodnotou pro cílovou aplikaci.
 	//  */
 	// private handleUse(action: ResultAction, button: HTMLElement): void {
-	// 	const wrapper = button.closest<HTMLElement>('.ai-result__wrapper');
-	// 	if (!wrapper) return;
+// 	const wrapper = button.closest<HTMLElement>('.pb-result__wrapper');
+// 	if (!wrapper) return;
 
-	// 	const contentEl = wrapper.querySelector<HTMLElement>('.ai-result__content');
+// 	const contentEl = wrapper.querySelector<HTMLElement>('.pb-result__content');
 	// 	if (!contentEl) return;
 
 	// 	const text = contentEl.textContent?.trim() ?? '';
@@ -199,7 +199,7 @@ export class ResultActionHandler {
 	// 	});
 
 	// 	// Vizuální feedback
-	// 	const item = wrapper.closest<HTMLElement>('.ai-result__item');
+	// 	const item = wrapper.closest<HTMLElement>('.pb-result__item');
 	// 	item?.classList.add('is-used');
 	// }
 
@@ -210,7 +210,7 @@ export class ResultActionHandler {
 	// 	button.classList.toggle('is-active');
 
 	// 	// Deaktivuj opačné tlačítko
-	// 	const wrapper = button.closest<HTMLElement>('.ai-result__wrapper');
+	// 	const wrapper = button.closest<HTMLElement>('.pb-result__wrapper');
 	// 	if (wrapper) {
 	// 		const opposite = action.action === 'thumb-up' ? 'thumb-down' : 'thumb-up';
 	// 		const oppositeBtn = wrapper.querySelector<HTMLElement>(`[action="${opposite}"]`);

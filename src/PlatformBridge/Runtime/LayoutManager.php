@@ -95,7 +95,7 @@ final class LayoutManager
 
         if (empty($attrs)) {
             return sprintf(
-                '<div class="ai-module__block" data-block-id="%s">%s</div>',
+                '<div class="pb-module__block" data-block-id="%s">%s</div>',
                 htmlspecialchars($blockId, ENT_QUOTES, 'UTF-8'),
                 $blockHtml
             );
@@ -104,7 +104,7 @@ final class LayoutManager
         $attrString = self::renderAttributes($attrs);
 
         return sprintf(
-            '<div class="ai-module__block" data-block-id="%s" %s>%s</div>',
+            '<div class="pb-module__block" data-block-id="%s" %s>%s</div>',
             htmlspecialchars($blockId, ENT_QUOTES, 'UTF-8'),
             $attrString,
             $blockHtml

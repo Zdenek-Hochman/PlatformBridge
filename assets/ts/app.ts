@@ -1,8 +1,9 @@
-import { COMPONENTS } from "assets/ts/Const";
+import { COMPONENTS, MODULE } from "assets/ts/Const";
 import { Dom, DomNode, EventBus } from "assets/ts/Core";
 import { ApiClient, SessionManager } from "assets/ts/Services";
 import { FormValidator, VisibilityController, ResultActionHandler } from 'assets/ts/Features';
 import { CustomSelect, LayoutController } from "assets/ts/UI";
+import { PlatformBridge } from 'assets/ts/Public/PlatformBridge';
 
 import { HttpTransport, SseTransport } from 'assets/ts/Services/Transports';
 import { RetryMiddleware, CacheMiddleware, TimingMiddleware } from 'assets/ts/Middleware';
@@ -29,6 +30,7 @@ export class App {
 		{ name: "Services", time: performance.now(), step: () => this.initServices() },
 		{ name: "Features", time: performance.now(), step: () => this.initFeatures() },
 		{ name: "Bindings", time: performance.now(), step: () => this.bindEvents() },
+		{ name: "Public API", time: performance.now(), step: () => this.exposePublicApi() },
 	];
 
 	init(): void {
@@ -39,7 +41,7 @@ export class App {
 	}
 
 	private initDom(): void {
-		CustomSelect.init("select.ai-module__field");
+		CustomSelect.init(`select.${MODULE.FIELD}`);
 		LayoutController.autoInit();
 		VisibilityController.init();
 	}
@@ -53,11 +55,6 @@ export class App {
 
 		this.api = new ApiClient(this.events, { allowFallback: true })
 			.registerTransport(new HttpTransport(this.events, {
-				url: apiUrl,
-				timeout: 60_000,
-				priority: 10,
-			}))
-			.registerTransport(new SseTransport(this.events, {
 				url: apiUrl,
 				timeout: 60_000,
 				priority: 10,
@@ -79,11 +76,29 @@ export class App {
 	}
 
 	/**
+	 * Vystaví veřejné API na window.PlatformBridge.
+	 * Cílová aplikace může volat: window.PlatformBridge.setFieldValue(...) atd.
+	 */
+	private exposePublicApi(): void {
+		const bridge = new PlatformBridge(
+			this.api,
+			this.events,
+			this.session,
+			this.validator,
+		);
+
+		(window as any).PlatformBridge = bridge;
+
+		// Dispatchnout event, aby cílová aplikace věděla, že API je připraveno
+		window.dispatchEvent(new CustomEvent('pb:ready', { detail: { bridge } }));
+	}
+
+	/**
 	 * Přečte API URL z data atributu na wrapper elementu.
 	 * PHP strana injektuje správnou URL podle režimu (standalone/vendor).
 	 */
 	private getApiUrl(): string {
-		const module = document.querySelector<HTMLElement>('.ai-module');
+		const module = document.querySelector<HTMLElement>(`.${MODULE.ROOT}`);
 		const url = module?.dataset.apiUrl;
 
 		if (!url) {

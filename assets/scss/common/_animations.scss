@@ -3,7 +3,7 @@
 
 // ── Fade In / Out ──────────────────────────────────────────────
 
-@keyframes ai-fade-in {
+@keyframes pb-fade-in {
 	from {
 		opacity: 0;
 	}
@@ -12,7 +12,7 @@
 	}
 }
 
-@keyframes ai-fade-out {
+@keyframes pb-fade-out {
 	from {
 		opacity: 1;
 	}
@@ -23,7 +23,7 @@
 
 // ── Slide ──────────────────────────────────────────────────────
 
-@keyframes ai-slide-up {
+@keyframes pb-slide-up {
 	from {
 		opacity: 0;
 		transform: translateY(8px);
@@ -34,7 +34,7 @@
 	}
 }
 
-@keyframes ai-slide-down {
+@keyframes pb-slide-down {
 	from {
 		opacity: 0;
 		transform: translateY(-8px);
@@ -47,7 +47,7 @@
 
 // ── Pulse (pro skeleton loading) ───────────────────────────────
 
-@keyframes ai-pulse {
+@keyframes pb-pulse {
 	0%, 100% {
 		opacity: 1;
 	}
@@ -59,14 +59,14 @@
 // ── Utility classes ────────────────────────────────────────────
 // Přidejte tyto třídy z TS pro řízení animací.
 
-.ai-animate-fade-in {
-	animation: ai-fade-in var(--transition-base) both;
+.pb-animate-fade-in {
+	animation: pb-fade-in var(--pb-transition-base) both;
 }
 
-.ai-animate-slide-up {
-	animation: ai-slide-up var(--transition-slow) both;
+.pb-animate-slide-up {
+	animation: pb-slide-up var(--pb-transition-slow) both;
 }
 
-.ai-animate-pulse {
-	animation: ai-pulse 2s ease-in-out infinite;
+.pb-animate-pulse {
+	animation: pb-pulse 2s ease-in-out infinite;
 }

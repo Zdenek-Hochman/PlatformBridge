@@ -1,57 +1,57 @@
 // ─── CSS Reset ─────────────────────────────────────────────────
 // Normalizace výchozích stylů prohlížeče.
 
-.ai-module {
-	font-size: var(--base-font-size);
+.pb-module {
+	font-size: var(--pb-base-font-size);
 }
 
-.ai-module *,
-.ai-module *::before,
-.ai-module *::after {
+.pb-module *,
+.pb-module *::before,
+.pb-module *::after {
 	box-sizing: border-box;
 	margin: 0;
 	padding: 0;
 }
 
-.ai-module * {
-	line-height: var(--line-height-normal);
+.pb-module * {
+	line-height: var(--pb-line-height-normal);
 	letter-spacing: 0.3px;
-	font-family: var(--font-primary);
+	font-family: var(--pb-font-primary);
 }
 
-.ai-module p,
-.ai-module a,
-.ai-module small,
-.ai-module span,
-.ai-module li {
+.pb-module p,
+.pb-module a,
+.pb-module small,
+.pb-module span,
+.pb-module li {
 	font: inherit;
 }
 
-.ai-module button {
+.pb-module button {
 	border: none;
 	cursor: pointer;
 }
 
-.ai-module input,
-.ai-module textarea,
-.ai-module select {
+.pb-module input,
+.pb-module textarea,
+.pb-module select {
 	outline: none;
 	font: inherit;
 }
 
-.ai-module select {
+.pb-module select {
 	background-color: transparent;
 	border: none;
 	cursor: inherit;
 }
 
-.ai-module img,
-.ai-module svg {
+.pb-module img,
+.pb-module svg {
 	display: block;
 	max-width: 100%;
 }
 
-.ai-module ul,
-.ai-module ol {
+.pb-module ul,
+.pb-module ol {
 	list-style: none;
 }

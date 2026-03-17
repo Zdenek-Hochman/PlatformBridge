@@ -1,13 +1,13 @@
 // ─── Module Field Primitives ───────────────────────────────────
-// BEM styly pro formulářové prvky uvnitř .ai-module.
+// BEM styly pro formulářové prvky uvnitř .pb-module.
 
 @use "../common/mixins" as m;
 
-.ai-module {
+.pb-module {
 	&__field {
-		border: var(--border);
-		padding: var(--space-2);
-		border-radius: var(--radius-sm);
+		border: var(--pb-border);
+		padding: var(--pb-space-2);
+		border-radius: var(--pb-radius-sm);
 	}
 
 	&__select {
@@ -15,8 +15,8 @@
 	}
 
 	&__label {
-		font-weight: var(--font-weight-semibold);
-		color: var(--color-text-primary);
+		font-weight: var(--pb-font-weight-semibold);
+		color: var(--pb-color-text-primary);
 
 		&-value {
 			vertical-align: baseline;
@@ -25,27 +25,27 @@
 
 	&__small {
 		display: block;
-		font-size: var(--text-sm);
-		color: var(--color-text-secondary);
-		margin-top: var(--space-1);
+		font-size: var(--pb-text-sm);
+		color: var(--pb-color-text-secondary);
+		margin-top: var(--pb-space-1);
 	}
 
 	&__button {
 		@include m.flex(row-reverse, center, center, nowrap, m.rem(10px));
 		align-self: end;
-		border-radius: var(--radius-sm);
-		padding: var(--button-space);
-		font-weight: var(--font-weight-semibold);
+		border-radius: var(--pb-radius-sm);
+		padding: var(--pb-button-space);
+		font-weight: var(--pb-font-weight-semibold);
 		width: max-content;
 		cursor: pointer;
 		@include m.transition(background-color, transform);
 
 		&--primary {
-			background: var(--color-primary);
-			color: var(--color-text-inverse);
+			background: var(--pb-color-primary);
+			color: var(--pb-color-text-inverse);
 
 			&:hover {
-				background: color-mix(in srgb, var(--color-primary), white 10%);
+				background: color-mix(in srgb, var(--pb-color-primary), white 10%);
 			}
 
 			&:active {
@@ -53,7 +53,7 @@
 			}
 
 			&:disabled {
-				opacity: var(--disabled-opacity);
+				opacity: var(--pb-disabled-opacity);
 				cursor: not-allowed;
 			}
 		}

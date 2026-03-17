@@ -1,6 +1,6 @@
 <tick-box
     i-size="{$size}"
-    class="ai-module__tick-box ai-module__field {$class}"
+    class="pb-module__tick-box pb-module__field {$class}"
     name="{$name}"
     value="{$value}"
     {$fieldSpecificAttributes}
