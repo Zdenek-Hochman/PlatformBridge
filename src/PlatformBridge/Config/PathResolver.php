@@ -10,6 +10,14 @@ namespace Zoom\PlatformBridge\Config;
  * Podporuje:
  *   - vendor režim: balíček v vendor/zoom/platform-bridge/
  *   - standalone režim: balíček jako root projekt (XAMPP dev)
+ *
+ * Konfigurovatelné cesty:
+ *   Pokud v kořeni hostitelské aplikace existuje soubor platformbridge.php,
+ *   PathResolver z něj při konstrukci načte uživatelské cesty (kam instalovat
+ *   assety, config soubory apod.). Pokud soubor neexistuje, použijí se
+ *   výchozí hardcodované cesty – zpětná kompatibilita je plně zachována.
+ *
+ * @see InstallerConfig
  */
 final class PathResolver
 {
@@ -31,6 +39,11 @@ final class PathResolver
     private readonly bool $isVendor;
 
     /**
+     * Konfigurace instalačních cest (z platformbridge.php nebo výchozí)
+     */
+    private readonly InstallerConfig $installerConfig;
+
+    /**
      * Konstruktor nastaví cesty podle režimu použití.
      * @param string|null $packageRoot Volitelně lze předat kořen balíčku (pro testy nebo speciální případy)
      * @param bool|null $forceVendor Explicitně vynutí vendor (true) nebo standalone (false) režim.
@@ -46,6 +59,8 @@ final class PathResolver
         $this->isVendor = $forceVendor ?? $this->detectVendorMode();
         // Pokud jsme ve vendor režimu, projectRoot je 3 úrovně nad balíčkem (tj. kořen hostitelské aplikace), jinak je shodný s packageRoot
         $this->projectRoot = $this->isVendor ? dirname($this->packageRoot, 3) : $this->packageRoot;
+        // Načti konfiguraci cest z platformbridge.php (nebo výchozí hodnoty)
+        $this->installerConfig = new InstallerConfig($this->projectRoot);
     }
 
     /**
@@ -149,32 +164,35 @@ final class PathResolver
 
     /**
      * Vrací cestu ke složce s uživatelskou konfigurací platform-bridge v hostitelské aplikaci.
-     * Typicky: {projectRoot}/config/platform-bridge
+     * Výchozí: {projectRoot}/config/platform-bridge
+     * Konfigurovatelné přes platformbridge.php klíč 'json_path'.
      */
     public function userConfigPath(): string
     {
-        return $this->projectRoot . '/config/platform-bridge';
+        return $this->projectRoot . '/' . $this->installerConfig->jsonPath();
     }
 
     /**
      * Vrací cestu k uživatelskému konfiguračnímu souboru bridge-config.php v hostitelské aplikaci.
-     * V vendor režimu: {projectRoot}/public/bridge-config.php
+     * Výchozí: {projectRoot}/public/bridge-config.php
+     * Konfigurovatelné přes platformbridge.php klíč 'bridge_config'.
      * V standalone režimu: cesta neexistuje → fallback na resources/stubs/bridge-config.php
      */
     public function userBridgeConfigFile(): string
     {
-        return $this->projectRoot . '/public/bridge-config.php';
+        return $this->projectRoot . '/' . $this->installerConfig->bridgeConfig();
     }
 
     /**
      * Vrací cestu k uživatelskému bezpečnostnímu konfiguračnímu souboru.
      * Tento soubor NENÍ v public/ – je přístupný pouze internímu jádru.
-     * V vendor režimu: {projectRoot}/config/security-config.php
+     * Výchozí: {projectRoot}/config/security-config.php
+     * Konfigurovatelné přes platformbridge.php klíč 'security_config'.
      * V standalone režimu: cesta neexistuje → fallback na resources/stubs/security-config.php
      */
     public function userSecurityConfigFile(): string
     {
-        return $this->projectRoot . '/config/security-config.php';
+        return $this->projectRoot . '/' . $this->installerConfig->securityConfig();
     }
 
     /**
@@ -188,30 +206,33 @@ final class PathResolver
 
     /**
      * Vrací cestu ke složce s public assety (JS/CSS) v hostitelské aplikaci.
-     * Typicky: {projectRoot}/public/platformbridge
+     * Výchozí: {projectRoot}/public/platformbridge
+     * Konfigurovatelné přes platformbridge.php klíč 'assets_path'.
      * Používá se POUZE ve vendor režimu (produkce).
      */
     public function publicAssetsPath(): string
     {
-        return $this->projectRoot . '/public/platformbridge';
+        return $this->projectRoot . '/' . $this->installerConfig->assetsPath();
     }
 
     /**
      * Vrací cestu k publikovanému API endpointu v hostitelské aplikaci.
-     * Typicky: {projectRoot}/public/platformbridge/api.php
+     * Výchozí: {projectRoot}/public/platformbridge/api.php
+     * Konfigurovatelné přes platformbridge.php klíč 'api_file'.
      */
     public function publicApiFile(): string
     {
-        return $this->publicAssetsPath() . '/api.php';
+        return $this->projectRoot . '/' . $this->installerConfig->apiFile();
     }
 
     /**
      * Vrací cestu ke složce pro cache v hostitelské aplikaci.
-     * Typicky: {projectRoot}/var/cache
+     * Výchozí: {projectRoot}/var/cache
+     * Konfigurovatelné přes platformbridge.php klíč 'cache_path'.
      */
     public function cachePath(): string
     {
-        return $this->projectRoot . '/var/cache';
+        return $this->projectRoot . '/' . $this->installerConfig->cachePath();
     }
 
     /**
@@ -274,6 +295,31 @@ final class PathResolver
     public function isVendor(): bool
     {
         return $this->isVendor;
+    }
+
+    /**
+     * Vrací instanci InstallerConfig s načtenými/výchozími cestami.
+     */
+    public function installerConfig(): InstallerConfig
+    {
+        return $this->installerConfig;
+    }
+
+    /**
+     * Vrací cestu ke stub souboru platformbridge.php v balíčku.
+     * Používá se jako zdroj při publikování konfigurační mapy do hostitelské aplikace.
+     */
+    public function stubInstallerConfigFile(): string
+    {
+        return $this->packageStubsPath() . '/platformbridge.php';
+    }
+
+    /**
+     * Vrací cestu k souboru platformbridge.php v kořeni hostitelské aplikace.
+     */
+    public function userInstallerConfigFile(): string
+    {
+        return $this->projectRoot . '/' . InstallerConfig::CONFIG_FILE;
     }
 
     private function hasJsonFiles(string $dir): bool

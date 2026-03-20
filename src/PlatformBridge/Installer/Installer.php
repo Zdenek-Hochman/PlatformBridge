@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Zoom\PlatformBridge\Installer;
 
 use Zoom\PlatformBridge\Config\PathResolver;
+use Zoom\PlatformBridge\Config\InstallerConfig;
 
 /**
  * Instalátor PlatformBridge balíčku (vendor-only).
@@ -12,6 +13,11 @@ use Zoom\PlatformBridge\Config\PathResolver;
  * Zajišťuje publikování assetů (JS/CSS), API endpointu a konfigurace
  * do hostující aplikace. Funguje POUZE ve vendor režimu – v standalone/dev
  * režimu není instalace potřeba, vše se čte přímo ze zdrojových složek.
+ *
+ * Konfigurace cest:
+ *   Pokud v kořeni hostitelské aplikace existuje soubor platformbridge.php,
+ *   Installer z něj načte uživatelské cesty (kam instalovat assety, config apod.).
+ *   Pokud soubor neexistuje, použijou se výchozí hardcodované cesty.
  *
  * Použití:
  *   - CLI: php vendor/bin/platformbridge install [--force] [--only=assets,config,...]
@@ -23,7 +29,9 @@ use Zoom\PlatformBridge\Config\PathResolver;
  *                     Užitečné v CI/CD (TeamCity), kde složková struktura neodpovídá
  *                     standardní Composer instalaci.
  *   --only=<kroky>    Spustí jen vybrané kroky (čárkou oddělené):
- *                       assets, api, config, security, json, cache
+ *                       init, assets, api, config, security, json, cache
+ *
+ * @see InstallerConfig
  */
 final class Installer
 {
@@ -40,7 +48,7 @@ final class Installer
     private array $only = [];
 
     /** @var list<string> Povolené názvy kroků pro --only */
-    private const ALLOWED_STEPS = ['assets', 'api', 'config', 'security', 'json', 'cache'];
+    private const ALLOWED_STEPS = ['init', 'assets', 'api', 'config', 'security', 'json', 'cache'];
 
     public function __construct(?string $packageRoot = null, ?bool $forceVendor = null)
     {
@@ -155,8 +163,17 @@ final class Installer
         if ($this->only !== []) {
             $this->info("Flag: --only=" . implode(',', $this->only));
         }
+
+        // Vypiš zdroj konfigurace cest
+        $installerConfig = $this->paths->installerConfig();
+        if ($installerConfig->hasCustomConfig()) {
+            $this->info("Config: " . InstallerConfig::CONFIG_FILE . " (uživatelské cesty)");
+        } else {
+            $this->info("Config: výchozí cesty (" . InstallerConfig::CONFIG_FILE . " nenalezen)");
+        }
         $this->info("");
 
+        $this->runStep('init', $this->publishInstallerConfig(...));
         $this->runStep('assets', $this->publishAssets(...));
         $this->runStep('api', $this->publishApiEndpoint(...));
         $this->runStep('config', $this->publishConfig(...));
@@ -194,23 +211,44 @@ final class Installer
     // ─── Publish kroky ───────────────────────────────────────
 
     /**
+     * Publikuje platformbridge.php (konfigurační mapa cest) do kořene hostitelské aplikace.
+     * Bez --force se existující soubor nepřepisuje.
+     * Tento krok je volitelný – pokud soubor neexistuje, použijou se výchozí cesty.
+     */
+    public function publishInstallerConfig(): void
+    {
+        $stub = $this->paths->stubInstallerConfigFile();
+        $target = $this->paths->userInstallerConfigFile();
+        $label = InstallerConfig::CONFIG_FILE;
+
+        $written = $this->publisher->publish($stub, $target, overwrite: $this->force);
+        $this->info($written
+            ? "  ✅ Published: {$label}"
+            : "  ⏭️  Skipped:   {$label} (exists)"
+        );
+    }
+
+    /**
      * Publikuje bridge-config.php do hostující aplikace.
+     * Cílová cesta se čte z InstallerConfig (nebo výchozí).
      * Bez --force se existující soubor nepřepisuje.
      */
     public function publishConfig(): void
     {
         $stub = $this->paths->stubBridgeConfigFile();
         $target = $this->paths->userBridgeConfigFile();
+        $label = $this->paths->installerConfig()->bridgeConfig();
 
         $written = $this->publisher->publish($stub, $target, overwrite: $this->force);
         $this->info($written
-            ? "  ✅ Published: public/bridge-config.php"
-            : "  ⏭️  Skipped:   public/bridge-config.php (exists)"
+            ? "  ✅ Published: {$label}"
+            : "  ⏭️  Skipped:   {$label} (exists)"
         );
     }
 
     /**
      * Publikuje security-config.php do hostující aplikace.
+     * Cílová cesta se čte z InstallerConfig (nebo výchozí).
      * Soubor se umístí MIMO public/ složku – přístupný pouze internímu jádru.
      * Bez --force se existující soubor nepřepisuje.
      */
@@ -218,21 +256,25 @@ final class Installer
     {
         $stub = $this->paths->stubSecurityConfigFile();
         $target = $this->paths->userSecurityConfigFile();
+        $label = $this->paths->installerConfig()->securityConfig();
 
         $written = $this->publisher->publish($stub, $target, overwrite: $this->force);
         $this->info($written
-            ? "  ✅ Published: config/security-config.php"
-            : "  ⏭️  Skipped:   config/security-config.php (exists)"
+            ? "  ✅ Published: {$label}"
+            : "  ⏭️  Skipped:   {$label} (exists)"
         );
     }
 
     /**
-     * Publikuje JSON soubory. Bez --force se existující nepřepisují.
+     * Publikuje JSON soubory.
+     * Cílová složka se čte z InstallerConfig (nebo výchozí).
+     * Bez --force se existující nepřepisují.
      */
     public function publishJson(): void
     {
         $defaults = $this->paths->packageDefaultsPath();
         $target = $this->paths->userJsonPath();
+        $label = $this->paths->installerConfig()->jsonPath();
 
         foreach (['blocks.json', 'layouts.json', 'generators.json'] as $file) {
             $source = $defaults . '/' . $file;
@@ -248,25 +290,27 @@ final class Installer
                 overwrite: $this->force
             );
             $this->info($written
-                ? "  ✅ Published: config/platform-bridge/{$file}"
-                : "  ⏭️  Skipped:   config/platform-bridge/{$file} (exists)"
+                ? "  ✅ Published: {$label}/{$file}"
+                : "  ⏭️  Skipped:   {$label}/{$file} (exists)"
             );
         }
     }
 
     /**
-     * Publikuje dist/ assety do public/platformbridge/ (VŽDY přepíše).
+     * Publikuje dist/ assety do cílové složky (VŽDY přepíše).
+     * Cílová složka se čte z InstallerConfig (nebo výchozí).
      */
     private function publishAssets(): void
     {
         $distPath = $this->paths->packageDistPath();
         $targetPath = $this->paths->publicAssetsPath();
+        $label = $this->paths->installerConfig()->assetsPath();
 
         foreach (['js', 'css'] as $dir) {
             $source = $distPath . '/' . $dir;
             if (is_dir($source)) {
                 $count = $this->publisher->publishDirectory($source, $targetPath . '/' . $dir, overwrite: true);
-                $this->info("  ✅ Published: public/platformbridge/{$dir}/ ({$count} files)");
+                $this->info("  ✅ Published: {$label}/{$dir}/ ({$count} files)");
             } else {
                 $this->info("  ⚠️  Assets source not found: dist/{$dir}/");
                 $this->info("     Run 'npm run build' first to generate assets.");
@@ -275,14 +319,15 @@ final class Installer
     }
 
     /**
-     * Publikuje API endpoint do public/platformbridge/api.php.
+     * Publikuje API endpoint.
+     * Cílová cesta se čte z InstallerConfig (nebo výchozí).
      * Bez --force se existující soubor nepřepisuje.
      */
     private function publishApiEndpoint(): void
     {
         $stub = $this->paths->stubApiFile();
         $target = $this->paths->publicApiFile();
-        $label = 'public/platformbridge/api.php';
+        $label = $this->paths->installerConfig()->apiFile();
 
         $written = $this->publisher->publish($stub, $target, overwrite: $this->force);
         $this->info($written
@@ -294,9 +339,10 @@ final class Installer
     private function ensureCacheDir(): void
     {
         $cache = $this->paths->cachePath();
+        $label = $this->paths->installerConfig()->cachePath();
         if (!is_dir($cache)) {
             mkdir($cache, 0755, true);
-            $this->info("  ✅ Created: var/cache/");
+            $this->info("  ✅ Created: {$label}/");
         }
     }
 
