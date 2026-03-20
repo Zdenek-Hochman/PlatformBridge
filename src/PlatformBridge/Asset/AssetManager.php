@@ -53,7 +53,7 @@ final class AssetManager
 
         self::$rendered['scripts'] = true;
 
-        $url = $this->baseUrl . '/js/pb-main.js';
+        $url = $this->baseUrl . '/js/pb-main.js?v=' . time();
         return sprintf('<script src="%s"></script>', htmlspecialchars($url, ENT_QUOTES, 'UTF-8'));
     }
 
@@ -71,7 +71,7 @@ final class AssetManager
 
         self::$rendered['styles'] = true;
 
-        $url = $this->baseUrl . '/css/pb-main.css';
+        $url = $this->baseUrl . '/css/pb-main.css?v=' . time();
         return sprintf('<link rel="stylesheet" href="%s">', htmlspecialchars($url, ENT_QUOTES, 'UTF-8'));
     }
 

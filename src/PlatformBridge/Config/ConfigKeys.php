@@ -23,6 +23,9 @@ enum ConfigKeys: string
     /** Root klíč pro layouty v layouts.json */
     case LAYOUTS = 'layouts';
 
+	/** Root klíč pro layout v generatoru (layout_ref) */
+	case LAYOUT = 'layout';
+
     /** Root klíč pro generátory v generators.json */
     case GENERATORS = 'generators';
 

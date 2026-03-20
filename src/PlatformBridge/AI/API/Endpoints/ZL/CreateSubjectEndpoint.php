@@ -17,6 +17,8 @@ use Zoom\PlatformBridge\AI\API\EndpointDefinition;
  */
 class CreateSubjectEndpoint extends EndpointDefinition
 {
+    public ?string $variantKey = 'topic_source';
+
     public function getEndpoint(): string
     {
         return 'CreateSubject';
@@ -44,28 +46,27 @@ class CreateSubjectEndpoint extends EndpointDefinition
      * Transformuje vstup podle detekované varianty.
      * Využívá AI klíče z konfigurace pro mapování polí.
      */
-    public function transformInput(array $input, string $variant): array
+    public function transformInput(array $input, ...$args): array
     {
-        // Transformace na AI klíče z konfigurace
-        $transformed = $this->transformToAiKeys($input);
+		[$variant] = $args;
 
         return match ($variant) {
             'template' => $this->transformTemplateVariant($input),
             'custom' => $this->transformCustomVariant($input),
-            default => $transformed,
+            default => $input,
         };
     }
 
     /**
      * Template varianta - rozbalí šablonu na server straně
      */
-    protected function transformTemplateVariant(array $originalInput): array
+    private function transformTemplateVariant(array $originalInput): array
     {
 		$excludedKeys = ['email_topic', 'topic_source'];
 		return array_diff_key($originalInput, array_flip($excludedKeys));
     }
 
-	protected function transformCustomVariant(array $originalInput): array
+	private function transformCustomVariant(array $originalInput): array
     {
 		$excludedKeys = ['template_id', 'topic_source'];
 		return array_diff_key($originalInput, array_flip($excludedKeys));

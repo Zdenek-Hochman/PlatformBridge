@@ -436,6 +436,10 @@
   opacity: var(--pb-disabled-opacity);
   cursor: not-allowed;
 }
+.pb-module__button--used {
+  background: var(--pb-color-success);
+  color: var(--pb-color-text-inverse);
+}
 .pb-module__button svg {
   fill: currentColor;
 }

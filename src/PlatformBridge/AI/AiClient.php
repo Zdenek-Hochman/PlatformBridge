@@ -6,6 +6,7 @@ namespace Zoom\PlatformBridge\AI;
 
 use Zoom\PlatformBridge\AI\AiClientConfig;
 use Zoom\PlatformBridge\AI\AiResponse;
+use Zoom\PlatformBridge\AI\Exception\AiException;
 
 /**
  * AI klient pro komunikaci s API

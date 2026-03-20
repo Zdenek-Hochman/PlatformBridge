@@ -1,3 +1,45 @@
+// ─── Error codes (matching PHP AiException) ──────────
+
+/**
+ * Kódy chyb sjednocené s PHP AiException.
+ * Umožňují konzistentní mapování mezi serverem a klientem.
+ */
+export const ErrorCode = {
+	INVALID_REQUEST:  1001,
+	VALIDATION:       1002,
+	CONNECTION:       1003,
+	TIMEOUT:          1004,
+	INVALID_RESPONSE: 1005,
+	API:              1006,
+
+	// SecurityException kódy (2001–2003)
+	INVALID_SIGNATURE: 2001,
+	EXPIRED_TOKEN:     2002,
+	MISSING_TOKEN:     2003,
+
+	// JsonException kódy (3001–3003)
+	JSON_DEPTH: 3001,
+	INVALID_JSON: 3002,
+	JSON_UTF8: 3003,
+} as const;
+
+export type ErrorCodeValue = typeof ErrorCode[keyof typeof ErrorCode];
+
+// ─── Message levels ───────────────────────────────────
+
+export type MessageLevel = 'error' | 'success' | 'warning' | 'info';
+
+export interface AppMessage {
+	level: MessageLevel;
+	title?: string;
+	message: string;
+	/** Původní zpráva ze serveru (zobrazena v debug módu jako sekundární info) */
+	serverMessage?: string;
+	detail?: unknown;
+	/** false = neprovádět auto-hide (default: true) */
+	autoHide?: boolean;
+}
+
 // ─── Errors ───────────────────────────────────────────
 
 export interface ApiError {
@@ -8,9 +50,15 @@ export interface ApiError {
 }
 
 export interface AiBridgeError {
-	type: 'network' | 'http' | 'validation' | 'parse' | 'unknown';
+	type: 'network' | 'http' | 'api' | 'validation' | 'parse' | 'timeout' | 'dom' | 'unknown';
+	/** Kód chyby – HTTP status nebo ErrorCode z AiException */
+	code?: number;
 	message: string;
+	/** Původní zpráva ze serveru (PHP AiException message) – vždy přítomna pokud server vrátil chybu */
+	serverMessage?: string;
 	detail?: unknown;
+	/** Zdroj chyby pro debugování ('ajax' | 'dom' | 'custom' | …) */
+	source?: string;
 }
 
 // ─── SSE streaming events ─────────────────────────────

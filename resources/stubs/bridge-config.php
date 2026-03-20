@@ -27,7 +27,7 @@ $baseHost = "{$protocol}://{$host}";
 return [
     // ─── AI Provider ────────────────────────────────────────────
     // API klíč pro autentizaci vůči AI provideru
-    'api_key'     => 'YOUR_API_KEY_HERE',
+    'api_key'     => '5bb61ad879da490705dd959e4cbc3fa6675990e2016b65bc50b695a4f7c4f63a',
 
     // Timeout HTTP požadavku na AI v sekundách
     'timeout'     => 30,
@@ -36,6 +36,7 @@ return [
     'max_retries' => 3,
 
     // URL AI API endpointu, kam se odesílají AJAX požadavky
-    'base_url'    => $baseHost . '/ai/src/PlatformBridge/AI/TEST/',
+    'base_url'    => $baseHost . '/ai/TEST/',
+    // 'base_url'    => 'https://api.virtualzoom.com/v2/AI/',
 	// 'base_url'    => $baseHost . '/Test/vendor/zoom/platform-bridge/src/PlatformBridge/AI/TEST/',
 ];

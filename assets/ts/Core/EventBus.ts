@@ -1,6 +1,7 @@
 import {
 	type ValidationError,
 	type AiBridgeError,
+	type AppMessage,
 	type SseProgressEvent,
 	type SseResultEvent,
 	type SseCompleteEvent,
@@ -36,7 +37,8 @@ export interface AiBridgeEventMap {
 	'copy':           { success: boolean };
 	'transport:fallback': { from: TransportMode; to: TransportMode };
 	'regenerate-key': { key: string; index: number; data: ApiResult | null };
-	'use':            { data: Record<string, string> };
+	'pb-use':            { data: Record<string, string> };
+	'notification':   AppMessage;
 
 	// SSE streaming events
 	'sse:progress':   SseProgressEvent;

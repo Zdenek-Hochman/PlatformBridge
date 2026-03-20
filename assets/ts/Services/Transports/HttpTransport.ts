@@ -3,8 +3,8 @@ import {
 	type ApiTransport,
 	type HttpResult,
 	type ServerResponse,
-	type AiBridgeError,
 } from 'assets/ts/Types';
+import { ApiErrorHandler } from '../ApiErrorHandler';
 
 // ─── Config ───────────────────────────────────────────
 
@@ -13,6 +13,8 @@ export interface HttpTransportConfig {
 	timeout?: number;
 	priority?: number;
 	headers?: Record<string, string>;
+	/** ApiErrorHandler pro delegaci chyb (volitelný – bez něj se chyby logují do konzole) */
+	apiErrorHandler?: ApiErrorHandler;
 }
 
 const DEFAULTS = {
@@ -25,8 +27,9 @@ const DEFAULTS = {
 
 /**
  * HttpTransport – klasický POST fetch s JSON odpovědí.
- * Self-contained: obsahuje veškerou logiku odesílání, parsování i validace.
- * Chyby emituje přes EventBus ('error' event).
+ * Self-contained: obsahuje veškerou logiku odesílání a parsování.
+ * Chyby deleguje na ApiErrorHandler (pokud je poskytnut),
+ * jinak emituje raw error eventy přes EventBus.
  */
 export class HttpTransport implements ApiTransport {
 	readonly name = 'http' as const;
@@ -36,6 +39,7 @@ export class HttpTransport implements ApiTransport {
 	private readonly url: string;
 	private readonly timeout: number;
 	private readonly headers: Record<string, string>;
+	private readonly apiErrors?: ApiErrorHandler;
 	private controller?: AbortController;
 
 	constructor(events: EventBus, config: HttpTransportConfig) {
@@ -44,6 +48,7 @@ export class HttpTransport implements ApiTransport {
 		this.timeout = config.timeout ?? DEFAULTS.timeout;
 		this.priority = config.priority ?? DEFAULTS.priority;
 		this.headers = { ...DEFAULTS.headers, ...config.headers };
+		this.apiErrors = config.apiErrorHandler;
 	}
 
 	canHandle(): boolean {
@@ -63,17 +68,27 @@ export class HttpTransport implements ApiTransport {
 			});
 
 			const body = await this.parseJson(response);
-			if (!body) return null;
 
-			if (!this.validate(response, body)) return null;
+			// ApiErrorHandler přebírá veškerou logiku zpracování chyb
+			if (this.apiErrors) {
+				if (!body) {
+					this.apiErrors.handleUnexpectedResponse(response);
+					return null;
+				}
+
+				const error = this.apiErrors.handleResponse(response, body);
+				if (error) return null;
+			} else {
+				// Fallback bez ApiErrorHandler (zpětná kompatibilita)
+				if (!body) return null;
+				if (!this.validateLegacy(response, body)) return null;
+			}
 
 			return { mode: 'http', response: body };
 
 		} catch (error) {
-			if ((error as DOMException).name === 'AbortError') {
-				this.emitError('network', 'Požadavek byl zrušen nebo vypršel timeout.');
-			} else {
-				this.emitError('network', 'Nelze se připojit k serveru.');
+			if (this.apiErrors) {
+				this.apiErrors.handleTransportError(error);
 			}
 			return null;
 
@@ -90,23 +105,17 @@ export class HttpTransport implements ApiTransport {
 	// ─── Private ──────────────────────────────────────
 
 	private async parseJson(response: Response): Promise<ServerResponse | null> {
-		try {
-			return await response.json();
-		} catch {
-			this.emitError('parse', 'Server vrátil neočekávanou odpověď.');
-			return null;
-		}
+		return await response.json();
 	}
 
-	private validate(response: Response, body: ServerResponse): boolean {
+	/** @deprecated Zpětná kompatibilita – použijte ApiErrorHandler */
+	private validateLegacy(response: Response, body: ServerResponse): boolean {
 		if (!response.ok) {
 			const message = body.api?.error?.message ?? `Chyba serveru (${response.status})`;
-			this.emitError('http', message, response.status);
 			return false;
 		}
 
 		if (body.api && !body.api.success && body.api.error) {
-			this.emitError('http', body.api.error.message ?? 'API vrátila chybu.', body.api.error.code);
 			return false;
 		}
 
@@ -118,12 +127,5 @@ export class HttpTransport implements ApiTransport {
 			this.controller!.signal,
 			AbortSignal.timeout(this.timeout),
 		]);
-	}
-
-	private emitError(type: AiBridgeError['type'], message: string, statusCode?: number): void {
-		this.events.publish('error', {
-			error: { type, message },
-			statusCode,
-		});
 	}
 }

@@ -6,7 +6,8 @@ namespace Zoom\PlatformBridge\AI\API;
 
 use Zoom\PlatformBridge\AI\AiClient;
 use Zoom\PlatformBridge\AI\AiClientConfig;
-use Zoom\PlatformBridge\AI\AiException;
+use Zoom\PlatformBridge\AI\Exception\AiException;
+use Zoom\PlatformBridge\AI\Exception\JsonException;
 use Zoom\PlatformBridge\AI\AiResponse;
 use Zoom\PlatformBridge\AI\AiResponseRenderer;
 use Zoom\PlatformBridge\Config\ConfigLoader;
@@ -23,13 +24,6 @@ use Zoom\PlatformBridge\Security\SignedParams;
  * Konfigurace se načítá ze dvou oddělených souborů:
  *   - bridge-config.php: API připojení (base_url, api_key, timeout, max_retries)
  *   - security-config.php: HMAC podepisování (secretKey, ttl)
- *
- * Standalone: oba soubory z resources/stubs/
- * Vendor: bridge-config z {projectRoot}/public/, security-config z {projectRoot}/config/
- *
- * Použití:
- *   ApiHandler::bootstrap()->handle();
- *   ApiHandler::create($configPath, $securityConfigPath, $configDir)->handle();
  */
 final class ApiHandler
 {
@@ -42,7 +36,6 @@ final class ApiHandler
     private function __construct(
         private readonly string $configPath,
         private readonly string $securityConfigPath,
-        private readonly string $configDir,
     ) {
         $this->config = $this->loadConfig($this->configPath, 'Bridge');
         $this->securityConfig = $this->loadConfig($this->securityConfigPath, 'Security');
@@ -51,48 +44,57 @@ final class ApiHandler
     /**
      * Tovární metoda s explicitními cestami.
      */
-    public static function create(string $configPath, string $securityConfigPath, string $configDir): self
+    public static function create(string $configPath, string $securityConfigPath): self
     {
-        return new self($configPath, $securityConfigPath, $configDir);
+        return new self($configPath, $securityConfigPath);
     }
 
     /**
-     * Bootstrap s automatickou detekcí cest přes PathResolver.
-     */
-    public static function bootstrap(): self
-    {
-        $paths = new PathResolver();
+	 * Inicializační metoda pro automatickou detekci cest ke konfiguračním souborům.
+	 *
+	 * @return self Instance třídy ApiHandler s načtenými cestami ke konfiguracím.
+	 */
+	public static function bootstrap(): self
+	{
+		$paths = new PathResolver();
 
-        if (!defined('BRIDGE_BOOTSTRAPPED')) {
-            define('BRIDGE_BOOTSTRAPPED', true);
-        }
+		if (!defined('BRIDGE_BOOTSTRAPPED')) {
+			define('BRIDGE_BOOTSTRAPPED', true);
+		}
 
-        $configPath = $paths->resolvedBridgeConfigFile();
-        $securityConfigPath = $paths->resolvedSecurityConfigFile();
-        $configDir = $paths->resolvedConfigPath();
+		$configPath = $paths->resolvedBridgeConfigFile();
+		$securityConfigPath = $paths->resolvedSecurityConfigFile();
+		$configDir = $paths->resolvedConfigPath();
 
-        return new self($configPath, $securityConfigPath, $configDir);
-    }
+		return new self($configPath, $securityConfigPath, $configDir);
+	}
 
-    // ─── Request handling ───────────────────────────────────────
-
+	/**
+	 * Zpracuje příchozí HTTP požadavek a odešle odpověď ve formátu JSON.
+	 *
+	 * @return void Metoda nevrací žádnou hodnotu.
+	 */
     public function handle(): void
     {
         header('Content-Type: application/json; charset=UTF-8');
 
         try {
             $this->processRequest();
-        } catch (SecurityException) {
-            self::sendError(403, 'security', 'Forbidden');
-        } catch (AiException $e) {
-            self::sendAiError($e);
-        } catch (\JsonException) {
-            self::sendError(400, 'invalid_json', 'Neplatný JSON vstup');
         } catch (\Throwable $e) {
-            self::sendError(500, 'internal_error', $e->getMessage(), $e->getTraceAsString());
+            self::sendRawError($e);
         }
     }
 
+	/**
+	 * Zpracuje příchozí požadavek v několika krocích:
+	 *  1. Načte vstupní data z HTTP požadavku.
+	 *  2. Ověří podpis a validitu vstupních dat.
+	 *  3. Rozpozná cílový endpoint na základě parametrů.
+	 *  4. Zavolá poskytovatele AI s požadovanými daty.
+	 *  5. Odešle úspěšnou odpověď zpět klientovi.
+	 *
+	 * @return void Metoda nevrací žádnou hodnotu.
+	 */
     private function processRequest(): void
     {
         $input    = $this->parseInput();
@@ -103,37 +105,57 @@ final class ApiHandler
         $this->sendSuccessResponse($response, $endpoint, $input, $params);
     }
 
-    // ─── Pipeline kroky ─────────────────────────────────────────
-
-    private function parseInput(): array
+    /**
+     * Načte a dekóduje vstupní data z HTTP požadavku ve formátu JSON.
+     *
+     * @return array|null Pole s daty z požadavku, nebo null pokud je vstup prázdný.
+     * @throws JsonException Pokud je JSON neplatný nebo nelze dekódovat.
+     */
+    private function parseInput()
     {
-        return json_decode(
-            file_get_contents('php://input'),
-            true, 512, JSON_THROW_ON_ERROR,
-        );
+        try {
+            return json_decode(file_get_contents('php://input'), true, 512, JSON_THROW_ON_ERROR);
+        } catch (\JsonException $e) {
+            throw JsonException::invalidJson('Nepodařilo se zpracovat odeslaná data.', $e, $e->getTrace());
+        }
     }
 
+    /**
+     * Ověří podpis a validitu vstupních dat.
+     *
+     * @param array $input Reference na vstupní data, která obsahují podepsané parametry.
+     * @return array Ověřené parametry získané z podepsaných dat.
+     *
+     * @throws RuntimeException Pokud chybí podepsané parametry nebo je podpis neplatný.
+     */
     private function verifySignature(array &$input): array
     {
-        $secretKey = $this->securityConfig['secretKey']
-            ?? throw new \RuntimeException('Secret key not configured in security-config.php.');
-
         if (!isset($input['__ai_signed'])) {
-            throw new SecurityException('Missing signed params (__ai_signed).');
+            throw new SecurityException(
+                'Missing signed params (__ai_signed).',
+                SecurityException::CODE_MISSING_TOKEN,
+            );
         }
 
-        $verified = (new SignedParams($secretKey, $this->securityConfig['ttl'] ?? null))
-            ->verify($input['__ai_signed']);
+        $verified = (new SignedParams($this->securityConfig['secretKey'], $this->securityConfig['ttl'] ?? null))->verify($input['__ai_signed']);
 
         unset($input['__ai_signed']);
 
         return $verified;
     }
 
+    /**
+     * Rozpozná a vrátí cílový endpoint na základě parametrů a vstupních dat.
+     *
+     * @param array $params Parametry obsahující konfiguraci endpointu.
+     * @param array $input Reference na vstupní data, která mohou obsahovat další informace o endpointu.
+     *
+     * @return EndpointDefinition Definice cílového endpointu.
+     * @throws AiException Pokud chybí název endpointu v konfiguraci.
+     */
     private function resolveEndpoint(array $params, array &$input): EndpointDefinition
     {
-        $name = $params['config']['endpoint']
-            ?? throw AiException::invalidRequest('Chybí název endpointu v konfiguraci.');
+        $name = $params['config']['endpoint'] ?? throw AiException::invalidRequest('Chybí název endpointu v konfiguraci.');
 
         $paths = new PathResolver();
         $loader = new ConfigLoader(
@@ -158,23 +180,25 @@ final class ApiHandler
         return $endpoint;
     }
 
-    private function callAiProvider(
-        EndpointDefinition $endpoint,
-        array $input,
-        array $params,
-    ): AiResponse {
-        $request = $endpoint->createRequest(
-            $input,
-            $params['get'] ?? [],
-            $params['body'] ?? [],
-        );
+    /**
+     * Zavolá poskytovatele AI s požadovanými daty a vrátí odpověď.
+     *
+     * @param EndpointDefinition $endpoint Definice cílového endpointu.
+     * @param array $input Vstupní data pro vytvoření požadavku.
+     * @param array $params Parametry obsahující další informace, jako hlavičky a tělo požadavku.
+     *
+     * @return AiResponse Odpověď od poskytovatele AI.
+     */
+    private function callAiProvider(EndpointDefinition $endpoint, array $input, array $params): AiResponse
+    {
+        $request = $endpoint->createRequest($input, $params['get'] ?? [], $params['body'] ?? []);
 
         foreach ($params['headers'] ?? [] as $name => $value) {
             $request->withHeader($name, $value);
         }
 
         $client = new AiClient(AiClientConfig::fromArray([
-            'api_key'     => $this->config['api_key'] ?? 'YOUR_API_KEY_HERE',
+            'api_key'     => $this->config['api_key'] ?? '',
             'timeout'     => $this->config['timeout'] ?? 30,
             'max_retries' => $this->config['max_retries'] ?? 3,
             'base_url'    => $this->config['base_url'] ?? '',
@@ -184,14 +208,16 @@ final class ApiHandler
         return $client->send($request);
     }
 
-    // ─── Odpovědi ───────────────────────────────────────────────
-
-    private function sendSuccessResponse(
-        AiResponse $response,
-        EndpointDefinition $endpoint,
-        array $input,
-        array $params,
-    ): void {
+    /**
+     * Odešle úspěšnou odpověď zpět klientovi ve formátu JSON.
+     *
+     * @param AiResponse $response Odpověď od poskytovatele AI.
+     * @param EndpointDefinition $endpoint Definice cílového endpointu.
+     * @param array $input Vstupní data použitá pro zpracování požadavku.
+     * @param array $params Parametry obsahující další informace o požadavku.
+     */
+    private function sendSuccessResponse(AiResponse $response, EndpointDefinition $endpoint, array $input, array $params): void
+    {
         $parsed = $endpoint->parseResponse($response->getResponse());
 
         $html = AiResponseRenderer::create()->render(
@@ -229,12 +255,20 @@ final class ApiHandler
         ], JSON_UNESCAPED_UNICODE);
     }
 
-    // ─── Konfigurace ────────────────────────────────────────────
-
+	/**
+	 * Načte konfiguraci ze zadaného souboru.
+	 *
+	 * @param string $path Cesta k souboru s konfigurací.
+	 * @param string $label Označení konfigurace pro chybové hlášení.
+	 * @return array Vrací pole s konfigurací.
+	 */
     private function loadConfig(string $path, string $label): array
     {
         if (!file_exists($path)) {
-            throw new \RuntimeException("{$label} config not found: {$path}");
+            self::sendRawError(
+                AiException::invalidRequest("{$label} config not found: {$path}")
+            );
+            exit;
         }
 
         if (!defined('BRIDGE_BOOTSTRAPPED')) {
@@ -244,60 +278,89 @@ final class ApiHandler
         $config = require $path;
 
         if (!is_array($config)) {
-            throw new \RuntimeException("{$label} config must return an array.");
+			self::sendRawError(
+                AiException::invalidRequest("{$label} config must return an array.")
+            );
+            exit;
         }
 
         return $config;
     }
 
-    // ─── Chybové odpovědi ───────────────────────────────────────
-
-    private static function sendError(
-        int $status,
-        string $type,
-        string $message,
-        ?string $context = null,
-    ): void {
+	/**
+	 * Odešle chybovou odpověď ve formátu JSON.
+	 *
+	 * @param \Throwable $e Výjimka nebo chyba, která má být odeslána.
+	 */
+    private static function sendRawError(\Throwable $e): void
+    {
+        $status = self::resolveHttpStatus($e);
         http_response_code($status);
+
+        $error = [
+            'type'    => self::resolveErrorType($e),
+            'code'    => $e->getCode() ?: $status,
+            'message' => $e->getMessage(),
+        ];
+
+        // AiException a JsonException nesou strukturovaný kontext
+        if ($e instanceof AiException || $e instanceof JsonException) {
+            $error['context'] = $e->getContext();
+        }
+
+        // V debug režimu přidat trace
+        if (defined('DEBUG_MODE') && \constant('DEBUG_MODE')) {
+            $error['trace'] = $e->getTraceAsString();
+        }
+
         echo json_encode([
             'api' => [
                 'success'     => false,
                 'status_code' => $status,
-                'error'       => [
-                    'type'    => $type,
-                    'message' => $message,
-                    'context' => $context,
-                    'code'    => $status,
-                ],
+                'error'       => $error,
             ],
             'provider' => null,
             'data'     => null,
         ], JSON_UNESCAPED_UNICODE);
     }
 
-    private static function sendAiError(AiException $e): void
+	/**
+	 * Určí HTTP status kód na základě typu výjimky.
+	 *
+	 * @param \Throwable $e Výjimka, pro kterou se určuje status kód.
+	 * @return int Vrací odpovídající HTTP status kód.
+	 */
+    private static function resolveHttpStatus(\Throwable $e): int
     {
-        $status = match ($e->getCode()) {
-            AiException::ERROR_VALIDATION      => 422,
-            AiException::ERROR_INVALID_REQUEST => 400,
-            AiException::ERROR_TIMEOUT         => 504,
-            default                            => 500,
-        };
+        if ($e instanceof SecurityException) return 403;
+        if ($e instanceof \JsonException) return 500;
 
-        http_response_code($status);
-        echo json_encode([
-            'api' => [
-                'success'     => false,
-                'status_code' => $e->getCode(),
-                'error'       => [
-                    'type'    => 'ai_provider',
-                    'message' => $e->getMessage(),
-                    'context' => $e->getContext(),
-                    'code'    => $e->getCode(),
-                ],
-            ],
-            'provider' => null,
-            'data'     => null,
-        ], JSON_UNESCAPED_UNICODE);
+        if ($e instanceof AiException) {
+            return match ($e->getCode()) {
+                AiException::ERROR_VALIDATION => 422,
+                AiException::ERROR_INVALID_REQUEST => 400,
+                AiException::ERROR_TIMEOUT => 504,
+                AiException::ERROR_CONNECTION => 502,
+                default => 500,
+            };
+        }
+
+        return 500;
+    }
+
+	/**
+	 * Určí typ chyby na základě typu výjimky.
+	 *
+	 * @param \Throwable $e Výjimka, pro kterou se určuje typ chyby.
+	 * @return string Vrací řetězec reprezentující typ chyby.
+	 */
+    private static function resolveErrorType(\Throwable $e): string
+    {
+        return match (true) {
+            $e instanceof SecurityException => 'security',
+            $e instanceof \JsonException => 'invalid_json',
+            $e instanceof AiException => 'ai_provider',
+            default => 'internal_error',
+        };
     }
 }

@@ -39,13 +39,19 @@
     OPEN: "pb-select--open",
     DISABLED: "pb-select--disabled"
   };
-  var ERROR_ALERT = {
-    ROOT: "pb-error",
-    CONTENT: "pb-error__content",
-    TITLE: "pb-error__title",
-    MESSAGE: "pb-error__message",
-    DETAIL: "pb-error__detail",
-    CLOSE: "pb-error__close"
+  var NOTIFICATION = {
+    ROOT: "pb-notification",
+    CONTAINER: "pb-notifications",
+    ICON: "pb-notification__icon",
+    CONTENT: "pb-notification__content",
+    TITLE: "pb-notification__title",
+    MESSAGE: "pb-notification__message",
+    CLOSE: "pb-notification__close",
+    ERROR: "pb-notification--error",
+    SUCCESS: "pb-notification--success",
+    WARNING: "pb-notification--warning",
+    INFO: "pb-notification--info",
+    LEAVING: "pb-notification--leaving"
   };
   var COMPONENTS = {
     RESULT_CONTAINER: "pb-result",
@@ -744,22 +750,504 @@
     }
   };
 
-  // assets/ts/Core/ErrorHandler.ts
+  // assets/ts/Core/MessageRenderer.ts
+  var LEVEL_ICONS = {
+    error: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="10" cy="10" r="8"/><path d="M7 7l6 6M13 7l-6 6" stroke-linecap="round"/></svg>',
+    success: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="10" cy="10" r="8"/><path d="M6.5 10.5l2.5 2.5 5-6" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+    warning: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M10 3L2 17h16L10 3z" stroke-linejoin="round"/><path d="M10 8v4" stroke-linecap="round"/><circle cx="10" cy="14.5" r=".75" fill="currentColor" stroke="none"/></svg>',
+    info: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="10" cy="10" r="8"/><path d="M10 9v5" stroke-linecap="round"/><circle cx="10" cy="6.5" r=".75" fill="currentColor" stroke="none"/></svg>'
+  };
+  var CLOSE_ICON = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 4l8 8M12 4l-8 8"/></svg>';
+  var LEVEL_MODIFIER = {
+    error: NOTIFICATION.ERROR,
+    success: NOTIFICATION.SUCCESS,
+    warning: NOTIFICATION.WARNING,
+    info: NOTIFICATION.INFO
+  };
+  var DEFAULT_TITLES = {
+    error: "Chyba",
+    success: "\xDAsp\u011Bch",
+    warning: "Varov\xE1n\xED",
+    info: "Informace"
+  };
   var DEFAULTS = {
-    errorContainerSelector: `.${MODULE.ROOT}`,
-    errorAlertClass: ERROR_ALERT.ROOT,
-    autoHideDelay: 1e4,
+    maxVisible: 5,
+    autoHideDelay: 8e3,
     verbose: false,
-    httpMessages: {
-      400: "Neplatn\xFD po\u017Eadavek.",
-      403: "P\u0159\xEDstup zam\xEDtnut \u2014 neplatn\xFD bezpe\u010Dnostn\xED podpis.",
-      404: "API endpoint nenalezen.",
-      422: "Chyba validace vstupn\xEDch dat.",
-      429: "P\u0159\xEDli\u0161 mnoho po\u017Eadavk\u016F. Zkuste to pozd\u011Bji.",
-      500: "Intern\xED chyba serveru.",
-      502: "Server do\u010Dasn\u011B nedostupn\xFD.",
-      503: "Slu\u017Eba je do\u010Dasn\u011B nedostupn\xE1.",
-      504: "Po\u017Eadavek vypr\u0161el \u2014 server neodpov\u011Bd\u011Bl v\u010Das."
+    debug: false
+  };
+  var MessageRenderer = class {
+    options;
+    container = null;
+    timers = /* @__PURE__ */ new Map();
+    active = [];
+    constructor(options = {}) {
+      this.options = { ...DEFAULTS, ...options };
+    }
+    // ─── Public API ─────────────────────────────────────
+    /**
+     * Zobrazí notifikaci a vrátí její element.
+     */
+    show(message) {
+      const container = this.ensureContainer();
+      this.enforceLimit();
+      const el = this.build(message);
+      container.appendChild(el);
+      this.active.push(el);
+      const delay = message.autoHide === false ? 0 : this.options.autoHideDelay;
+      if (delay > 0) {
+        const timer = window.setTimeout(() => this.dismiss(el), delay);
+        this.timers.set(el, timer);
+      }
+      return el;
+    }
+    /**
+     * Odstraní konkrétní notifikaci s leaving animací.
+     */
+    dismiss(el) {
+      if (!el.parentNode) return;
+      const timer = this.timers.get(el);
+      if (timer) {
+        clearTimeout(timer);
+        this.timers.delete(el);
+      }
+      el.classList.add(NOTIFICATION.LEAVING);
+      const remove = () => {
+        el.remove();
+        this.active = this.active.filter((n) => n !== el);
+      };
+      el.addEventListener("animationend", remove, { once: true });
+      setTimeout(remove, 500);
+    }
+    /**
+     * Odstraní všechny aktivní notifikace.
+     */
+    clear() {
+      for (const el of [...this.active]) {
+        this.dismiss(el);
+      }
+    }
+    // ─── Private ────────────────────────────────────────
+    /**
+     * Zajistí existenci `.pb-notifications` kontejneru.
+     * Vytvoří ho lazy při prvním volání show().
+     */
+    ensureContainer() {
+      if (this.container && document.body.contains(this.container)) {
+        return this.container;
+      }
+      let container = document.querySelector(`.${NOTIFICATION.CONTAINER}`);
+      if (!container) {
+        container = document.createElement("div");
+        container.className = NOTIFICATION.CONTAINER;
+        document.body.appendChild(container);
+      }
+      this.container = container;
+      return container;
+    }
+    /**
+     * Odstraní nejstarší notifikace pokud je překročen limit.
+     */
+    enforceLimit() {
+      while (this.active.length >= this.options.maxVisible) {
+        const oldest = this.active[0];
+        if (oldest) this.dismiss(oldest);
+      }
+    }
+    /**
+     * Sestaví DOM element notifikace.
+     */
+    build(message) {
+      const el = document.createElement("div");
+      el.className = `${NOTIFICATION.ROOT} ${LEVEL_MODIFIER[message.level]}`;
+      el.setAttribute("role", message.level === "error" ? "alert" : "status");
+      const title = this.escapeHtml(message.title || DEFAULT_TITLES[message.level]);
+      const text = this.escapeHtml(message.message);
+      let serverMsgHtml = "";
+      let detailHtml = "";
+      if ((this.options.verbose || this.options.debug) && message.detail != null) {
+        const raw = typeof message.detail === "string" ? message.detail : JSON.stringify(message.detail, null, 2);
+        detailHtml = `<pre style="font-size:.75rem;margin-top:8px;padding:8px;background:rgba(0,0,0,.06);border-radius:4px;overflow:auto;max-height:200px;white-space:pre-wrap;word-break:break-word">${this.escapeHtml(raw)}</pre>`;
+      }
+      el.innerHTML = `
+			<span class="${NOTIFICATION.ICON}">${LEVEL_ICONS[message.level]}</span>
+			<div class="${NOTIFICATION.CONTENT}">
+				<strong class="${NOTIFICATION.TITLE}">${title}</strong>
+				<p class="${NOTIFICATION.MESSAGE}">${text}</p>
+				${serverMsgHtml}
+				${detailHtml}
+			</div>
+			<button class="${NOTIFICATION.CLOSE}" type="button" aria-label="Zav\u0159\xEDt">${CLOSE_ICON}</button>
+		`;
+      const closeBtn = el.querySelector(`.${NOTIFICATION.CLOSE}`);
+      closeBtn?.addEventListener("click", () => this.dismiss(el));
+      return el;
+    }
+    escapeHtml(str) {
+      const div = document.createElement("div");
+      div.textContent = str;
+      return div.innerHTML;
+    }
+  };
+
+  // assets/ts/Types/Api.ts
+  var ErrorCode = {
+    INVALID_REQUEST: 1001,
+    VALIDATION: 1002,
+    CONNECTION: 1003,
+    TIMEOUT: 1004,
+    INVALID_RESPONSE: 1005,
+    API: 1006,
+    // SecurityException kódy (2001–2003)
+    INVALID_SIGNATURE: 2001,
+    EXPIRED_TOKEN: 2002,
+    MISSING_TOKEN: 2003,
+    // JsonException kódy (3001–3003)
+    JSON_DEPTH: 3001,
+    INVALID_JSON: 3002,
+    JSON_UTF8: 3003
+  };
+
+  // assets/ts/Core/ErrorHandler.ts
+  var HTTP_MESSAGES = {
+    400: "Neplatn\xFD po\u017Eadavek.",
+    401: "Neautorizovan\xFD p\u0159\xEDstup.",
+    403: "P\u0159\xEDstup zam\xEDtnut \u2014 neplatn\xFD bezpe\u010Dnostn\xED podpis.",
+    404: "API endpoint nenalezen.",
+    405: "Nepodporovan\xE1 HTTP metoda.",
+    408: "Po\u017Eadavek vypr\u0161el.",
+    422: "Chyba validace vstupn\xEDch dat.",
+    429: "P\u0159\xEDli\u0161 mnoho po\u017Eadavk\u016F. Zkuste to pozd\u011Bji.",
+    500: "Intern\xED chyba serveru.",
+    502: "Server do\u010Dasn\u011B nedostupn\xFD.",
+    503: "Slu\u017Eba je do\u010Dasn\u011B nedostupn\xE1.",
+    504: "Po\u017Eadavek vypr\u0161el \u2014 server neodpov\u011Bd\u011Bl v\u010Das."
+  };
+  var CODE_TITLES = {
+    [ErrorCode.INVALID_REQUEST]: "Neplatn\xFD po\u017Eadavek",
+    [ErrorCode.VALIDATION]: "Chyba validace",
+    [ErrorCode.CONNECTION]: "Chyba p\u0159ipojen\xED",
+    [ErrorCode.TIMEOUT]: "\u010Casov\xFD limit vypr\u0161el",
+    [ErrorCode.INVALID_RESPONSE]: "Neplatn\xE1 odpov\u011B\u010F",
+    [ErrorCode.API]: "Chyba API",
+    // SecurityException titulky
+    [ErrorCode.INVALID_SIGNATURE]: "Bezpe\u010Dnostn\xED chyba",
+    [ErrorCode.EXPIRED_TOKEN]: "Token vypr\u0161el",
+    [ErrorCode.MISSING_TOKEN]: "Chyb\u011Bj\xEDc\xED token",
+    // JsonException titulky
+    [ErrorCode.INVALID_JSON]: "Neplatn\xE9 v\xFDstupn\xED data",
+    [ErrorCode.JSON_DEPTH]: "Neplatn\xE9 v\xFDstupn\xED data",
+    [ErrorCode.JSON_UTF8]: "Neplatn\xE9 v\xFDstupn\xED data"
+  };
+  var CODE_USER_MESSAGES = {
+    // AiException (1001–1006)
+    [ErrorCode.INVALID_REQUEST]: "Po\u017Eadavek obsahuje neplatn\xE1 data.",
+    [ErrorCode.VALIDATION]: "Vstupn\xED data nepro\u0161la validac\xED.",
+    [ErrorCode.CONNECTION]: "Nelze se p\u0159ipojit k AI poskytovateli.",
+    [ErrorCode.TIMEOUT]: "Po\u017Eadavek na AI poskytovatele vypr\u0161el.",
+    [ErrorCode.INVALID_RESPONSE]: "AI poskytovatel vr\xE1til neplatnou odpov\u011B\u010F.",
+    [ErrorCode.API]: "AI poskytovatel vr\xE1til chybu.",
+    // SecurityException (2001–2003)
+    [ErrorCode.INVALID_SIGNATURE]: "Neplatn\xFD bezpe\u010Dnostn\xED podpis po\u017Eadavku.",
+    [ErrorCode.EXPIRED_TOKEN]: "Platnost bezpe\u010Dnostn\xEDho tokenu vypr\u0161ela. Obnovte str\xE1nku.",
+    [ErrorCode.MISSING_TOKEN]: "Po\u017Eadavek neobsahuje bezpe\u010Dnostn\xED token.",
+    // JsonException (3001–3003)
+    [ErrorCode.JSON_DEPTH]: "P\u0159ekro\u010Dena maxim\xE1ln\xED hloubka JSON.",
+    [ErrorCode.INVALID_JSON]: "Neplatn\xFD form\xE1t JSON.",
+    [ErrorCode.JSON_UTF8]: "Neplatn\xE9 UTF-8 znaky ve v\xFDstupu."
+  };
+  var CODE_TYPE_MAP = {
+    [ErrorCode.INVALID_REQUEST]: "validation",
+    [ErrorCode.VALIDATION]: "validation",
+    [ErrorCode.CONNECTION]: "network",
+    [ErrorCode.TIMEOUT]: "timeout",
+    [ErrorCode.INVALID_RESPONSE]: "parse",
+    [ErrorCode.API]: "api",
+    [ErrorCode.INVALID_SIGNATURE]: "http",
+    [ErrorCode.EXPIRED_TOKEN]: "http",
+    [ErrorCode.MISSING_TOKEN]: "http",
+    [ErrorCode.INVALID_JSON]: "parse",
+    [ErrorCode.JSON_DEPTH]: "parse",
+    [ErrorCode.JSON_UTF8]: "parse"
+  };
+  var TYPE_TITLES = {
+    network: "Chyba s\xEDt\u011B",
+    http: "Chyba serveru",
+    api: "Chyba API",
+    validation: "Chyba validace",
+    parse: "Chyba zpracov\xE1n\xED",
+    timeout: "\u010Casov\xFD limit",
+    dom: "Chyba aplikace",
+    unknown: "Neo\u010Dek\xE1van\xE1 chyba"
+  };
+  var HANDLER_DEFAULTS = {
+    autoListen: true,
+    verbose: false,
+    debug: false,
+    httpMessages: HTTP_MESSAGES,
+    autoHideDelay: 1e4
+  };
+  var ErrorHandler = class {
+    options;
+    events;
+    _renderer;
+    normalizers = [];
+    /** Ochrana proti re-entrancy při emit → subscribe cyklu */
+    handling = false;
+    constructor(events, options = {}) {
+      this.events = events;
+      const { rendererOptions, ...rest } = options;
+      this.options = {
+        ...HANDLER_DEFAULTS,
+        ...rest,
+        httpMessages: { ...HANDLER_DEFAULTS.httpMessages, ...rest.httpMessages }
+      };
+      this._renderer = new MessageRenderer({
+        verbose: this.options.verbose,
+        debug: this.options.debug,
+        autoHideDelay: this.options.autoHideDelay,
+        ...rendererOptions
+      });
+      if (this.options.autoListen) {
+        this.listen();
+      }
+    }
+    /** Přímý přístup k rendereru pro pokročilé použití */
+    get renderer() {
+      return this._renderer;
+    }
+    // ─── Rozšiřitelnost ────────────────────────────────
+    /**
+     * Registruje vlastní normalizátor chyb.
+     * Normalizátory se volají v pořadí registrace – první non-null výsledek vyhrává.
+     *
+     * @example
+     * // Rozšíření pro DOM eventy
+     * handler.use((error) => {
+     *     if (error instanceof SecurityPolicyViolationEvent) {
+     *         return { type: 'dom', message: 'Porušení bezpečnostní politiky.', source: 'dom' };
+     *     }
+     *     return null;
+     * });
+     *
+     * // Rozšíření pro vlastní error třídy
+     * handler.use((error) => {
+     *     if (error instanceof MyDomError) {
+     *         return { type: 'dom', code: error.code, message: error.message, source: 'dom' };
+     *     }
+     *     return null;
+     * });
+     */
+    use(normalizer) {
+      this.normalizers.push(normalizer);
+      return this;
+    }
+    // ─── Zpracování chyb ──────────────────────────────
+    /**
+     * Univerzální handler – normalizuje libovolnou chybu, emituje event a zobrazí notifikaci.
+     *
+     * Použitelné v catch blocích kdekoliv v aplikaci:
+     * ```ts
+     * try { ... } catch (e) { errorHandler.handle(e); }
+     * ```
+     */
+    handle(error) {
+      return this.process(this.normalize(error));
+    }
+    /**
+     * Zpracuje HTTP response (s případným parsovaným body).
+     * Vrátí null pokud response je OK a API nevrátila chybu.
+     *
+     * Pokrývá:
+     * - HTTP 4xx/5xx s api.error detailem
+     * - HTTP 200 ale api.success === false
+     */
+    handleResponse(response, body) {
+      if (response.ok && (!body?.api || body.api.success)) return null;
+      const showDetail = this.options.verbose || this.options.debug;
+      if (!response.ok) {
+        const apiError = body?.api?.error;
+        const code = apiError?.code;
+        const serverMessage = apiError?.message || void 0;
+        const userMessage = code && CODE_USER_MESSAGES[code] ? this.options.debug && serverMessage ? serverMessage : CODE_USER_MESSAGES[code] : this.options.httpMessages[response.status] ?? `Chyba serveru (${response.status})`;
+        return this.process({
+          type: (code != null ? CODE_TYPE_MAP[code] : void 0) ?? "http",
+          code: code ?? response.status,
+          message: userMessage,
+          serverMessage,
+          source: "ajax",
+          detail: showDetail ? {
+            status: response.status,
+            statusText: response.statusText,
+            apiError
+          } : void 0
+        });
+      }
+      if (body?.api?.error) {
+        return this.handleApiError(body.api.error);
+      }
+      return null;
+    }
+    /**
+     * Zpracuje API chybu z backendu (api.error objekt).
+     * Kódy chyb odpovídají PHP AiException (1001–1006), SecurityException (2001–2003)
+     * a JsonException (3001–3003).
+     *
+     * - `message`       → user-friendly hláška z CODE_USER_MESSAGES (nebo fallback)
+     * - `serverMessage` → originální PHP throw message (zobrazí se jen v debug módu)
+     */
+    handleApiError(apiError) {
+      const showDetail = this.options.verbose || this.options.debug;
+      const code = apiError.code;
+      const serverMessage = apiError.message || void 0;
+      const userMessage = code && CODE_USER_MESSAGES[code] ? this.options.debug && serverMessage ? serverMessage : CODE_USER_MESSAGES[code] : serverMessage || "API vr\xE1tila chybu.";
+      return this.process({
+        type: (code != null ? CODE_TYPE_MAP[code] : void 0) ?? "api",
+        code,
+        message: userMessage,
+        serverMessage,
+        source: "ajax",
+        detail: showDetail ? apiError : void 0
+      });
+    }
+    /**
+     * Zpracuje neočekávanou odpověď serveru (HTML místo JSON, prázdné tělo atd.).
+     * Pokrývá případ, kdy PHP hodí fatal error a vrátí HTML.
+     */
+    handleUnexpectedResponse(response, rawBody) {
+      const showDetail = this.options.verbose || this.options.debug;
+      return this.process({
+        type: "parse",
+        code: ErrorCode.INVALID_RESPONSE,
+        message: "Server vr\xE1til neo\u010Dek\xE1vanou odpov\u011B\u010F.",
+        source: "ajax",
+        detail: showDetail ? {
+          status: response.status,
+          contentType: response.headers.get("content-type"),
+          body: rawBody?.substring(0, 500)
+        } : void 0
+      });
+    }
+    // ─── Notifikace (obecné hlášky) ────────────────────
+    /**
+     * Zobrazí notifikaci libovolné úrovně.
+     * Pro success, info, warning hlášky které nejsou chyby.
+     *
+     * @example
+     * handler.notify('success', 'Data byla úspěšně uložena.');
+     * handler.notify('info', 'Zpracování probíhá...', 'Průběh');
+     * handler.notify('warning', 'Tato akce je nevratná.');
+     */
+    notify(level, message, title) {
+      this._renderer.show({ level, message, title });
+      this.events.publish("notification", { level, message, title });
+    }
+    /**
+     * Odstraní všechny zobrazené notifikace.
+     */
+    dismiss() {
+      this._renderer.clear();
+    }
+    // ─── EventBus naslouchání ─────────────────────────
+    /**
+     * Přihlásí se na EventBus 'error' eventy.
+     * Voláno automaticky pokud autoListen === true.
+     * Zachytává chyby emitované transporty (HttpTransport, SseTransport atd.).
+     */
+    listen() {
+      this.events.subscribe("error", ({ error, statusCode }) => {
+        if (this.handling) return;
+        const enriched = {
+          ...error,
+          code: error.code ?? statusCode
+        };
+        this.render(enriched);
+      });
+    }
+    // ─── Normalizace ──────────────────────────────────
+    /**
+     * Normalizuje libovolný typ chyby do AiBridgeError.
+     */
+    normalize(error) {
+      if (this.isAiBridgeError(error)) return error;
+      for (const normalizer of this.normalizers) {
+        const result = normalizer(error);
+        if (result) return result;
+      }
+      if (error instanceof DOMException && error.name === "AbortError") {
+        return {
+          type: "timeout",
+          code: ErrorCode.TIMEOUT,
+          message: "Po\u017Eadavek byl zru\u0161en nebo vypr\u0161el timeout."
+        };
+      }
+      if (error instanceof TypeError) {
+        return {
+          type: "network",
+          code: ErrorCode.CONNECTION,
+          message: "Nelze se p\u0159ipojit k serveru. Zkontrolujte p\u0159ipojen\xED k internetu.",
+          detail: this.options.verbose ? error.message : void 0
+        };
+      }
+      if (error instanceof Error) {
+        return {
+          type: "unknown",
+          message: error.message || "Nastala neo\u010Dek\xE1van\xE1 chyba.",
+          detail: this.options.verbose ? error.stack : void 0
+        };
+      }
+      if (typeof error === "string") {
+        return { type: "unknown", message: error };
+      }
+      return {
+        type: "unknown",
+        message: "Nastala neo\u010Dek\xE1van\xE1 chyba.",
+        detail: this.options.verbose ? error : void 0
+      };
+    }
+    // ─── Interní zpracování ───────────────────────────
+    /**
+     * Emituje error event a zobrazí notifikaci.
+     */
+    process(error) {
+      this.emit(error);
+      this.render(error);
+      return error;
+    }
+    /**
+     * Emituje 'error' event na EventBus s re-entrancy ochranou.
+     */
+    emit(error) {
+      this.handling = true;
+      this.events.publish("error", { error, statusCode: error.code });
+      this.handling = false;
+    }
+    /**
+     * Zobrazí error notifikaci přes MessageRenderer.
+     */
+    render(error) {
+      this._renderer.show({
+        level: "error",
+        title: this.resolveTitle(error),
+        message: error.message,
+        serverMessage: error.serverMessage,
+        detail: error.detail
+      });
+    }
+    /**
+     * Rozhodne titulek na základě error kódu (AiException) nebo typu.
+     */
+    resolveTitle(error) {
+      if (error.code && CODE_TITLES[error.code]) {
+        return CODE_TITLES[error.code];
+      }
+      return TYPE_TITLES[error.type] ?? "Chyba";
+    }
+    /**
+     * Type guard pro AiBridgeError.
+     */
+    isAiBridgeError(error) {
+      return typeof error === "object" && error !== null && "type" in error && "message" in error && typeof error.message === "string";
     }
   };
 
@@ -990,14 +1478,219 @@
     }
   };
 
-  // assets/ts/Services/LoadingManager.ts
+  // assets/ts/Services/ApiErrorHandler.ts
+  var PHP_TYPE_MESSAGES = {
+    security: "P\u0159\xEDstup zam\xEDtnut \u2014 neplatn\xFD bezpe\u010Dnostn\xED podpis.",
+    invalid_json: "Neplatn\xFD form\xE1t po\u017Eadavku.",
+    ai_provider: "Chyba AI poskytovatele.",
+    internal_error: "Intern\xED chyba serveru."
+  };
+  var PHP_TYPE_MAP = {
+    security: "http",
+    invalid_json: "validation",
+    ai_provider: "api",
+    internal_error: "unknown"
+  };
+  var AI_CODE_MESSAGES = {
+    [ErrorCode.INVALID_REQUEST]: "Po\u017Eadavek obsahuje neplatn\xE1 data.",
+    [ErrorCode.VALIDATION]: "Vstupn\xED data nepro\u0161la validac\xED.",
+    [ErrorCode.CONNECTION]: "Nelze se p\u0159ipojit k AI poskytovateli.",
+    [ErrorCode.TIMEOUT]: "Po\u017Eadavek na AI poskytovatele vypr\u0161el.",
+    [ErrorCode.INVALID_RESPONSE]: "AI poskytovatel vr\xE1til neplatnou odpov\u011B\u010F.",
+    [ErrorCode.API]: "AI poskytovatel vr\xE1til chybu.",
+    // SecurityException kódy
+    [ErrorCode.INVALID_SIGNATURE]: "Neplatn\xFD bezpe\u010Dnostn\xED podpis po\u017Eadavku.",
+    [ErrorCode.EXPIRED_TOKEN]: "Platnost bezpe\u010Dnostn\xEDho tokenu vypr\u0161ela. Obnovte str\xE1nku.",
+    [ErrorCode.MISSING_TOKEN]: "Po\u017Eadavek neobsahuje bezpe\u010Dnostn\xED token.",
+    // JsonException kódy
+    [ErrorCode.INVALID_JSON]: "Neplatn\xFD form\xE1t JSON.",
+    [ErrorCode.JSON_DEPTH]: "P\u0159ekro\u010Dena maxim\xE1ln\xED hloubka JSON.",
+    [ErrorCode.JSON_UTF8]: "Neplatn\xE9 UTF-8 znaky."
+  };
+  var AI_CODE_TYPE_MAP = {
+    [ErrorCode.INVALID_REQUEST]: "validation",
+    [ErrorCode.VALIDATION]: "validation",
+    [ErrorCode.CONNECTION]: "network",
+    [ErrorCode.TIMEOUT]: "timeout",
+    [ErrorCode.INVALID_RESPONSE]: "parse",
+    [ErrorCode.API]: "api",
+    // SecurityException → http (403/401)
+    [ErrorCode.INVALID_SIGNATURE]: "http",
+    [ErrorCode.EXPIRED_TOKEN]: "http",
+    [ErrorCode.MISSING_TOKEN]: "http",
+    // JsonException → parse
+    [ErrorCode.INVALID_JSON]: "parse",
+    [ErrorCode.JSON_DEPTH]: "parse",
+    [ErrorCode.JSON_UTF8]: "parse"
+  };
+  var HTTP_STATUS_MESSAGES = {
+    400: "Neplatn\xFD po\u017Eadavek.",
+    403: "P\u0159\xEDstup zam\xEDtnut.",
+    404: "API endpoint nenalezen.",
+    422: "Chyba validace vstupn\xEDch dat.",
+    429: "P\u0159\xEDli\u0161 mnoho po\u017Eadavk\u016F \u2014 zkuste to pozd\u011Bji.",
+    500: "Intern\xED chyba serveru.",
+    502: "Server AI poskytovatele je do\u010Dasn\u011B nedostupn\xFD.",
+    503: "Slu\u017Eba je do\u010Dasn\u011B nedostupn\xE1.",
+    504: "Po\u017Eadavek na AI poskytovatele vypr\u0161el."
+  };
   var DEFAULTS2 = {
-    loadingClass: MODULE.LOADING,
-    buttonLoadingClass: MODULE.SUBMIT_LOADING,
-    buttonLoadingText: "Generuji...",
-    showOverlay: true,
-    overlayClass: MODULE.OVERLAY,
-    disableForm: true
+    verbose: false,
+    debug: false
+  };
+  var ApiErrorHandler = class {
+    events;
+    errorHandler;
+    options;
+    typeMessages;
+    codeMessages;
+    constructor(events, errorHandler, options = {}) {
+      this.events = events;
+      this.errorHandler = errorHandler;
+      const { typeMessages, codeMessages, ...rest } = options;
+      this.options = { ...DEFAULTS2, ...rest };
+      this.typeMessages = { ...PHP_TYPE_MESSAGES, ...typeMessages };
+      this.codeMessages = { ...AI_CODE_MESSAGES, ...codeMessages };
+    }
+    // ─── Hlavní entry points ──────────────────────────
+    /**
+     * Zpracuje fetch Response + rozparsované body.
+     * Vrátí null pokud odpověď je úspěšná, jinak AiBridgeError.
+     *
+     * Volá se z HttpTransport po obdržení odpovědi:
+     * ```ts
+     * const error = apiErrors.handleResponse(response, body);
+     * if (error) return null; // transport vrátí null = selhání
+     * ```
+     */
+    handleResponse(response, body) {
+      if (response.ok && (!body?.api || body.api.success)) {
+        return null;
+      }
+      const apiError = body?.api?.error;
+      if (!response.ok) {
+        return this.processHttpError(response, apiError);
+      }
+      if (apiError) {
+        return this.processApiError(apiError);
+      }
+      return null;
+    }
+    /**
+     * Zpracuje neočekávanou odpověď (HTML místo JSON, prázdné tělo).
+     * Pokrývá případ PHP fatal error → HTML output.
+     */
+    handleUnexpectedResponse(response, rawBody) {
+      const showDetail = this.options.verbose || this.options.debug;
+      const error = {
+        type: "parse",
+        code: ErrorCode.INVALID_RESPONSE,
+        message: "Server vr\xE1til neo\u010Dek\xE1vanou odpov\u011B\u010F m\xEDsto JSON.",
+        source: "api",
+        detail: showDetail ? {
+          status: response.status,
+          contentType: response.headers.get("content-type"),
+          bodyPreview: rawBody?.substring(0, 500)
+        } : void 0
+      };
+      return this.emit(error);
+    }
+    /**
+     * Zpracuje síťovou/transport chybu (TypeError, AbortError, generická Error).
+     * Volá se z catch bloku v HttpTransport.
+     */
+    handleTransportError(error) {
+      if (error instanceof DOMException && error.name === "AbortError") {
+        return this.emit({
+          type: "timeout",
+          code: ErrorCode.TIMEOUT,
+          message: "Po\u017Eadavek byl zru\u0161en nebo vypr\u0161el timeout.",
+          source: "transport"
+        });
+      }
+      if (error instanceof TypeError) {
+        return this.emit({
+          type: "network",
+          code: ErrorCode.CONNECTION,
+          message: "Nelze se p\u0159ipojit k serveru. Zkontrolujte p\u0159ipojen\xED k internetu.",
+          source: "transport",
+          detail: this.options.verbose || this.options.debug ? error.message : void 0
+        });
+      }
+      return this.errorHandler.handle(error);
+    }
+    // ─── Interní zpracování ───────────────────────────
+    /**
+     * Zpracuje HTTP chybu (4xx/5xx) s volitelným API error detailem z PHP.
+     */
+    processHttpError(response, apiError) {
+      if (apiError) {
+        return this.processApiError(apiError, response.status);
+      }
+      const message = HTTP_STATUS_MESSAGES[response.status] ?? `Neo\u010Dek\xE1van\xE1 chyba serveru (${response.status}).`;
+      const showDetail = this.options.verbose || this.options.debug;
+      return this.emit({
+        type: "http",
+        code: response.status,
+        message,
+        source: "api",
+        detail: showDetail ? {
+          status: response.status,
+          statusText: response.statusText
+        } : void 0
+      });
+    }
+    /**
+     * Zpracuje API error objekt z PHP odpovědi.
+     *
+     * Rozpoznává:
+     * 1. AiException / JsonException kódy (1001–1006, 3001–3003) → specifické hlášky a typy
+     * 2. PHP error type (security, invalid_json…) → mapované hlášky
+     * 3. Fallback na raw message z PHP
+     *
+     * `message` je vždy klientsky přívětivá mapovaná zpráva.
+     * `serverMessage` je vždy originální PHP zpráva (dostupná pro debug zobrazení).
+     */
+    processApiError(apiError, httpStatus) {
+      const code = apiError.code;
+      const phpType = apiError.type;
+      const serverMessage = apiError.message || void 0;
+      const showDetail = this.options.verbose || this.options.debug;
+      if (code && this.codeMessages[code]) {
+        return this.emit({
+          type: AI_CODE_TYPE_MAP[code] ?? "api",
+          code,
+          message: this.codeMessages[code],
+          serverMessage,
+          source: "api",
+          detail: showDetail ? apiError : void 0
+        });
+      }
+      if (phpType && this.typeMessages[phpType]) {
+        return this.emit({
+          type: PHP_TYPE_MAP[phpType] ?? "unknown",
+          code: code ?? httpStatus,
+          message: this.typeMessages[phpType],
+          serverMessage,
+          source: "api",
+          detail: showDetail ? apiError : void 0
+        });
+      }
+      return this.emit({
+        type: "api",
+        code: code ?? httpStatus,
+        message: serverMessage || "API vr\xE1tila nespecifikovanou chybu.",
+        serverMessage,
+        source: "api",
+        detail: showDetail ? apiError : void 0
+      });
+    }
+    /**
+     * Emituje chybu přes ErrorHandler (EventBus + notifikace) a vrátí ji.
+     */
+    emit(error) {
+      return this.errorHandler.handle(error);
+    }
   };
 
   // assets/ts/Services/SessionManager.ts
@@ -1421,7 +2114,7 @@
      * funguje i pro dynamicky přidané výsledky.
      */
     init() {
-      Dom.delegate("click", "[data-action]", (el, e) => {
+      Dom.delegate("click", ".pb-module [data-action]", (el, e) => {
         e.preventDefault();
         const button = Dom.wrap(el);
         const parsed = this.parseAction(button);
@@ -1461,7 +2154,7 @@
           this.handleCopy(button);
           break;
         case "use":
-          console.log("Bude v budoucnu");
+          this.handleUse(action, button);
           break;
         case "thumb-up":
         case "thumb-down":
@@ -1537,24 +2230,22 @@
         this.events.publish("copy", { success: false });
       }
     }
-    // /**
-    //  * "Použít" — emituje event s klíčem a hodnotou pro cílovou aplikaci.
-    //  */
-    // private handleUse(action: ResultAction, button: HTMLElement): void {
-    // 	const wrapper = button.closest<HTMLElement>('.pb-result__wrapper');
-    // 	if (!wrapper) return;
-    // 	const contentEl = wrapper.querySelector<HTMLElement>('.pb-result__content');
-    // 	if (!contentEl) return;
-    // 	const text = contentEl.textContent?.trim() ?? '';
-    // 	this.events.emit('use', {
-    // 		data: {
-    // 			[action.key]: text,
-    // 		},
-    // 	});
-    // 	// Vizuální feedback
-    // 	const item = wrapper.closest<HTMLElement>('.pb-result__item');
-    // 	item?.classList.add('is-used');
-    // }
+    /**
+     * "Použít" — emituje event s klíčem a hodnotou pro cílovou aplikaci.
+     */
+    handleUse(action, button) {
+      const wrapper = button.closest("[data-key]");
+      if (!wrapper) return;
+      const content = Dom.flag("result-content", wrapper.el);
+      const text = content.text().trim();
+      this.events.publish("pb-use", {
+        data: {
+          [action.key]: text
+        }
+      });
+      button.removeClass("pb-module__button--primary");
+      button.addClass("pb-module__button--used");
+    }
     // /**
     //  * Feedback (thumb up/down) — emituje event.
     //  */
@@ -2073,618 +2764,6 @@
     }
   };
 
-  // assets/ts/Public/PlatformBridge.ts
-  var PlatformBridge = class {
-    constructor(api, events, session, validator) {
-      this.api = api;
-      this.events = events;
-      this.session = session;
-      this.validator = validator;
-    }
-    // ═══════════════════════════════════════════════════
-    // ── Field Manipulation ────────────────────────────
-    // ═══════════════════════════════════════════════════
-    /**
-     * Nastaví hodnotu formulářového pole podle jména.
-     * Podporuje input, select, textarea, checkbox i radio.
-     *
-     * @param name Atribut `name` pole
-     * @param value Nová hodnota (pro checkbox: 'true'/'false')
-     * @param options Volitelné nastavení
-     *
-     * @example
-     * pb.setFieldValue('tone', 'formal');
-     * pb.setFieldValue('agree', 'true'); // checkbox
-     */
-    setFieldValue(name, value, options = {}) {
-      const { triggerChange = true, clearErrors = true } = options;
-      const el = this.getFieldElement(name);
-      if (!el) {
-        console.warn(`[PlatformBridge] Pole "${name}" nenalezeno.`);
-        return this;
-      }
-      if (el instanceof HTMLInputElement) {
-        if (el.type === "checkbox") {
-          el.checked = value === "true" || value === "1";
-        } else if (el.type === "radio") {
-          this.setRadioValue(el.form, name, value);
-        } else {
-          el.value = value;
-        }
-      } else {
-        el.value = value;
-      }
-      if (triggerChange) {
-        el.dispatchEvent(new Event("change", { bubbles: true }));
-        el.dispatchEvent(new Event("input", { bubbles: true }));
-      }
-      if (clearErrors) {
-        this.clearFieldError(name);
-      }
-      return this;
-    }
-    /**
-     * Vrátí aktuální hodnotu pole.
-     *
-     * @param name Atribut `name` pole
-     * @returns Hodnota pole, nebo null pokud neexistuje
-     */
-    getFieldValue(name) {
-      const el = this.getFieldElement(name);
-      if (!el) return null;
-      if (el instanceof HTMLInputElement && el.type === "checkbox") {
-        return el.checked ? "true" : "false";
-      }
-      return el.value;
-    }
-    /**
-     * Nastaví hodnoty více polí najednou.
-     *
-     * @param values Objekt { name: value }
-     * @param options Volitelné nastavení
-     *
-     * @example
-     * pb.setFieldValues({
-     *     tone: 'formal',
-     *     language: 'cs',
-     *     length: '500'
-     * });
-     */
-    setFieldValues(values, options) {
-      for (const [name, value] of Object.entries(values)) {
-        this.setFieldValue(name, value, options);
-      }
-      return this;
-    }
-    /**
-     * Vrátí hodnoty všech polí formuláře jako objekt.
-     */
-    getFormData() {
-      const form = this.getForm();
-      return form ? ApiClient.extractFormData(form) : {};
-    }
-    /**
-     * Vrátí informace o konkrétním poli.
-     */
-    getFieldInfo(name) {
-      const el = this.getFieldElement(name);
-      if (!el) return null;
-      return {
-        name: el.name,
-        value: el.value,
-        type: el instanceof HTMLInputElement ? el.type : el.tagName.toLowerCase(),
-        disabled: el.disabled,
-        required: el.required,
-        element: el
-      };
-    }
-    /**
-     * Vrátí seznam všech polí formuláře.
-     */
-    getFields() {
-      const form = this.getForm();
-      if (!form) return [];
-      return Array.from(form.elements).filter(
-        (el) => (el instanceof HTMLInputElement || el instanceof HTMLSelectElement || el instanceof HTMLTextAreaElement) && !!el.name && el.type !== "hidden" && el.type !== "button" && el.type !== "submit"
-      ).map((el) => ({
-        name: el.name,
-        value: el.value,
-        type: el instanceof HTMLInputElement ? el.type : el.tagName.toLowerCase(),
-        disabled: el.disabled,
-        required: el.required,
-        element: el
-      }));
-    }
-    // ═══════════════════════════════════════════════════
-    // ── Field State ───────────────────────────────────
-    // ═══════════════════════════════════════════════════
-    /**
-     * Zablokuje pole (disabled).
-     */
-    disableField(name) {
-      const el = this.getFieldElement(name);
-      if (el) el.disabled = true;
-      return this;
-    }
-    /**
-     * Odblokuje pole (enabled).
-     */
-    enableField(name) {
-      const el = this.getFieldElement(name);
-      if (el) el.disabled = false;
-      return this;
-    }
-    /**
-     * Zablokuje/odblokuje více polí najednou.
-     *
-     * @example
-     * pb.disableFields(['tone', 'language', 'length']);
-     */
-    disableFields(names) {
-      names.forEach((n) => this.disableField(n));
-      return this;
-    }
-    enableFields(names) {
-      names.forEach((n) => this.enableField(n));
-      return this;
-    }
-    /**
-     * Nastaví pole jako povinné (required).
-     */
-    setRequired(name, required = true) {
-      const el = this.getFieldElement(name);
-      if (el) el.required = required;
-      return this;
-    }
-    /**
-     * Skryje blok obsahující dané pole.
-     */
-    hideField(name) {
-      const wrapper = this.getFieldWrapper(name);
-      if (wrapper) wrapper.hide();
-      return this;
-    }
-    /**
-     * Zobrazí blok obsahující dané pole.
-     */
-    showField(name) {
-      const wrapper = this.getFieldWrapper(name);
-      if (wrapper) wrapper.show();
-      return this;
-    }
-    /**
-     * Přepne viditelnost bloku pole.
-     */
-    toggleField(name, visible) {
-      const wrapper = this.getFieldWrapper(name);
-      if (!wrapper) return this;
-      if (visible === void 0) {
-        wrapper.el.style.display === "none" ? wrapper.show() : wrapper.hide();
-      } else {
-        visible ? wrapper.show() : wrapper.hide();
-      }
-      return this;
-    }
-    // ═══════════════════════════════════════════════════
-    // ── Select Options ────────────────────────────────
-    // ═══════════════════════════════════════════════════
-    /**
-     * Přidá option do selectu.
-     *
-     * @example
-     * pb.addSelectOption('language', 'pl', 'Polština');
-     */
-    addSelectOption(name, value, label, selected = false) {
-      const el = this.getFieldElement(name);
-      if (!(el instanceof HTMLSelectElement)) return this;
-      const option = new Option(label, value, selected, selected);
-      el.add(option);
-      el.dispatchEvent(new Event("change", { bubbles: true }));
-      return this;
-    }
-    /**
-     * Odebere option ze selectu podle hodnoty.
-     */
-    removeSelectOption(name, value) {
-      const el = this.getFieldElement(name);
-      if (!(el instanceof HTMLSelectElement)) return this;
-      const option = el.querySelector(`option[value="${value}"]`);
-      if (option) {
-        option.remove();
-        el.dispatchEvent(new Event("change", { bubbles: true }));
-      }
-      return this;
-    }
-    /**
-     * Nahradí všechny options v selectu.
-     *
-     * @example
-     * pb.setSelectOptions('language', [
-     *     { value: 'cs', label: 'Čeština' },
-     *     { value: 'en', label: 'Angličtina' },
-     * ]);
-     */
-    setSelectOptions(name, options, selectedValue) {
-      const el = this.getFieldElement(name);
-      if (!(el instanceof HTMLSelectElement)) return this;
-      el.innerHTML = "";
-      for (const opt of options) {
-        const selected = opt.value === selectedValue;
-        el.add(new Option(opt.label, opt.value, selected, selected));
-      }
-      el.dispatchEvent(new Event("change", { bubbles: true }));
-      return this;
-    }
-    // ═══════════════════════════════════════════════════
-    // ── Validation ────────────────────────────────────
-    // ═══════════════════════════════════════════════════
-    /**
-     * Spustí validaci formuláře.
-     *
-     * @returns true pokud je formulář validní
-     */
-    validate() {
-      const form = this.getForm();
-      return form ? this.validator.validate(form) : false;
-    }
-    /**
-     * Vymaže všechny validační chyby z formuláře.
-     */
-    clearValidationErrors() {
-      const form = this.getForm();
-      if (form) this.validator.clearErrors(form);
-      return this;
-    }
-    /**
-     * Vymaže chybu u konkrétního pole.
-     */
-    clearFieldError(name) {
-      const el = this.getFieldElement(name);
-      if (!el) return this;
-      const wrapper = el.closest(`.${MODULE.FIELD}`);
-      wrapper?.classList.remove(MODULE.FIELD_ERROR);
-      const errorMsg = el.parentElement?.querySelector(`[data-validation-error="${name}"]`);
-      errorMsg?.remove();
-      return this;
-    }
-    /**
-     * Zobrazí vlastní chybovou zprávu u pole.
-     *
-     * @example
-     * pb.setFieldError('email', 'Neplatný formát emailu');
-     */
-    setFieldError(name, message) {
-      this.clearFieldError(name);
-      const el = this.getFieldElement(name);
-      if (!el) return this;
-      const wrapper = el.closest(`.${MODULE.FIELD}`);
-      wrapper?.classList.add(MODULE.FIELD_ERROR);
-      const errorEl = document.createElement("span");
-      errorEl.className = MODULE.ERROR_MSG;
-      errorEl.textContent = message;
-      errorEl.setAttribute("data-validation-error", name);
-      el.insertAdjacentElement("afterend", errorEl);
-      return this;
-    }
-    /**
-     * Zobrazí chyby u více polí najednou.
-     *
-     * @example
-     * pb.setFieldErrors([
-     *     { field: 'email', message: 'Neplatný email' },
-     *     { field: 'name', message: 'Povinné pole' },
-     * ]);
-     */
-    setFieldErrors(errors) {
-      for (const err of errors) {
-        this.setFieldError(err.field, err.message);
-      }
-      return this;
-    }
-    // ═══════════════════════════════════════════════════
-    // ── Form Submission ───────────────────────────────
-    // ═══════════════════════════════════════════════════
-    /**
-     * Odešle formulář programově.
-     * Provede validaci, extrakci dat a odeslání přes API.
-     *
-     * @example
-     * // Odeslat s výchozím transportem
-     * const result = await pb.submit();
-     *
-     * // Odeslat přes SSE
-     * const result = await pb.submit({ transport: 'sse' });
-     *
-     * // Odeslat s vlastními daty
-     * const result = await pb.submit({ overrideData: { tone: 'creative' } });
-     */
-    async submit(options = {}) {
-      const form = this.getForm();
-      if (!form) {
-        console.warn("[PlatformBridge] Formul\xE1\u0159 nenalezen.");
-        return null;
-      }
-      if (!this.validator.validate(form)) {
-        return null;
-      }
-      let data = ApiClient.extractFormData(form);
-      if (options.overrideData) {
-        data = { ...data, ...options.overrideData };
-      }
-      const result = options.transport ? await this.api.via(options.transport).send(data) : await this.api.send(data);
-      if (result) {
-        this.session.save(data);
-      }
-      return result;
-    }
-    /**
-     * Přeruší probíhající API požadavek.
-     */
-    abort() {
-      this.api.abort();
-      return this;
-    }
-    /**
-     * Vrací true pokud probíhá SSE streaming.
-     */
-    get isStreaming() {
-      return this.api.isStreaming;
-    }
-    // ═══════════════════════════════════════════════════
-    // ── Events ────────────────────────────────────────
-    // ═══════════════════════════════════════════════════
-    /**
-     * Přihlásí callback na interní event.
-     *
-     * @example
-     * pb.on('success', ({ data, duration }) => {
-     *     console.log('Vygenerováno za', duration, 'ms');
-     * });
-     *
-     * pb.on('error', ({ error }) => {
-     *     alert(error.message);
-     * });
-     *
-     * pb.on('sse:progress', ({ phase, current, total }) => {
-     *     console.log(`${phase}: ${current}/${total}`);
-     * });
-     */
-    on(event, callback) {
-      this.events.subscribe(event, callback);
-      return this;
-    }
-    /**
-     * Odhlásí callback z interního eventu.
-     */
-    off(event, callback) {
-      this.events.unsubscribe(event, callback);
-      return this;
-    }
-    /**
-     * Jednorázový event listener.
-     */
-    once(event, callback) {
-      this.events.once(event, callback);
-      return this;
-    }
-    /**
-     * Emituje event (pro pokročilé integrace).
-     */
-    emit(event, payload) {
-      this.events.publish(event, payload);
-      return this;
-    }
-    // ═══════════════════════════════════════════════════
-    // ── Result Manipulation ───────────────────────────
-    // ═══════════════════════════════════════════════════
-    /**
-     * Vrátí HTML obsah výsledkového kontejneru.
-     */
-    getResultHtml() {
-      const container = this.getResultContainer();
-      return container?.html() ?? "";
-    }
-    /**
-     * Nastaví HTML obsah výsledkového kontejneru.
-     */
-    setResultHtml(html) {
-      const container = this.getResultContainer();
-      if (container) container.html(html);
-      return this;
-    }
-    /**
-     * Vymaže výsledky.
-     */
-    clearResults() {
-      return this.setResultHtml("");
-    }
-    /**
-     * Zjistí, zda jsou zobrazeny výsledky.
-     */
-    hasResults() {
-      const html = this.getResultHtml();
-      return html.trim().length > 0;
-    }
-    /**
-     * Vrátí text konkrétního výsledku podle klíče (data-key).
-     *
-     * @example
-     * const subject = pb.getResultByKey('subject');
-     */
-    getResultByKey(key) {
-      const container = this.getResultContainer();
-      if (!container) return null;
-      const item = Dom.q(`[data-key="${key}"]`, container.el);
-      if (!item) return null;
-      const content = item.querySelector('[data-flag="result-content"]');
-      return content?.textContent ?? null;
-    }
-    /**
-     * Vrátí všechny výsledky jako objekt { key: text }.
-     */
-    getResults() {
-      const container = this.getResultContainer();
-      if (!container) return {};
-      const items = Dom.qa("[data-key]", container.el);
-      const results = {};
-      for (const item of items) {
-        const key = item.dataset.key;
-        if (!key) continue;
-        const content = item.querySelector('[data-flag="result-content"]');
-        results[key] = content?.textContent ?? "";
-      }
-      return results;
-    }
-    // ═══════════════════════════════════════════════════
-    // ── Session ───────────────────────────────────────
-    // ═══════════════════════════════════════════════════
-    /**
-     * Vrátí data z poslední relace (session).
-     */
-    getSessionData() {
-      return this.session.getFormData();
-    }
-    /**
-     * Zjistí, zda existuje aktivní relace.
-     */
-    hasSession() {
-      return this.session.hasSession();
-    }
-    /**
-     * Vymaže relaci.
-     */
-    clearSession() {
-      this.session.clear();
-      return this;
-    }
-    // ═══════════════════════════════════════════════════
-    // ── Form Reset ────────────────────────────────────
-    // ═══════════════════════════════════════════════════
-    /**
-     * Resetuje formulář do výchozího stavu.
-     * Vymaže validační chyby a volitelně i výsledky.
-     */
-    reset(options = {}) {
-      const form = this.getForm();
-      if (form) {
-        form.reset();
-        this.validator.clearErrors(form);
-        Dom.qa("select", form).forEach((sel) => {
-          sel.dispatchEvent(new Event("change", { bubbles: true }));
-        });
-      }
-      if (options.clearResults ?? true) {
-        this.clearResults();
-      }
-      return this;
-    }
-    /**
-     * Naplní formulář daty z objektu.
-     *
-     * @example
-     * pb.fillForm({
-     *     tone: 'formal',
-     *     language: 'cs',
-     *     length: '500',
-     *     agree: 'true',
-     * });
-     */
-    fillForm(data) {
-      return this.setFieldValues(data, { triggerChange: true, clearErrors: true });
-    }
-    // ═══════════════════════════════════════════════════
-    // ── UI Utilities ──────────────────────────────────
-    // ═══════════════════════════════════════════════════
-    /**
-     * Fokusuje dané pole.
-     */
-    focusField(name) {
-      const el = this.getFieldElement(name);
-      el?.focus();
-      return this;
-    }
-    /**
-     * Scrolluje na formulář / výsledky.
-     */
-    scrollTo(target) {
-      let el = null;
-      switch (target) {
-        case "form":
-          el = this.getForm();
-          break;
-        case "results":
-          el = this.getResultContainer()?.el ?? null;
-          break;
-        case "top":
-          el = document.querySelector(`.${MODULE.ROOT}`);
-          break;
-      }
-      el?.scrollIntoView({ behavior: "smooth", block: "start" });
-      return this;
-    }
-    /**
-     * Vrátí root element modulu (.pb-module).
-     */
-    getRoot() {
-      return document.querySelector(`.${MODULE.ROOT}`);
-    }
-    // ═══════════════════════════════════════════════════
-    // ── Destroy ───────────────────────────────────────
-    // ═══════════════════════════════════════════════════
-    /**
-     * Odpojí public API a vyčistí reference.
-     * Volatelné při odebrání modulu ze stránky.
-     */
-    destroy() {
-      this.events.clear();
-      this.session.clear();
-      window.PlatformBridge = void 0;
-    }
-    // ═══════════════════════════════════════════════════
-    // ── Private Helpers ───────────────────────────────
-    // ═══════════════════════════════════════════════════
-    /**
-     * Najde formulářový element (input/select/textarea) podle `name`.
-     */
-    getFieldElement(name) {
-      const form = this.getForm();
-      if (!form) return null;
-      const el = form.querySelector(`[name="${name}"]`);
-      return el;
-    }
-    /**
-     * Najde wrapper (.pb-module__field) pole podle name.
-     */
-    getFieldWrapper(name) {
-      const el = this.getFieldElement(name);
-      if (!el) return null;
-      const wrapper = el.closest(`.${MODULE.FIELD}`);
-      return wrapper ? Dom.wrap(wrapper) : null;
-    }
-    /**
-     * Vrátí formulář z DOM.
-     */
-    getForm() {
-      return document.querySelector("form");
-    }
-    /**
-     * Vrátí result kontejner.
-     */
-    getResultContainer() {
-      const el = document.querySelector('[data-component="pb-result"]');
-      return el ? Dom.wrap(el) : null;
-    }
-    /**
-     * Nastaví hodnotu radio skupiny.
-     */
-    setRadioValue(form, name, value) {
-      const radios = form.querySelectorAll(`input[name="${name}"]`);
-      for (const radio of radios) {
-        radio.checked = radio.value === value;
-      }
-    }
-  };
-
   // assets/ts/Services/Transports/HttpTransport.ts
   var DEFAULTS4 = {
     timeout: 6e4,
@@ -2698,6 +2777,7 @@
     url;
     timeout;
     headers;
+    apiErrors;
     controller;
     constructor(events, config) {
       this.events = events;
@@ -2705,6 +2785,7 @@
       this.timeout = config.timeout ?? DEFAULTS4.timeout;
       this.priority = config.priority ?? DEFAULTS4.priority;
       this.headers = { ...DEFAULTS4.headers, ...config.headers };
+      this.apiErrors = config.apiErrorHandler;
     }
     canHandle() {
       return true;
@@ -2720,14 +2801,21 @@
           signal: this.createSignal()
         });
         const body = await this.parseJson(response);
-        if (!body) return null;
-        if (!this.validate(response, body)) return null;
+        if (this.apiErrors) {
+          if (!body) {
+            this.apiErrors.handleUnexpectedResponse(response);
+            return null;
+          }
+          const error = this.apiErrors.handleResponse(response, body);
+          if (error) return null;
+        } else {
+          if (!body) return null;
+          if (!this.validateLegacy(response, body)) return null;
+        }
         return { mode: "http", response: body };
       } catch (error) {
-        if (error.name === "AbortError") {
-          this.emitError("network", "Po\u017Eadavek byl zru\u0161en nebo vypr\u0161el timeout.");
-        } else {
-          this.emitError("network", "Nelze se p\u0159ipojit k serveru.");
+        if (this.apiErrors) {
+          this.apiErrors.handleTransportError(error);
         }
         return null;
       } finally {
@@ -2740,21 +2828,15 @@
     }
     // ─── Private ──────────────────────────────────────
     async parseJson(response) {
-      try {
-        return await response.json();
-      } catch {
-        this.emitError("parse", "Server vr\xE1til neo\u010Dek\xE1vanou odpov\u011B\u010F.");
-        return null;
-      }
+      return await response.json();
     }
-    validate(response, body) {
+    /** @deprecated Zpětná kompatibilita – použijte ApiErrorHandler */
+    validateLegacy(response, body) {
       if (!response.ok) {
         const message = body.api?.error?.message ?? `Chyba serveru (${response.status})`;
-        this.emitError("http", message, response.status);
         return false;
       }
       if (body.api && !body.api.success && body.api.error) {
-        this.emitError("http", body.api.error.message ?? "API vr\xE1tila chybu.", body.api.error.code);
         return false;
       }
       return true;
@@ -2764,12 +2846,6 @@
         this.controller.signal,
         AbortSignal.timeout(this.timeout)
       ]);
-    }
-    emitError(type, message, statusCode) {
-      this.events.publish("error", {
-        error: { type, message },
-        statusCode
-      });
     }
   };
 
@@ -2818,6 +2894,8 @@
     api;
     session;
     validator;
+    errorHandler;
+    apiErrors;
     requestButton;
     resultContainer;
     form;
@@ -2831,8 +2909,8 @@
       { name: "Core", time: performance.now(), step: () => this.initCore() },
       { name: "Services", time: performance.now(), step: () => this.initServices() },
       { name: "Features", time: performance.now(), step: () => this.initFeatures() },
-      { name: "Bindings", time: performance.now(), step: () => this.bindEvents() },
-      { name: "Public API", time: performance.now(), step: () => this.exposePublicApi() }
+      { name: "Bindings", time: performance.now(), step: () => this.bindEvents() }
+      // { name: "Public API", time: performance.now(), step: () => this.exposePublicApi() },
     ];
     init() {
       for (const stage of this.pipeline) {
@@ -2847,13 +2925,16 @@
     }
     initCore() {
       this.events = new EventBus(window);
+      this.errorHandler = new ErrorHandler(this.events, { autoListen: true, debug: true });
+      this.apiErrors = new ApiErrorHandler(this.events, this.errorHandler, { debug: true });
     }
     initServices() {
       const apiUrl = this.getApiUrl();
       this.api = new ApiClient(this.events, { allowFallback: true }).registerTransport(new HttpTransport(this.events, {
         url: apiUrl,
         timeout: 6e4,
-        priority: 10
+        priority: 10,
+        apiErrorHandler: this.apiErrors
       })).use(RetryMiddleware(2)).use(CacheMiddleware(1e4));
       this.session = new SessionManager();
       new ResultActionHandler(this.events, this.api, this.session).init();
@@ -2868,16 +2949,17 @@
      * Vystaví veřejné API na window.PlatformBridge.
      * Cílová aplikace může volat: window.PlatformBridge.setFieldValue(...) atd.
      */
-    exposePublicApi() {
-      const bridge = new PlatformBridge(
-        this.api,
-        this.events,
-        this.session,
-        this.validator
-      );
-      window.PlatformBridge = bridge;
-      window.dispatchEvent(new CustomEvent("pb:ready", { detail: { bridge } }));
-    }
+    // private exposePublicApi(): void {
+    // 	const bridge = new PlatformBridge(
+    // 		this.api,
+    // 		this.events,
+    // 		this.session,
+    // 		this.validator,
+    // 	);
+    // 	(window as any).PlatformBridge = bridge;
+    // 	// Dispatchnout event, aby cílová aplikace věděla, že API je připraveno
+    // 	window.dispatchEvent(new CustomEvent('pb:ready', { detail: { bridge } }));
+    // }
     /**
      * Přečte API URL z data atributu na wrapper elementu.
      * PHP strana injektuje správnou URL podle režimu (standalone/vendor).

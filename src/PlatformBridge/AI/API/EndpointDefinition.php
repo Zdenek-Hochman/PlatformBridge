@@ -32,13 +32,10 @@ abstract class EndpointDefinition
     /**
      * Klíč v inputu, podle kterého se určuje varianta
      */
-    protected ?string $variantKey = 'topic_source';
+    protected ?string $variantKey;
 
     /** ConfigManager pro načítání pravidel z JSON */
     protected ?ConfigManager $configManager = null;
-
-    /** Cache pro required pole z konfigurace */
-    private ?array $cachedRequiredFields = null;
 
     /**
      * Single-key mód: pokud je nastaveno, generuje se pouze tento klíč.
@@ -49,38 +46,46 @@ abstract class EndpointDefinition
     /**
      * Vrátí název endpointu pro API
      */
-    abstract public function getEndpoint(): string;
+    abstract protected function getEndpoint(): string;
 
     /**
      * Vrátí očekávaný typ odpovědi
      */
-    abstract public function getResponseType(): string;
+    abstract protected function getResponseType(): string;
 
     /**
      * Vrátí šablonu pro renderování odpovědi
      */
-    abstract public function getTemplate(): string;
+    abstract protected function getTemplate(): string;
 
     /**
      * Vrátí ID generátoru v konfiguraci (pro načtení required polí)
      * Přetíž v potomcích pro specifický generátor
      */
-    abstract public function getGeneratorId(): ?string;
+    abstract protected function getGeneratorId(): ?string;
 
-    /**
-     * Nastaví ConfigManager pro dynamické načítání pravidel
-     */
+	/**
+	 * Transformuje vstupní data podle varianty nebo kontextu.
+	 *
+	 * Přetíž v potomcích pro specifickou logiku transformace vstupu (např. podle varianty, typu nebo dalších parametrů).
+	 *
+	 * @param array $input Vstupní data (pole s hodnotami).
+	 * @param mixed ...$context Další kontextové parametry pro transformaci (např. varianta, typ, apod.).
+	 * @return array Upravená vstupní data po transformaci.
+	 */
+    abstract protected function transformInput(array $input, mixed ...$context): array;
+
+	/**
+	 * Nastaví instanci správce konfigurace.
+	 *
+	 * @param ConfigManager $configManager Instance správce konfigurace.
+	 * @return self Vrací aktuální instanci třídy pro řetězení metod.
+	 */
     public function setConfigManager(ConfigManager $configManager): self
     {
         $this->configManager = $configManager;
-        $this->cachedRequiredFields = null; // reset cache
         return $this;
     }
-
-    // =========================================================================
-    // SINGLE-KEY MÓD
-    // =========================================================================
-
     /**
      * Přepne endpoint do single-key módu.
      *
@@ -90,6 +95,7 @@ abstract class EndpointDefinition
      * - Použije se jednoduchá šablona (šetří tokeny)
      *
      * @param string $key Klíč k regeneraci (např. "subject", "preheader")
+	 * @return self Vrací aktuální instanci pro řetězení metod
      */
     public function setSingleKeyMode(string $key): self
     {
@@ -97,25 +103,36 @@ abstract class EndpointDefinition
         return $this;
     }
 
-    /**
-     * Vrátí, zda je endpoint v single-key módu.
-     */
-    public function isSingleKeyMode(): bool
+	/**
+	 * Určuje, zda je endpoint v single-key módu.
+	 * Vrací true, pokud je nastaven klíč pro single-key generování, jinak false.
+	 *
+	 * @return bool True pokud je aktivní single-key mód, jinak false.
+	 */
+    private function isSingleKeyMode(): bool
     {
         return $this->singleKey !== null;
     }
 
-    /**
-     * Vrátí název klíče pro single-key regeneraci.
-     */
+	/**
+	 * Vrátí název klíče pro single-key regeneraci.
+	 * Pokud není nastaven single-key mód, vrací hodnotu null.
+	 *
+	 * @return string|null Název klíče nebo null, pokud není nastaven single-key mód.
+	 */
     public function getSingleKey(): ?string
     {
         return $this->singleKey;
     }
 
-    /**
-     * Vrátí aktivní šablonu — v single-key módu jednoduchá textová šablona.
-     */
+	/**
+	 * Vrátí aktivní šablonu pro renderování odpovědi.
+	 *
+	 * Pokud je endpoint v single-key módu, použije jednoduchou šablonu {@see SINGLE_KEY_TEMPLATE}.
+	 * Jinak vrací šablonu definovanou v potomcích.
+	 *
+	 * @return string Název šablony pro renderování odpovědi.
+	 */
     public function getActiveTemplate(): string
     {
         if ($this->isSingleKeyMode()) {
@@ -124,9 +141,14 @@ abstract class EndpointDefinition
         return $this->getTemplate();
     }
 
-    /**
-     * Vrátí aktivní typ odpovědi — v single-key módu vždy STRING.
-     */
+	/**
+	 * Vrátí aktivní typ odpovědi pro endpoint.
+	 *
+	 * Pokud je endpoint v single-key módu, vrací vždy typ odpovědi "string".
+	 * Jinak vrací typ odpovědi definovaný v potomcích.
+	 *
+	 * @return string Typ odpovědi (např. "string", "array", "nested").
+	 */
     public function getActiveResponseType(): string
     {
         if ($this->isSingleKeyMode()) {
@@ -137,76 +159,23 @@ abstract class EndpointDefinition
 
     /**
      * Vrátí HTTP metodu (výchozí POST)
+	 * @return string HTTP metoda pro endpoint (např. "POST", "GET")
      */
     public function getMethod(): string
     {
         return 'POST';
     }
 
-    /**
-     * Vrátí required pole z JSON konfigurace.
-     *
-     * Načítá z blocks.json podle layoutu přiřazeného generátoru.
-     * Pole je required pokud má v rules: { "required": true }
-     *
-     * @return array<string> Seznam názvů (name) povinných polí
-     */
-    public function getRequiredFieldsFromConfig(): array
+	/**
+	 * Vrátí mapování názvů polí na AI klíče podle konfigurace generátoru.
+	 *
+	 * Pro daný generátor načte sekce a bloky z konfigurace a vytvoří mapu [název_pole => ai_klíč].
+	 * Pokud není generátor nebo jeho layout dostupný, vrací prázdné pole.
+	 *
+	 * @return array<string, string> Mapování názvů polí na AI klíče (field_name => ai_key).
+	 */
+    private function getFieldToAiKeyMapping(): array
     {
-        if ($this->cachedRequiredFields !== null) {
-            return $this->cachedRequiredFields;
-        }
-
-        $this->cachedRequiredFields = [];
-
-        if ($this->configManager === null) {
-            return $this->cachedRequiredFields;
-        }
-
-        $generatorId = $this->getGeneratorId();
-        if ($generatorId === null) {
-            return $this->cachedRequiredFields;
-        }
-
-        $generator = $this->configManager->findGenerator($generatorId);
-        if ($generator === null || !isset($generator['layout'])) {
-            return $this->cachedRequiredFields;
-        }
-
-        // Projdi všechny sekce a bloky v layoutu
-        $sections = $generator['layout'][ConfigKeys::SECTIONS->value] ?? [];
-
-        foreach ($sections as $section) {
-            $blocks = $section[ConfigKeys::BLOCKS->value] ?? [];
-
-            foreach ($blocks as $block) {
-                $rules = $block[ConfigKeys::RULES->value] ?? [];
-                $isRequired = $rules[ConfigKeys::REQUIRED->value] ?? false;
-
-                if ($isRequired === true) {
-                    // Použij 'name' jako identifikátor pole (to přijde z formuláře)
-                    $fieldName = $block[ConfigKeys::NAME->value] ?? $block[ConfigKeys::ID->value] ?? null;
-                    if ($fieldName !== null) {
-                        $this->cachedRequiredFields[] = $fieldName;
-                    }
-                }
-            }
-        }
-
-        return $this->cachedRequiredFields;
-    }
-
-    /**
-     * Vrátí mapování field name -> ai_key z konfigurace.
-     *
-     * @return array<string, string> [field_name => ai_key]
-     */
-    public function getFieldToAiKeyMapping(): array
-    {
-        if ($this->configManager === null) {
-            return [];
-        }
-
         $generatorId = $this->getGeneratorId();
         if ($generatorId === null) {
             return [];
@@ -236,10 +205,15 @@ abstract class EndpointDefinition
         return $mapping;
     }
 
-    /**
-     * Detekuje variantu vstupu podle nastaveného klíče (variantKey).
-     * Hodnota z inputu pod tímto klíčem = název varianty.
-     */
+	/**
+	 * Detekuje variantu vstupu podle nastaveného klíče variantKey.
+	 *
+	 * Z inputu načte hodnotu pod klíčem variantKey a vrátí ji jako název varianty.
+	 * Pokud není klíč nastaven nebo je hodnota prázdná, vrací null.
+	 *
+	 * @param array $input Vstupní data (pole s hodnotami).
+	 * @return string|null Název varianty nebo null, pokud není varianta určena.
+	 */
     public function detectVariant(array $input): ?string
     {
         if ($this->variantKey === null) {
@@ -255,38 +229,16 @@ abstract class EndpointDefinition
         return (string) $value;
     }
 
-    /**
-     * Zkontroluje, zda vstup odpovídá pravidlům varianty
-     */
-    protected function matchesVariant(array $input, array $rules): bool
-    {
-        $requiredFields = $rules['required'] ?? [];
-        $forbiddenFields = $rules['forbidden'] ?? [];
-
-        // Musí obsahovat všechny required
-        foreach ($requiredFields as $field) {
-            if (!isset($input[$field]) || $input[$field] === '' || $input[$field] === null) {
-                return false;
-            }
-        }
-
-        // Nesmí obsahovat forbidden (pokud jsou definovány)
-        foreach ($forbiddenFields as $field) {
-            if (isset($input[$field]) && $input[$field] !== '' && $input[$field] !== null) {
-                return false;
-            }
-        }
-
-        return true;
-    }
-
-    /**
-     * Transformuje vstupní pole na AI klíče podle konfigurace.
-     *
-     * @param array $input Vstupní data s field names
-     * @return array Data s AI klíči
-     */
-    public function transformToAiKeys(array $input): array
+	/**
+	 * Transformuje vstupní pole na AI klíče podle konfigurace.
+	 *
+	 * Pro každý název pole ve vstupním poli najde odpovídající AI klíč z mapování
+	 * a vytvoří nové pole s těmito klíči. Pokud není mapování nalezeno, použije původní název pole.
+	 *
+	 * @param array $input Vstupní data s názvy polí (field names).
+	 * @return array Výstupní data s AI klíči.
+	 */
+    private function transformToAiKeys(array $input): array
     {
         $mapping = $this->getFieldToAiKeyMapping();
         $transformed = [];
@@ -299,18 +251,18 @@ abstract class EndpointDefinition
         return $transformed;
     }
 
-    /**
-     * Transformuje vstupní data podle varianty
-     * Přetíž v potomcích pro specifickou logiku
-     */
-    public function transformInput(array $input, string $variant): array
-    {
-        return $input;
-    }
-
-    /**
-     * Vytvoří AiRequest z dat
-     */
+	/**
+	 * Vytvoří instanci AiRequest z předaných dat.
+	 *
+	 * Detekuje variantu vstupu, případně transformuje data podle varianty.
+	 * V single-key módu nastaví speciální parametry pro generování pouze jednoho klíče.
+	 * Sloučí vstupní data s parametry pro tělo požadavku a nastaví parametry pro dotaz.
+	 *
+	 * @param array $input Vstupní data pro požadavek (pole s hodnotami).
+	 * @param array $queryParams Parametry pro dotaz (query string), výchozí je prázdné pole.
+	 * @param array $bodyParams Parametry pro tělo požadavku, výchozí je prázdné pole.
+	 * @return AiRequest Instanci požadavku pro AI API.
+	 */
     public function createRequest(array $input, array $queryParams = [], array $bodyParams = []): AiRequest
     {
         $variant = $this->detectVariant($input);
@@ -318,6 +270,8 @@ abstract class EndpointDefinition
         if ($variant !== null) {
             $input = $this->transformInput($input, $variant);
         }
+
+        $transformed = $this->transformToAiKeys($input);
 
         // Single-key mód: přidá informaci o klíči do body payloadu
         // AI API pak generuje pouze tento jeden klíč → šetří tokeny
@@ -329,14 +283,19 @@ abstract class EndpointDefinition
         // Merge bodyParams do inputu (bodyParams mají vyšší prioritu)
         return AiRequest::to($this->getEndpoint())
             ->withQueryParams($queryParams)
-            ->withPrompt(array_merge($input, $bodyParams))
+            ->withPrompt(array_merge($transformed, $bodyParams))
             ->usingMethod($this->getMethod());
     }
 
-    /**
-     * Parsuje odpověď podle očekávaného typu.
-     * V single-key módu vždy parsuje jako string.
-     */
+	/**
+	 * Parsuje odpověď podle aktivního typu odpovědi.
+	 *
+	 * Na základě typu odpovědi (string, array, nested) zavolá odpovídající metodu pro parsování dat.
+	 * V single-key módu vždy parsuje jako string.
+	 *
+	 * @param mixed $data Data k parsování (může být string, pole nebo jiný typ).
+	 * @return mixed Parsovaná odpověď podle typu (string, array nebo jiný typ).
+	 */
     public function parseResponse(mixed $data): mixed
     {
         return match ($this->getActiveResponseType()) {
@@ -347,7 +306,17 @@ abstract class EndpointDefinition
         };
     }
 
-    protected function parseAsString(mixed $data): string
+	/**
+	 * Parsuje data jako string.
+	 *
+	 * Pokud jsou data typu string, vrací je přímo.
+	 * Pokud jsou data pole a obsahují klíč 'text' nebo 'content', vrací jeho hodnotu jako string.
+	 * V ostatních případech vrací data převedená na string.
+	 *
+	 * @param mixed $data Data k parsování (string nebo pole).
+	 * @return string Parsovaná hodnota jako string.
+	 */
+    private function parseAsString(mixed $data): string
     {
         if (is_string($data)) {
             return $data;
@@ -361,30 +330,48 @@ abstract class EndpointDefinition
         return (string) ($data ?? '');
     }
 
-    protected function parseAsArray(mixed $data): array
+	/**
+	 * Parsuje data jako pole (array).
+	 *
+	 * Pokud jsou data typu array, vrací je přímo.
+	 * Pokud jsou data typu string, pokusí se je dekódovat jako JSON a vrátí výsledek,
+	 * nebo vrátí pole s hodnotou pod klíčem 'value'.
+	 * V ostatních případech vrací pole s hodnotou pod klíčem 'value'.
+	 *
+	 * @param mixed $data Data k parsování (array, string nebo jiný typ).
+	 * @return array Parsovaná data jako pole.
+	 */
+    private function parseAsArray(mixed $data): array
     {
         if (is_array($data)) {
-            // Pokud je to asociativní pole nebo indexované, vrátíme jak je
             return $data;
         }
         if (is_string($data)) {
-            // Zkusíme parsovat jako JSON
             $decoded = json_decode($data, true);
             return is_array($decoded) ? $decoded : ['value' => $data];
         }
         return ['value' => $data];
     }
 
-    protected function parseAsNested(mixed $data): array
+	/**
+	 * Parsuje data jako pole v poli (nested array).
+	 *
+	 * Nejprve data převede na pole pomocí parseAsArray().
+	 * Pokud je pole prázdné, vrací prázdné pole.
+	 * Pokud první prvek není pole, obalí výsledek do pole (array v array).
+	 * Jinak vrací původní pole.
+	 *
+	 * @param mixed $data Data k parsování (array, string nebo jiný typ).
+	 * @return array Parsovaná data jako pole v poli (nested array).
+	 */
+    private function parseAsNested(mixed $data): array
     {
         $parsed = $this->parseAsArray($data);
 
-        // Zajistíme, že máme array v array
         if (empty($parsed)) {
             return [];
         }
 
-        // Pokud první element není array, obalíme
         $firstKey = array_key_first($parsed);
 
         if (!is_array($parsed[$firstKey] ?? null)) {

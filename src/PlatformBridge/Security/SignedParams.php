@@ -48,8 +48,6 @@ final class SignedParams
      * @return string Podepsaný payload
      *
      * @example $signed = $signer->sign(['get' => [], 'body' => []]);
-	 *
-	 * @throws \RuntimeException Pokud selže JSON encoding
      */
     public function sign(array $params): string
     {
@@ -62,11 +60,6 @@ final class SignedParams
         ];
 
         $payloadJson = json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-
-        if ($payloadJson === false) {
-            throw new \RuntimeException('Failed to encode params to JSON: ' . json_last_error_msg());
-        }
-
         $signature = $this->createSignature($payloadJson);
 
         $signedPayload = [
@@ -93,7 +86,10 @@ final class SignedParams
         $signedPayload = $this->decode($signedString);
 
         if (!isset($signedPayload['p'], $signedPayload['s'])) {
-            throw new SecurityException('Invalid signed payload structure.');
+            throw new SecurityException(
+                'Invalid signed payload structure.',
+                SecurityException::CODE_INVALID_SIGNATURE,
+            );
         }
 
         $payloadJson = $signedPayload['p'];
@@ -103,19 +99,28 @@ final class SignedParams
         $expectedSignature = $this->createSignature($payloadJson);
 
         if (!hash_equals($expectedSignature, $providedSignature)) {
-            throw new SecurityException('Invalid signature - data may have been tampered with.');
+            throw new SecurityException(
+                'Invalid signature - data may have been tampered with.',
+                SecurityException::CODE_INVALID_SIGNATURE,
+            );
         }
 
         // Dekódování payload
         $payload = json_decode($payloadJson, true);
 
         if ($payload === null) {
-            throw new SecurityException('Failed to decode payload JSON.');
+            throw new SecurityException(
+                'Failed to decode payload JSON.',
+                SecurityException::CODE_INVALID_SIGNATURE,
+            );
         }
 
         // Kontrola verze
         if (($payload['v'] ?? 0) !== self::VERSION) {
-            throw new SecurityException('Unsupported payload version.');
+            throw new SecurityException(
+                'Unsupported payload version.',
+                SecurityException::CODE_INVALID_SIGNATURE,
+            );
         }
 
         // Kontrola expirace
@@ -125,33 +130,20 @@ final class SignedParams
 
             if ($age > $this->ttl) {
                 throw new SecurityException(
-                    sprintf('Signed params expired (%d seconds old, TTL is %d).', $age, $this->ttl)
+                    sprintf('Signed params expired (%d seconds old, TTL is %d).', $age, $this->ttl),
+                    SecurityException::CODE_EXPIRED_TOKEN,
                 );
             }
 
             if ($age < 0) {
-                throw new SecurityException('Invalid timestamp - appears to be from the future.');
+                throw new SecurityException(
+                    'Invalid timestamp - appears to be from the future.',
+                    SecurityException::CODE_EXPIRED_TOKEN,
+                );
             }
         }
 
         return $payload['d'] ?? [];
-    }
-
-    /**
-     * Ověří, zda je podpis platný (bez vyhození výjimky).
-     * Interně používá verify(), ale nevyhazuje výjimky.
-     *
-     * @param string $signedString Podepsaný string
-     * @return bool True pokud je platný, jinak false
-     */
-    public function isValid(string $signedString): bool
-    {
-        try {
-            $this->verify($signedString);
-            return true;
-        } catch (SecurityException) {
-            return false;
-        }
     }
 
     /**
@@ -189,13 +181,19 @@ final class SignedParams
         $json = base64_decode(strtr($encoded, '-_', '+/'), true);
 
         if ($json === false) {
-            throw new SecurityException('Failed to decode base64 payload.');
+            throw new SecurityException(
+                'Failed to decode base64 payload.',
+                SecurityException::CODE_INVALID_SIGNATURE,
+            );
         }
 
         $data = json_decode($json, true);
 
         if (!is_array($data)) {
-            throw new SecurityException('Invalid payload format.');
+            throw new SecurityException(
+                'Invalid payload format.',
+                SecurityException::CODE_INVALID_SIGNATURE,
+            );
         }
 
         return $data;

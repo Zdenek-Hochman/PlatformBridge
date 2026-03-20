@@ -8,10 +8,6 @@ namespace Zoom\PlatformBridge\Form\Element;
  *
  * Backed enum (string) — hodnota enumu je základní jméno třídy pole,
  *
- * Přidané helpery:
- *  - getElementClass(): vrátí FQCN třídy pole (např. \Form\Element\Input)
- *  - toKey(): vrátí "klíč" v malých písmenech (např. 'input') pro indexování datových struktur
- *  - tryFromCaseInsensitive(): pokusí se najít case-insensitive enum podle jména nebo hodnoty
  */
 enum ElementType: string
 {
@@ -28,16 +24,6 @@ enum ElementType: string
     public function getElementClass(): string
     {
         return "\\Zoom\\PlatformBridge\\Form\\Element\\" . $this->value;
-    }
-
-	/**
-     * Vrátí klíč v malých písmenech, který používáš v datové struktuře (např. 'input').
-     *
-     * @return string
-     */
-    public function toKey(): string
-    {
-        return strtolower($this->value);
     }
 
 	/**

@@ -85,7 +85,7 @@ abstract class Element
 	 * @param string $key Klíč v camelCase.
 	 * @return string Klíč převedený na kebab-case (malá písmena, spojovníky).
 	 */
-    protected static function normalizeDataKey(string $key): string
+    private static function normalizeDataKey(string $key): string
     {
         return strtolower(preg_replace('/([a-z])([A-Z])/', '$1-$2', $key));
     }
@@ -202,7 +202,7 @@ abstract class Element
      * @param string $value Hodnota k ověření.
      * @return bool True pokud je hodnota předformátovaný atribut.
      */
-    protected function isPreformattedAttribute(string $value): bool
+    private function isPreformattedAttribute(string $value): bool
     {
         // Detekuje vzor: nazev="..." nebo nazev=hodnota (bez mezer před =)
         return (bool) preg_match('/^[a-zA-Z][a-zA-Z0-9_-]*=/', $value);

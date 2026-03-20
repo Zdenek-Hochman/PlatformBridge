@@ -242,7 +242,7 @@ final class ConfigResolver
             ConfigKeys::ID->value => $generator[ConfigKeys::ID->value] ?? $generatorId,
             ConfigKeys::LABEL->value => $generator[ConfigKeys::LABEL->value] ?? null,
             ConfigKeys::LAYOUT_REF->value => $layoutRef,
-            'layout' => $resolvedLayout,
+            ConfigKeys::LAYOUT->value => $resolvedLayout,
             ConfigKeys::CONFIG->value => $generator[ConfigKeys::CONFIG->value] ?? [],
         ];
     }

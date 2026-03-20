@@ -34,7 +34,7 @@ export class ResultActionHandler {
 	 * funguje i pro dynamicky přidané výsledky.
 	 */
 	init(): void {
-		Dom.delegate('click', '[data-action]', (el, e) => {
+		Dom.delegate('click', '.pb-module [data-action]', (el, e) => {
 			e.preventDefault();
 
 			const button = Dom.wrap(el);
@@ -82,8 +82,7 @@ export class ResultActionHandler {
 				this.handleCopy(button);
 				break;
 			case 'use':
-				console.log("Bude v budoucnu");
-				// this.handleUse(action, button);
+				this.handleUse(action, button);
 				break;
 			case 'thumb-up':
 			case 'thumb-down':
@@ -180,28 +179,25 @@ export class ResultActionHandler {
 		}
 	}
 
-	// /**
-	//  * "Použít" — emituje event s klíčem a hodnotou pro cílovou aplikaci.
-	//  */
-	// private handleUse(action: ResultAction, button: HTMLElement): void {
-// 	const wrapper = button.closest<HTMLElement>('.pb-result__wrapper');
-// 	if (!wrapper) return;
+	/**
+	 * "Použít" — emituje event s klíčem a hodnotou pro cílovou aplikaci.
+	 */
+	private handleUse(action: ResultAction, button: DomNode<HTMLElement>): void {
+		const wrapper = button.closest('[data-key]');
+		if (!wrapper) return;
 
-// 	const contentEl = wrapper.querySelector<HTMLElement>('.pb-result__content');
-	// 	if (!contentEl) return;
+		const content = Dom.flag("result-content", wrapper.el);
+		const text = content.text().trim();
 
-	// 	const text = contentEl.textContent?.trim() ?? '';
+		this.events.publish('pb-use', {
+			data: {
+				[action.key]: text,
+			},
+		});
 
-	// 	this.events.emit('use', {
-	// 		data: {
-	// 			[action.key]: text,
-	// 		},
-	// 	});
-
-	// 	// Vizuální feedback
-	// 	const item = wrapper.closest<HTMLElement>('.pb-result__item');
-	// 	item?.classList.add('is-used');
-	// }
+		button.removeClass('pb-module__button--primary');
+		button.addClass('pb-module__button--used');
+	}
 
 	// /**
 	//  * Feedback (thumb up/down) — emituje event.

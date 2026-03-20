@@ -15,6 +15,7 @@ use Zoom\PlatformBridge\Template\Engine;
 use Zoom\PlatformBridge\Runtime\FormRenderer;
 use Zoom\PlatformBridge\Security\SignedParams;
 use Zoom\PlatformBridge\Error\ErrorHandler;
+use Zoom\PlatformBridge\Error\ErrorRenderer;
 
 /**
  * Hlavní fasáda knihovny PlatformBridge.
@@ -47,6 +48,8 @@ final class PlatformBridge
      */
     public static function create(): PlatformBridgeBuilder
     {
+		(new ErrorHandler(new ErrorRenderer()))->register();
+
         return new PlatformBridgeBuilder();
     }
 
@@ -95,7 +98,7 @@ final class PlatformBridge
      */
     private function bootErrorHandler(): void
     {
-        (new ErrorHandler())->register();
+        (new ErrorHandler(new ErrorRenderer()))->register();
     }
 
     /**

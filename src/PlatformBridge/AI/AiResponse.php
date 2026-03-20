@@ -3,6 +3,8 @@ declare(strict_types=1);
 
 namespace Zoom\PlatformBridge\AI;
 
+use Zoom\PlatformBridge\AI\Exception\AiException;
+
 /**
  * Vylepšená odpověď z AI API
  */

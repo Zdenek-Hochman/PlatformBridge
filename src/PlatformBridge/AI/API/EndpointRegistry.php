@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Zoom\PlatformBridge\AI\API;
 
-use Zoom\PlatformBridge\AI\AiException;
+use Zoom\PlatformBridge\AI\Exception\AiException;
 use Zoom\PlatformBridge\Config\ConfigManager;
 
 /**
@@ -27,11 +27,15 @@ class EndpointRegistry
     /** ConfigManager pro dynamické načítání pravidel z JSON */
     private ?ConfigManager $configManager = null;
 
+	/** @var self|null Instance singletonu nebo null, pokud ještě nebyla vytvořena.*/
     private static ?self $instance = null;
 
-    /**
-     * Singleton pro globální přístup (volitelné)
-     */
+	/**
+	 * Vrátí instanci singletonu EndpointRegistry.
+	 * Pokud instance ještě neexistuje, vytvoří ji a zaregistruje výchozí endpointy.
+	 *
+	 * @return self Instance registru endpointů (singleton).
+	 */
     public static function getInstance(): self
     {
         if (self::$instance === null) {
@@ -41,10 +45,15 @@ class EndpointRegistry
         return self::$instance;
     }
 
-    /**
-     * Nastaví ConfigManager pro všechny endpointy.
-     * Umožňuje dynamické načítání required polí z JSON konfigurace.
-     */
+	/**
+	 * Nastaví instanci ConfigManager pro registry a všechny endpointy.
+	 *
+	 * Umožňuje dynamické načítání required polí z JSON konfigurace.
+	 * Aktualizuje již vytvořené endpointy, aby používaly nový ConfigManager.
+	 *
+	 * @param ConfigManager $configManager Instance správce konfigurace.
+	 * @return self Vrací aktuální instanci registru pro řetězení metod.
+	 */
     public function setConfigManager(ConfigManager $configManager): self
     {
         $this->configManager = $configManager;
@@ -57,10 +66,15 @@ class EndpointRegistry
         return $this;
     }
 
-    /**
-     * Registruje výchozí endpointy
-     */
-    public function registerDefaults(): void
+	/**
+	 * Registruje výchozí endpointy do registru.
+	 *
+	 * Přidává základní endpointy jako lazy-loaded třídy pro pozdější použití.
+	 * Slouží k inicializaci registru s předdefinovanými endpointy.
+	 *
+	 * @return void
+	 */
+    private function registerDefaults(): void
     {
         // Registruj všechny endpointy jako lazy-loaded
         $this->registerClass('CreateSubject', Endpoints\ZL\CreateSubjectEndpoint::class);

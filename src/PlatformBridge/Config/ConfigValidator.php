@@ -27,6 +27,7 @@ final class ConfigValidator
      * @param array $data Obsah generators.json
      * @param string $filename Název souboru pro chybové hlášky
      * @return array<string, array> Validované generátory
+	 *
      * @throws ConfigException
      */
     public function validateGenerators(array $data, string $filename = 'generators.json'): array
@@ -55,6 +56,7 @@ final class ConfigValidator
      * @param array $data Obsah layouts.json
      * @param string $filename Název souboru pro chybové hlášky
      * @return array<string, array> Validované layouty
+	 *
      * @throws ConfigException
      */
     public function validateLayouts(array $data, string $filename = 'layouts.json'): array
@@ -83,6 +85,7 @@ final class ConfigValidator
      * @param array $data Obsah blocks.json
      * @param string $filename Název souboru pro chybové hlášky
      * @return array<string, array> Validované bloky
+	 *
      * @throws ConfigException
      */
     public function validateBlocks(array $data, string $filename = 'blocks.json'): array
@@ -111,6 +114,7 @@ final class ConfigValidator
      * @param array<string, array> $blocks
      * @param array<string, array> $layouts
      * @param array<string, array> $generators
+	 *
      * @throws ConfigException
      */
     public function validateRelations(array $blocks, array $layouts, array $generators): void
@@ -163,10 +167,15 @@ final class ConfigValidator
         }
     }
 
-    // =========================================================================
-    // PRIVATE VALIDATION METHODS
-    // =========================================================================
+    /**
+     * Validuje jeden generátor v konfiguraci generators.json.
+     *
+     * @param mixed $generator Generátor (pole s klíči id, label, layout_ref)
+     * @param string $genKey Klíč generátoru v konfiguraci (např. 'text', 'image')
+     * @param string $filename Název souboru pro chybové hlášky
 
+	* @throws ConfigException Pokud je struktura nebo hodnoty neplatné
+     */
     private function validateGenerator(mixed $generator, string $genKey, string $filename): void
     {
         if (!is_array($generator)) {
@@ -195,6 +204,15 @@ final class ConfigValidator
         }
     }
 
+    /**
+     * Validuje jeden layout v konfiguraci layouts.json.
+     *
+     * @param mixed $layout Layout (pole s klíči sections, columns, ...)
+     * @param string $layoutId Identifikátor layoutu v konfiguraci
+     * @param string $filename Název souboru pro chybové hlášky
+
+	* @throws ConfigException Pokud je struktura nebo hodnoty neplatné
+     */
     private function validateLayout(mixed $layout, string $layoutId, string $filename): void
     {
         if (!is_array($layout)) {
@@ -223,6 +241,16 @@ final class ConfigValidator
         }
     }
 
+    /**
+     * Validuje jednu sekci v layoutu (pole sekcí v layouts.json).
+     *
+     * @param mixed $section Sekce (pole s klíči id, blocks, columns, column_template, ...)
+     * @param int $sectionIndex Index sekce v layoutu (pořadí v poli)
+     * @param string $layoutId Identifikátor layoutu, ve kterém je sekce
+     * @param string $filename Název souboru pro chybové hlášky
+
+	* @throws ConfigException Pokud je struktura nebo hodnoty neplatné
+     */
     private function validateSection(mixed $section, int $sectionIndex, string $layoutId, string $filename): void
     {
         if (!is_array($section)) {
@@ -272,6 +300,17 @@ final class ConfigValidator
         }
     }
 
+    /**
+     * Validuje jeden blok v sekci layoutu (reference na blok v blocks.json).
+     *
+     * @param mixed $blockDef Definice bloku v sekci (pole s klíči ref, span, row_span, grid_column, grid_row, ...)
+     * @param int $blockIndex Index bloku v sekci (pořadí v poli)
+     * @param string $sectionId Identifikátor sekce, ve které je blok
+     * @param string $layoutId Identifikátor layoutu, ve kterém je sekce
+     * @param string $filename Název souboru pro chybové hlášky
+
+	* @throws ConfigException Pokud je struktura nebo hodnoty neplatné
+     */
     private function validateBlockReference(mixed $blockDef, int $blockIndex, string $sectionId, string $layoutId, string $filename): void
     {
         if (!is_array($blockDef)) {
@@ -338,9 +377,14 @@ final class ConfigValidator
     }
 
     /**
-     * Validuje hodnotu columns (musí být kladné číslo).
+     * Validuje hodnotu columns (počet sloupců) v layoutu nebo sekci.
+     *
+     * @param mixed $value Hodnota columns (očekává se celé číslo 1–12)
+     * @param string $context Kontext pro chybovou hlášku (např. "layout 'main'", "sekce 'A'")
+
+	* @throws ConfigException Pokud columns není platné číslo
      */
-    private function validateColumnsValue(mixed $value, string $context, string $filename): void
+    private function validateColumnsValue(mixed $value, string $context): void
     {
         if (!is_int($value) || $value < 1 || $value > 12) {
             throw ConfigException::validationFailed(
@@ -350,9 +394,16 @@ final class ConfigValidator
     }
 
     /**
-     * Validuje hodnotu span (musí být kladné číslo).
+     * Validuje hodnotu span (počet sloupců/bloků) pro konkrétní blok v sekci layoutu.
+     *
+     * @param mixed $value Hodnota span (očekává se celé číslo 1–12)
+     * @param string $ref Identifikátor bloku (ref)
+     * @param string $sectionId Identifikátor sekce, ve které je blok
+     * @param string $layoutId Identifikátor layoutu, ve kterém je sekce
+
+	* @throws ConfigException Pokud span není platné číslo
      */
-    private function validateSpanValue(mixed $value, string $ref, string $sectionId, string $layoutId, string $filename): void
+    private function validateSpanValue(mixed $value, string $ref, string $sectionId, string $layoutId): void
     {
         if (!is_int($value) || $value < 1 || $value > 12) {
             throw ConfigException::validationFailed(
@@ -362,9 +413,17 @@ final class ConfigValidator
     }
 
     /**
-     * Validuje hodnotu grid pozice (musí být neprázdný string, např. "1 / -1", "2 / 4", "full").
+     * Validuje hodnotu grid pozice (např. grid_column, grid_row) pro blok v sekci layoutu.
+     *
+     * @param mixed $value Hodnota grid pozice (očekává se neprázdný string, např. "1 / -1", "full")
+     * @param string $property Název vlastnosti (grid_column nebo grid_row)
+     * @param string $ref Identifikátor bloku (ref)
+     * @param string $sectionId Identifikátor sekce, ve které je blok
+     * @param string $layoutId Identifikátor layoutu, ve kterém je sekce
+
+	* @throws ConfigException Pokud grid pozice není platný string
      */
-    private function validateGridPositionValue(mixed $value, string $property, string $ref, string $sectionId, string $layoutId, string $filename): void
+    private function validateGridPositionValue(mixed $value, string $property, string $ref, string $sectionId, string $layoutId): void
     {
         if (!is_string($value) || $value === '') {
             throw ConfigException::validationFailed(
@@ -374,9 +433,14 @@ final class ConfigValidator
     }
 
     /**
-     * Validuje hodnotu column_template (musí být neprázdný string, např. "auto auto 1fr").
+     * Validuje hodnotu column_template (šablona sloupců) pro layout nebo sekci.
+     *
+     * @param mixed $value Hodnota column_template (očekává se neprázdný string, např. "auto auto 1fr")
+     * @param string $context Kontext pro chybovou hlášku (např. "layout 'main'", "sekce 'A'")
+
+	 * @throws ConfigException Pokud column_template není platný string
      */
-    private function validateColumnTemplateValue(mixed $value, string $context, string $filename): void
+    private function validateColumnTemplateValue(mixed $value, string $context): void
     {
         if (!is_string($value) || $value === '') {
             throw ConfigException::validationFailed(
@@ -385,6 +449,15 @@ final class ConfigValidator
         }
     }
 
+	/**
+	 * Validuje jeden blok v konfiguraci blocks.json.
+	 *
+	 * @param mixed $block Definice bloku (pole s klíči id, name, component, variant, rules, meta, ...)
+	 * @param string $blockKey Klíč bloku v konfiguraci (např. 'input', 'select', ...)
+	 * @param string $filename Název souboru pro chybové hlášky
+
+	 * @throws ConfigException Pokud je struktura nebo hodnoty bloku neplatné
+	 */
     private function validateBlock(mixed $block, string $blockKey, string $filename): void
     {
         if (!is_array($block)) {
@@ -435,6 +508,17 @@ final class ConfigValidator
         $this->validateComponentSpecific($block, $blockKey, $component, $variant, $filename);
     }
 
+	/**
+	 * Provádí komponenta-specifickou validaci bloku podle typu komponenty a varianty.
+	 *
+	 * @param array $block Definice bloku (pole s klíči id, name, component, variant, rules, ...)
+	 * @param string $blockKey Klíč bloku v konfiguraci (např. 'input', 'select', ...)
+	 * @param string $component Typ komponenty (např. 'input', 'select')
+	 * @param string|null $variant Varianta komponenty (např. 'text', 'radio', 'checkbox'), nebo null
+	 * @param string $filename Název souboru pro chybové hlášky
+
+	 * @throws ConfigException Pokud je struktura nebo hodnoty bloku neplatné pro danou komponentu
+	 */
     private function validateComponentSpecific(array $block, string $blockKey, string $component, ?string $variant, string $filename): void
     {
         $rules = $block[ConfigKeys::RULES->value] ?? [];
@@ -448,6 +532,17 @@ final class ConfigValidator
         }
     }
 
+	/**
+	 * Validuje variantu input komponenty (např. text, radio, checkbox) v bloku.
+	 *
+	 * @param array $block Definice bloku (pole s klíči id, name, component, variant, rules, group, ...)
+	 * @param string $blockKey Klíč bloku v konfiguraci (např. 'input')
+	 * @param string $variant Varianta input komponenty (např. 'text', 'radio', 'checkbox')
+	 * @param array $rules Pravidla validace (pole s klíči default, ...)
+	 * @param string $filename Název souboru pro chybové hlášky
+
+	* @throws ConfigException Pokud je varianta neplatná nebo má neplatnou strukturu/hodnoty
+	 */
     private function validateInputVariant(array $block, string $blockKey, string $variant, array $rules, string $filename): void
     {
         $allowedVariants = ['hidden', 'text', 'password', 'email', 'number', 'url', 'radio', 'checkbox'];
@@ -483,6 +578,16 @@ final class ConfigValidator
         }
     }
 
+	/**
+	 * Validuje blok typu select (výběrový komponent) v konfiguraci.
+	 *
+	 * @param array $block Definice bloku (pole s klíči id, name, component, options, rules, ...)
+	 * @param string $blockKey Klíč bloku v konfiguraci (např. 'select')
+	 * @param array $rules Pravidla validace (pole s klíči default, ...)
+	 * @param string $filename Název souboru pro chybové hlášky
+
+	* @throws ConfigException Pokud blok nemá platné options nebo default hodnotu
+	 */
     private function validateSelectBlock(array $block, string $blockKey, array $rules, string $filename): void
     {
         $optionsKey = ConfigKeys::OPTIONS->value;
@@ -499,6 +604,16 @@ final class ConfigValidator
         $this->validateDefaultInValues($rules, $values, $blockKey, 'select');
     }
 
+	/**
+	 * Validuje seznam možností (options/group) pro select nebo radio komponentu.
+	 *
+	 * @param array $list Seznam možností (pole objektů s klíči value, label)
+	 * @param string $blockKey Klíč bloku v konfiguraci (např. 'select', 'input')
+	 * @param string $fieldName Název pole (např. 'options', 'group')
+	 * @param string $filename Název souboru pro chybové hlášky
+
+	* @throws ConfigException Pokud některý prvek není objekt nebo nemá platné value/label
+	 */
     private function validateOptionList(array $list, string $blockKey, string $fieldName, string $filename): void
     {
         foreach ($list as $index => $opt) {
@@ -519,6 +634,16 @@ final class ConfigValidator
         }
     }
 
+	/**
+	 * Validuje, zda je výchozí hodnota (default) povolená v seznamu hodnot pro select/radio.
+	 *
+	 * @param array $rules Pravidla validace (pole s klíčem default)
+	 * @param array $values Seznam povolených hodnot (např. hodnoty options/group)
+	 * @param string $blockKey Klíč bloku v konfiguraci (např. 'select', 'input')
+	 * @param string $context Kontext pro chybovou hlášku (např. 'select', 'input + radio')
+
+	* @throws ConfigException Pokud default není v povolených hodnotách
+	 */
     private function validateDefaultInValues(array $rules, array $values, string $blockKey, string $context): void
     {
         $defaultKey = ConfigKeys::DEFAULT->value;
@@ -530,6 +655,15 @@ final class ConfigValidator
         }
     }
 
+	/**
+	 * Validuje meta atributy bloku (pole meta).
+	 *
+	 * @param mixed $meta Meta atributy bloku (pole klíč/hodnota)
+	 * @param string $blockKey Klíč bloku v konfiguraci (např. 'input', 'select', ...)
+	 * @param string $filename Název souboru pro chybové hlášky
+
+	* @throws ConfigException Pokud meta není pole nebo obsahuje neplatné klíče/hodnoty
+	 */
     private function validateMetaAttributes(mixed $meta, string $blockKey, string $filename): void
     {
         if (!is_array($meta)) {

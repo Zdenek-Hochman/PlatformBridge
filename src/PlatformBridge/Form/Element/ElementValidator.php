@@ -83,6 +83,7 @@ class ElementValidator
      *
      * @param array $attributes Asociační pole atributů, které se mají validovat.
      * @throws \InvalidArgumentException Pokud narazí na nepovolený klíč nebo špatný typ.
+	 * @internal
      */
     public static function validateBasicAttributes(array $attributes): void
     {
@@ -126,6 +127,7 @@ class ElementValidator
      * @param array $attributes Pole atributů, která chceme filtrovat / validovat.
      * @return array ['attributes' => array, 'method' => string]
      * @throws \InvalidArgumentException Pokud typ není podporován.
+	 * @internal
      */
     public static function validateInputTypeAttributes(string $type, array $attributes): array
     {

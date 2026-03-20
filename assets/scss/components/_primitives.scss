@@ -58,6 +58,11 @@
 			}
 		}
 
+		&--used {
+			background: var(--pb-color-success);
+			color: var(--pb-color-text-inverse);
+		}
+
 		svg {
 			fill: currentColor;
 		}

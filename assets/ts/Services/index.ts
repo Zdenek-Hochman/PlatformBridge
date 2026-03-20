@@ -1,4 +1,4 @@
 export * from './ApiClient';
-export * from './LoadingManager';
+export * from './ApiErrorHandler';
 export * from './SessionManager';
 export * from './TransportRegistry';
