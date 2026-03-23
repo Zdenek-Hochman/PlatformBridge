@@ -18,7 +18,7 @@
  *   --force           Přepíše i existující konfigurační soubory
  *   --vendor          Vynutí vendor režim (obejde autodetekci složkové struktury)
  *   --only=<kroky>    Spustí jen vybrané kroky (čárkou oddělené):
- *                       assets, api, config, security, json, cache
+ *                       init, dirs, assets, api, config, security, json, cache
  *
  * Examples:
  *   php vendor/bin/platformbridge install                - Nainstaluje vše
@@ -116,7 +116,7 @@ Options:
                           Useful in CI/CD (TeamCity) where folder structure differs
                           from standard Composer layout.
   --only=<steps>          Run only specific steps (comma-separated):
-                            assets, api, config, security, json, cache
+                            init, dirs, assets, api, config, security, json, cache
   --help, -h              Show this help
 
 Examples:
@@ -127,9 +127,10 @@ Examples:
   platformbridge install --vendor               Force vendor mode (CI/CD)
 
 Note:
-  In standalone/dev mode the installer is not needed – all files are read
-  directly from source folders. The installer is designed for vendor mode
-  (when installed via Composer into a host application).
+  In standalone/dev mode, if no platformbridge.php config exists, the installer
+  is not needed – all files are read from source folders. If you create a
+  platformbridge.php with custom paths, the installer will create the directory
+  structure and publish files accordingly.
 USAGE;
 
     echo $usage . PHP_EOL;

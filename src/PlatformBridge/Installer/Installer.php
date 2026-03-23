@@ -48,7 +48,7 @@ final class Installer
     private array $only = [];
 
     /** @var list<string> Povolené názvy kroků pro --only */
-    private const ALLOWED_STEPS = ['init', 'assets', 'api', 'config', 'security', 'json', 'cache'];
+    private const ALLOWED_STEPS = ['init', 'dirs', 'assets', 'api', 'config', 'security', 'json', 'cache'];
 
     public function __construct(?string $packageRoot = null, ?bool $forceVendor = null)
     {
@@ -132,31 +132,45 @@ final class Installer
     // ─── Install / Update ────────────────────────────────────
 
     /**
-     * Kompletní instalace – assety + API + konfigurace.
+     * Kompletní instalace – adresářová struktura + assety + API + konfigurace.
      * Konfigurace se NEPŘEPÍŠE pokud existuje (pokud není --force).
      *
-     * V standalone režimu instalace není potřeba – skript ukončí s upozorněním.
+     * V standalone režimu:
+     *   - Bez platformbridge.php: instalace není potřeba (vše z resources/)
+     *   - S platformbridge.php: vytvoří adresáře a publikuje soubory dle konfigurace
+     *
+     * Kroky: init → dirs → assets → api → config → security → json → cache
      */
     public function install(): void
     {
         $this->info("PlatformBridge Installer");
         $this->info("========================");
 
+        $installerConfig = $this->paths->installerConfig();
+
         if (!$this->paths->isVendor()) {
-            $this->info("");
-            $this->info("  ⚠️  Standalone (dev) režim – instalace není potřeba.");
-            $this->info("     V localhost se vše čte přímo ze zdrojových složek.");
-            $this->info("     Installer je určen pro vendor režim (produkce).");
-            $this->info("");
-            $this->info("  Tip: Přepni do vendor režimu nebo spusť z hostitelské aplikace:");
-            $this->info("       php vendor/bin/platformbridge install");
-            $this->info("");
-            $this->info("  V CI/CD prostředí použij --vendor pro vynucení vendor režimu:");
-            $this->info("       php vendor/bin/platformbridge install --vendor");
-            return;
+            if (!$installerConfig->hasCustomConfig()) {
+                $this->info("");
+                $this->info("  ⚠️  Standalone (dev) režim – instalace není potřeba.");
+                $this->info("     V localhost se vše čte přímo ze zdrojových složek.");
+                $this->info("     Installer je určen pro vendor režim (produkce).");
+                $this->info("");
+                $this->info("  Tip: Přepni do vendor režimu nebo spusť z hostitelské aplikace:");
+                $this->info("       php vendor/bin/platformbridge install");
+                $this->info("");
+                $this->info("  V CI/CD prostředí použij --vendor pro vynucení vendor režimu:");
+                $this->info("       php vendor/bin/platformbridge install --vendor");
+                $this->info("");
+                $this->info("  Pro standalone s vlastní konfigurací:");
+                $this->info("       1. Vytvořte soubor " . InstallerConfig::CONFIG_FILE . " v kořeni projektu");
+                $this->info("       2. Spusťte install znovu");
+                return;
+            }
+            $this->info("Mode: standalone (s " . InstallerConfig::CONFIG_FILE . ")");
+        } else {
+            $this->info("Mode: vendor");
         }
 
-        $this->info("Mode: vendor");
         if ($this->force) {
             $this->info("Flag: --force (overwrite configs)");
         }
@@ -165,7 +179,6 @@ final class Installer
         }
 
         // Vypiš zdroj konfigurace cest
-        $installerConfig = $this->paths->installerConfig();
         if ($installerConfig->hasCustomConfig()) {
             $this->info("Config: " . InstallerConfig::CONFIG_FILE . " (uživatelské cesty)");
         } else {
@@ -174,6 +187,7 @@ final class Installer
         $this->info("");
 
         $this->runStep('init', $this->publishInstallerConfig(...));
+        $this->runStep('dirs', $this->ensureDirectoryStructure(...));
         $this->runStep('assets', $this->publishAssets(...));
         $this->runStep('api', $this->publishApiEndpoint(...));
         $this->runStep('config', $this->publishConfig(...));
@@ -192,7 +206,7 @@ final class Installer
         $this->info("PlatformBridge Updater");
         $this->info("======================");
 
-        if (!$this->paths->isVendor()) {
+        if (!$this->paths->isVendor() && !$this->paths->installerConfig()->hasCustomConfig()) {
             $this->info("");
             $this->info("  ⚠️  Standalone (dev) režim – update není potřeba.");
             $this->info("     V localhost se vše čte přímo ze zdrojových složek.");
@@ -222,7 +236,8 @@ final class Installer
         $label = InstallerConfig::CONFIG_FILE;
 
         $written = $this->publisher->publish($stub, $target, overwrite: $this->force);
-        $this->info($written
+        $this->info(
+            $written
             ? "  ✅ Published: {$label}"
             : "  ⏭️  Skipped:   {$label} (exists)"
         );
@@ -240,7 +255,8 @@ final class Installer
         $label = $this->paths->installerConfig()->bridgeConfig();
 
         $written = $this->publisher->publish($stub, $target, overwrite: $this->force);
-        $this->info($written
+        $this->info(
+            $written
             ? "  ✅ Published: {$label}"
             : "  ⏭️  Skipped:   {$label} (exists)"
         );
@@ -259,7 +275,8 @@ final class Installer
         $label = $this->paths->installerConfig()->securityConfig();
 
         $written = $this->publisher->publish($stub, $target, overwrite: $this->force);
-        $this->info($written
+        $this->info(
+            $written
             ? "  ✅ Published: {$label}"
             : "  ⏭️  Skipped:   {$label} (exists)"
         );
@@ -289,7 +306,8 @@ final class Installer
                 $target . '/' . $file,
                 overwrite: $this->force
             );
-            $this->info($written
+            $this->info(
+                $written
                 ? "  ✅ Published: {$label}/{$file}"
                 : "  ⏭️  Skipped:   {$label}/{$file} (exists)"
             );
@@ -330,10 +348,54 @@ final class Installer
         $label = $this->paths->installerConfig()->apiFile();
 
         $written = $this->publisher->publish($stub, $target, overwrite: $this->force);
-        $this->info($written
+        $this->info(
+            $written
             ? "  ✅ Published: {$label}"
             : "  ⏭️  Skipped:   {$label} (exists)"
         );
+    }
+
+    /**
+     * Vytvoří kompletní adresářovou strukturu podle InstallerConfig.
+     *
+     * Projde všechny cesty z InstallerConfig a zajistí, že cílové adresáře
+     * existují PŘED publikováním souborů. Tím se řeší situace, kdy:
+     *   - Uživatel má vlastní platformbridge.php s nestandardními cestami
+     *   - Některé publish kroky jsou přeskočeny (soubor existuje)
+     *   - Aplikace potřebuje adresáře ještě před prvním install
+     */
+    private function ensureDirectoryStructure(): void
+    {
+        $config = $this->paths->installerConfig();
+        $projectRoot = $this->paths->projectRoot();
+
+        // Sbírka adresářů, které je potřeba vytvořit
+        $dirs = [
+            $config->assetsPath()                   => 'assets (JS/CSS)',
+            dirname($config->bridgeConfig())        => 'bridge config',
+            dirname($config->securityConfig())      => 'security config',
+            $config->jsonPath()                      => 'JSON config',
+            $config->cachePath()                     => 'cache',
+            dirname($config->apiFile())              => 'API endpoint',
+        ];
+
+        $created = 0;
+        foreach ($dirs as $relDir => $label) {
+            // Přeskoč "." (dirname vrací "." pokud cesta nemá parent)
+            if ($relDir === '.' || $relDir === '') {
+                continue;
+            }
+            $absDir = $projectRoot . '/' . $relDir;
+            if (!is_dir($absDir)) {
+                mkdir($absDir, 0755, true);
+                $this->info("  📁 Created: {$relDir}/ ({$label})");
+                $created++;
+            }
+        }
+
+        if ($created === 0) {
+            $this->info("  ✅ Directory structure: OK (all directories exist)");
+        }
     }
 
     private function ensureCacheDir(): void

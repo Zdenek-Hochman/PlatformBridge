@@ -98,13 +98,16 @@ final class PlatformBridgeConfig
     {
         if (!is_dir($this->configPath)) {
             throw new \InvalidArgumentException(
-                "Config path does not exist: {$this->configPath}"
+                "Config path does not exist: {$this->configPath}\n"
+                . "Spusťte 'php vendor/bin/platformbridge install' pro vytvoření adresářové struktury,\n"
+                . "nebo zkontrolujte konfiguraci v platformbridge.php (klíč 'json_path')."
             );
         }
 
         if (!is_dir($this->viewsPath)) {
             throw new \InvalidArgumentException(
-                "Views path does not exist: {$this->viewsPath}"
+                "Views path does not exist: {$this->viewsPath}\n"
+                . "Spusťte 'php vendor/bin/platformbridge install' nebo ověřte konfiguraci."
             );
         }
     }

@@ -242,7 +242,9 @@ final class PathResolver
     public function resolvedConfigPath(): string
     {
         $userPath = $this->userConfigPath();
-        if ($this->isVendor && is_dir($userPath) && $this->hasJsonFiles($userPath)) {
+        // Respektuj uživatelskou cestu z InstallerConfig v obou režimech
+        // (vendor i standalone s vlastním platformbridge.php)
+        if (is_dir($userPath) && $this->hasJsonFiles($userPath)) {
             return $userPath;
         }
         return $this->packageDefaultsPath();
