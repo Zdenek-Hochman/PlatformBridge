@@ -118,9 +118,6 @@ final class PlatformBridgeBuilder
      */
     public function build(): PlatformBridge
     {
-        // Re-create PathResolver to ensure we read the latest platformbridge.php.
-        // Covers the case where the file was edited after the Builder was instantiated
-        // (e.g., during the same long-running process or between create() and build()).
         $this->paths = new PathResolver($this->paths->packageRoot());
 
         $config = new PlatformBridgeConfig(
@@ -180,9 +177,9 @@ final class PlatformBridgeBuilder
     /**
      * Vrátí výslednou URL pro assety.
      *
-     * Dynamicky resolví URL z InstallerConfig (platformbridge.php) a DOCUMENT_ROOT.
+     * Dynamicky resolví URL z InstallerConfig (platformbridge.json) a DOCUMENT_ROOT.
      * Respektuje uživatelské cesty – pokud uživatel změní assets_path v
-     * platformbridge.php, URL se automaticky přepočítá.
+     * platformbridge.json, URL se automaticky přepočítá.
      *
      * Priorita:
      *   1. DOCUMENT_ROOT detekce z konfigurované cesty (publicAssetsPath / packageDistPath)
@@ -192,43 +189,43 @@ final class PlatformBridgeBuilder
      */
     private function resolveAssetUrl(): string
     {
-        // Absolutní cesta k assets na disku (dle platformbridge.php)
-        $targetPath = $this->paths->isVendor()
-            ? $this->paths->publicAssetsPath()
-            : $this->paths->packageDistPath();
+        // Určení cílové cesty k assetům na základě režimu (vendor vs standalone)
+        $targetPath = $this->paths->isVendor() ? $this->paths->publicAssetsPath() : $this->paths->packageDistPath();
 
-        // Zkus resolvovat URL z DOCUMENT_ROOT
+        // Pokus o výpočet URL relativní k DOCUMENT_ROOT
         $url = $this->resolveUrlFromDocRoot($targetPath);
+
+        // Pokud byla URL úspěšně vypočítána, vrátí ji
         if ($url !== null) {
             return $url;
         }
 
-        // Fallback: odvoď URL z konfigurované cesty
+        // Fallback pro vendor režim: odstranění prefixu 'public/' z cesty
         if ($this->paths->isVendor()) {
             return $this->stripPublicPrefix($this->paths->installerConfig()->assetsPath());
         }
 
+        // Výchozí fallback: vrátí pevně danou cestu '/dist'
         return '/dist';
     }
 
     /**
      * Vrátí výslednou URL pro API endpoint.
      *
-     * Dynamicky resolví URL z InstallerConfig (platformbridge.php) a DOCUMENT_ROOT.
+     * Dynamicky resolví URL z InstallerConfig (platformbridge.json) a DOCUMENT_ROOT.
      * Respektuje uživatelské cesty – pokud uživatel změní api_file v
-     * platformbridge.php, URL se automaticky přepočítá.
+     * platformbridge.json, URL se automaticky přepočítá.
      *
      * @return string URL k API endpointu
      */
     private function resolveApiUrl(): string
     {
-        // Absolutní cesta k API souboru na disku (dle platformbridge.php)
-        $targetPath = $this->paths->isVendor()
-            ? $this->paths->publicApiFile()
-            : $this->paths->stubApiFile();
+        // Absolutní cesta k API souboru na disku (dle platformbridge.json)
+        $targetPath = $this->paths->isVendor() ? $this->paths->publicApiFile() : $this->paths->stubApiFile();
 
         // Zkus resolvovat URL z DOCUMENT_ROOT
         $url = $this->resolveUrlFromDocRoot($targetPath);
+
         if ($url !== null) {
             return $url;
         }
@@ -244,68 +241,53 @@ final class PlatformBridgeBuilder
     /**
      * Resolví URL relativní k DOCUMENT_ROOT z absolutní cesty na disku.
      *
-     * @param string $absolutePath Absolutní cesta k souboru/složce
-     * @return string|null URL nebo null pokud nelze resolvovat
+     * Pokud cesta leží uvnitř webového rootu, vrátí relativní URL (např. /assets/file.js).
+     * Pokud není možné URL určit (např. CLI režim, cesta mimo root), vrací null.
+     *
+     * @param string $absolutePath Absolutní cesta k souboru nebo složce
+     * @return string|null Relativní URL nebo null pokud nelze určit
      */
     private function resolveUrlFromDocRoot(string $absolutePath): ?string
     {
+        // 1) Pokud běžíme v CLI nebo není nastaven DOCUMENT_ROOT, nemá smysl řešit URL
         if (php_sapi_name() === 'cli' || empty($_SERVER['DOCUMENT_ROOT'])) {
             return null;
         }
 
+        // 2) Získáme normalizovaný webový root
         $docRoot = realpath($_SERVER['DOCUMENT_ROOT']);
         if ($docRoot === false) {
             return null;
         }
-
         $docRoot = str_replace('\\', '/', rtrim($docRoot, '/\\'));
 
-        // Zkus realpath (preferováno – resolvuje symlinky)
-        $realPath = realpath($absolutePath);
-        if ($realPath !== false) {
-            $realPath = str_replace('\\', '/', rtrim($realPath, '/\\'));
-            if (str_starts_with($realPath, $docRoot . '/')) {
-                return substr($realPath, strlen($docRoot));
-            }
+        // 3) Normalizujeme zadanou cestu
+        $abs = str_replace('\\', '/', rtrim($absolutePath, '/\\'));
+
+        // 4) Pokud cesta začíná webovým rootem, vrátíme relativní část jako URL
+        if (str_starts_with($abs, $docRoot . '/')) {
+            return substr($abs, strlen($docRoot));
         }
 
-        // Zkus normalizovanou cestu přímo (složka nemusí ještě existovat)
-        $normalized = str_replace('\\', '/', rtrim($absolutePath, '/\\'));
-        if (str_starts_with($normalized, $docRoot . '/')) {
-            return substr($normalized, strlen($docRoot));
-        }
-
-        // Project root je pod nebo nad doc root
-        $projectRoot = str_replace('\\', '/', rtrim($this->paths->projectRoot(), '/\\'));
-        $realProject = realpath($this->paths->projectRoot());
-        if ($realProject !== false) {
-            $realProject = str_replace('\\', '/', rtrim($realProject, '/\\'));
-        } else {
-            $realProject = $projectRoot;
-        }
-
-        if (str_starts_with($realProject, $docRoot . '/') || $realProject === $docRoot) {
-            // Project root je v doc root → relativní URL
-            $basePath = ($realProject === $docRoot) ? '' : substr($realProject, strlen($docRoot));
-            $relPath = $this->paths->isVendor()
-                ? $this->stripPublicPrefix($this->paths->installerConfig()->assetsPath())
-                : '/dist';
-            return $basePath . $relPath;
-        }
-
+        // 5) Jinak není cesta v rootu a URL určit neumíme
         return null;
     }
 
     /**
-     * Odstraní prefix 'public/' z relativní cesty a vrátí URL tvar.
+     * Převede relativní cestu k assetům na URL bez prefixu veřejné složky.
+     *
+     * Pokud cesta začíná některým z běžných veřejných prefixů (např. 'public/', 'web/', ...),
+     * tento prefix odstraní a vrátí URL začínající lomítkem. Pokud prefix neodpovídá,
+     * pouze přidá počáteční lomítko.
      *
      * Příklady:
-     *   'public/platformbridge'     → '/platformbridge'
-     *   'public/custom/assets'      → '/custom/assets'
-     *   'web/assets'                → '/web/assets' (neznámý prefix ponechán)
+     *   'public/platformbridge'   → '/platformbridge'
+     *   'public/custom/assets'    → '/custom/assets'
+     *   'web/assets'              → '/assets'
+     *   'custom/assets'           → '/custom/assets'
      *
-     * @param string $relativePath Relativní cesta z InstallerConfig
-     * @return string URL tvar cesty
+     * @param string $relativePath Relativní cesta k assetům (např. z InstallerConfig)
+     * @return string URL vhodná pro použití ve webu
      */
     private function stripPublicPrefix(string $relativePath): string
     {

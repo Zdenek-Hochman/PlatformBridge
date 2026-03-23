@@ -8,6 +8,7 @@
  * V standalone/dev režimu instalace není potřeba – vše se čte přímo ze zdrojových složek.
  *
  * Usage:
+ *   php vendor/bin/platformbridge init                   - Vygeneruj platformbridge.json (před install)
  *   php vendor/bin/platformbridge install [options]      - Kompletní instalace
  *   php vendor/bin/platformbridge update [options]       - Aktualizace assetů a API
  *   php vendor/bin/platformbridge publish:config         - Publikuje bridge-config.php
@@ -21,11 +22,18 @@
  *                       init, dirs, assets, api, config, security, json, cache
  *
  * Examples:
- *   php vendor/bin/platformbridge install                - Nainstaluje vše
- *   php vendor/bin/platformbridge install --force        - Nainstaluje vše, přepíše konfigurace
- *   php vendor/bin/platformbridge install --only=assets  - Nainstaluje pouze assety
+ *   php vendor/bin/platformbridge init                     - Vygeneruj konfiguraci cest
+ *   php vendor/bin/platformbridge init --vendor            - Vygeneruj konfiguraci (CI/CD)
+ *   php vendor/bin/platformbridge install                  - Nainstaluje vše
+ *   php vendor/bin/platformbridge install --force          - Nainstaluje vše, přepíše konfigurace
+ *   php vendor/bin/platformbridge install --only=assets    - Nainstaluje pouze assety
  *   php vendor/bin/platformbridge install --only=config,security - Pouze konfiguraci
- *   php vendor/bin/platformbridge install --vendor       - Vynutí vendor režim (CI/CD)
+ *   php vendor/bin/platformbridge install --vendor         - Vynutí vendor režim (CI/CD)
+ *
+ * Doporučený workflow:
+ *   1. php vendor/bin/platformbridge init       ← Vygeneruj platformbridge.json
+ *   2. Upravte platformbridge.json (nastavte vlastní cesty)
+ *   3. php vendor/bin/platformbridge install    ← Nainstalujte dle konfigurace
  *
  * @see \Zoom\PlatformBridge\Installer\Installer
  */
@@ -66,6 +74,15 @@ $installer = new Installer();
 $installer->applyCliOptions($cliArgs);
 
 switch ($command) {
+    case 'init':
+        $installer->applyCliOptions($cliArgs);
+        $installer->publishInstallerConfig();
+        echo PHP_EOL;
+        echo "  ℹ️  Edit platformbridge.json to configure your paths, then run:" . PHP_EOL;
+        echo "     php vendor/bin/platformbridge install" . PHP_EOL;
+        echo PHP_EOL;
+        break;
+
     case 'install':
         $installer->install();
         break;
@@ -104,6 +121,7 @@ Usage:
   platformbridge <command> [options]
 
 Commands:
+  init                    Generate platformbridge.json config (run before install)
   install                 Publish assets, API endpoint, config and JSON files
   update                  Update assets and API endpoint (keeps config)
   publish:config          Publish bridge-config.php to public/ (API settings)
@@ -119,17 +137,28 @@ Options:
                             init, dirs, assets, api, config, security, json, cache
   --help, -h              Show this help
 
+Recommended workflow:
+  1. platformbridge init                  Generate platformbridge.json
+  2. Edit platformbridge.json             Set your custom paths
+  3. platformbridge install               Install using your paths
+
 Examples:
+  platformbridge init                           Generate config file
   platformbridge install                        Full install
   platformbridge install --force                Full install, overwrite configs
   platformbridge install --only=assets          Install only JS/CSS assets
   platformbridge install --only=config,security Install only config files
   platformbridge install --vendor               Force vendor mode (CI/CD)
 
+Security:
+  platformbridge.json uses JSON format (not PHP) to prevent code injection.
+  All paths are validated against path traversal attacks.
+  Place platformbridge.json in the project root (NOT in public/).
+
 Note:
-  In standalone/dev mode, if no platformbridge.php config exists, the installer
+  In standalone/dev mode, if no platformbridge.json config exists, the installer
   is not needed – all files are read from source folders. If you create a
-  platformbridge.php with custom paths, the installer will create the directory
+  platformbridge.json with custom paths, the installer will create the directory
   structure and publish files accordingly.
 USAGE;
 

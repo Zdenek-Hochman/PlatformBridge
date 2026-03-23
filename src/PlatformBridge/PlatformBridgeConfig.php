@@ -9,7 +9,9 @@ use Zoom\PlatformBridge\Config\PathResolver;
 /**
  * Konfigurační objekt pro PlatformBridge.
  *
- * Immutable value object obsahující všechny konfigurační hodnoty.
+ * Immutable value object obsahující všechny konfigurační hodnoty pro běh PlatformBridge.
+ *
+ * Pro vytváření konfigurace používejte doporučeně {@see PlatformBridgeBuilder}.
  *
  * @see PlatformBridgeBuilder Pro doporučený způsob vytváření konfigurace
  */
@@ -65,11 +67,13 @@ final class PlatformBridgeConfig
      * Ověří existenci souboru, nastaví konstantu BRIDGE_BOOTSTRAPPED (pokud ještě není),
      * a vyžádá soubor. Pokud soubor neexistuje nebo nevrací pole, vyhodí výjimku.
      *
-     * @return array Konfigurační pole se security nastavením
+     * @return array<string, mixed> Konfigurační pole se security nastavením
      * @throws \InvalidArgumentException Pokud soubor neexistuje nebo nevrací pole
      */
     private function requireSecurityConfig(): array
     {
+        clearstatcache(true, $this->securityConfigPath);
+
         if (!file_exists($this->securityConfigPath)) {
             throw new \InvalidArgumentException(
                 "Security config not found: {$this->securityConfigPath}"
@@ -96,89 +100,24 @@ final class PlatformBridgeConfig
      */
     private function validatePaths(): void
     {
-        // Clear PHP stat cache to ensure we see the real filesystem state,
-        // not stale cached results from a previous check in the same request.
         clearstatcache(true, $this->configPath);
 
         if (!is_dir($this->configPath)) {
-            $diagnostic = $this->buildPathDiagnostic();
-            $mismatchWarning = $this->buildPathMismatchWarning();
-            throw new \InvalidArgumentException(
-                "Config path does not exist: {$this->configPath}\n"
-                . $diagnostic
-                . $mismatchWarning
-                . "Ověřte, že cesta předaná přes withConfigPath() existuje,\n"
-                . "nebo spusťte 'php vendor/bin/platformbridge install' pro vytvoření adresářové struktury."
-            );
+            throw new \InvalidArgumentException("Config path does not exist: {$this->configPath}");
         }
 
         clearstatcache(true, $this->viewsPath);
 
         if (!is_dir($this->viewsPath)) {
-            throw new \InvalidArgumentException(
-                "Views path does not exist: {$this->viewsPath}\n"
-                . "Spusťte 'php vendor/bin/platformbridge install' nebo ověřte konfiguraci."
-            );
+            throw new \InvalidArgumentException("Views path does not exist: {$this->viewsPath}");
         }
-    }
-
-    /**
-     * Sestaví diagnostický řetězec pro chybovou hlášku.
-     * Pomáhá identifikovat, odkud se cesta vzala a zda platformbridge.php
-     * skutečně obsahuje očekávané hodnoty.
-     */
-    private function buildPathDiagnostic(): string
-    {
-        $resolver = $this->pathResolver;
-        if ($resolver === null) {
-            return '';
-        }
-
-        $lines = [];
-        $installerConfig = $resolver->installerConfig();
-        $configFile = $resolver->userInstallerConfigFile();
-
-        $lines[] = "Diagnostika:";
-        $lines[] = "  platformbridge.php: " . (file_exists($configFile) ? $configFile : 'NENALEZEN');
-        $lines[] = "  actual config path:   " . $this->configPath;
-        $lines[] = "  project root: " . $resolver->projectRoot();
-        $lines[] = "  režim: " . ($resolver->isVendor() ? 'vendor' : 'standalone');
-        $lines[] = "  custom config: " . ($installerConfig->hasCustomConfig() ? 'ANO' : 'NE (výchozí cesty)');
-        $lines[] = '';
-
-        return implode("\n", $lines) . "\n";
-    }
-
-    /**
-     * Detekuje nesoulad mezi předanou configPath a cestou, kterou by PathResolver
-     * vypočítal. Pokud se liší, vrátí varování.
-     */
-    private function buildPathMismatchWarning(): string
-    {
-        $resolver = $this->pathResolver;
-        if ($resolver === null) {
-            return '';
-        }
-
-        $expectedPath = $resolver->resolvedConfigPath();
-        $normalizedExpected = str_replace('\\', '/', rtrim($expectedPath, '/\\'));
-        $normalizedActual   = str_replace('\\', '/', rtrim($this->configPath, '/\\'));
-
-        if ($normalizedExpected === $normalizedActual) {
-            return '';
-        }
-
-        return "⚠️  configPath se liší od výchozí cesty PathResolveru.\n"
-             . "     Předáno:    {$this->configPath}\n"
-             . "     Výchozí:    {$expectedPath}\n"
-             . "     To je v pořádku, pokud je cesta nastavena přes withConfigPath().\n\n";
     }
 
     /**
      * Vrátí URL pro načítání assetů (JS/CSS).
      *
      * @return string URL k asset složce
-     * @internal
+     * @internal Používá AssetManager
      */
     public function getAssetUrl(): string
     {
@@ -199,7 +138,7 @@ final class PlatformBridgeConfig
     /**
      * Vrátí cestu ke složce s JSON konfigurací (blocks.json, layouts.json, generators.json).
      *
-     * @return string Absolutní cesta ke složce s konfigurací.
+     * @return string Absolutní cesta ke složce s konfigurací
      * @internal
      */
     public function getConfigPath(): string
@@ -210,7 +149,7 @@ final class PlatformBridgeConfig
     /**
      * Vrátí cestu ke složce se šablonami (views).
      *
-     * @return string Absolutní cesta k šablonám.
+     * @return string Absolutní cesta k šablonám
      * @internal
      */
     public function getViewsPath(): string
@@ -221,7 +160,7 @@ final class PlatformBridgeConfig
     /**
      * Vrátí cestu ke složce pro cache šablon.
      *
-     * @return string Absolutní cesta ke cache.
+     * @return string Absolutní cesta ke cache
      * @internal
      */
     public function getCachePath(): string
@@ -232,7 +171,7 @@ final class PlatformBridgeConfig
     /**
      * Vrátí instanci PathResolver pro centrální resolverování cest.
      *
-     * @return PathResolver
+     * @return PathResolver Instance resolveru cest
      * @internal
      */
     public function getPathResolver(): PathResolver
@@ -240,7 +179,12 @@ final class PlatformBridgeConfig
         return $this->pathResolver ??= new PathResolver(dirname(__DIR__, 2));
     }
 
-    //TODO: Dodělat
+    /**
+     * Vrátí aktuální nastavenou lokalizaci (jazyk).
+     *
+     * @return string Kód jazyka (např. "cs_CZ")
+     * @internal
+     */
     // public function getLocale(): string
     // {
     //     return $this->locale;
@@ -250,7 +194,7 @@ final class PlatformBridgeConfig
      * Vrátí secret key pro HMAC podepisování parametrů.
      * Načítá se ze security-config.php pokud je HMAC zapnutý.
      *
-     * @return string|null Tajný klíč nebo null, pokud není nastaven nebo je HMAC vypnutý.
+     * @return string|null Tajný klíč nebo null, pokud není nastaven nebo je HMAC vypnutý
      * @internal
      */
     public function getSecretKey(): ?string

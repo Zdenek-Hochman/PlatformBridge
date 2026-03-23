@@ -20,8 +20,7 @@ use Zoom\PlatformBridge\Error\ErrorRenderer;
 /**
  * Hlavní fasáda knihovny PlatformBridge.
  *
- * Tato třída je vstupním bodem pro externí aplikace.
- * Poskytuje fluent API pro konfiguraci a použití knihovny.
+ * Tato třída je vstupním bodem pro externí aplikace a poskytuje fluent API pro konfiguraci a použití knihovny.
  *
  * @package Zoom\PlatformBridge
  */
@@ -42,7 +41,7 @@ final class PlatformBridge
     }
 
     /**
-     * Vytvoří nový builder pro konfiguraci instance.
+     * Vytvoří nový builder pro konfiguraci instance PlatformBridge.
      *
      * @return PlatformBridgeBuilder Builder pro konfiguraci PlatformBridge
      */
@@ -68,7 +67,6 @@ final class PlatformBridge
      *
      * @param PlatformBridgeConfig $config Konfigurace pro PlatformBridge
      * @return self Nová instance PlatformBridge
-     *
      * @internal
      */
     public static function fromConfig(PlatformBridgeConfig $config): self
@@ -81,6 +79,8 @@ final class PlatformBridge
      *
      * Orchestrátor, který deleguje na specializované boot metody.
      * Pořadí volání je důležité – pozdější kroky závisí na předchozích.
+     *
+     * @return void
      */
     private function boot(): void
     {
@@ -95,6 +95,8 @@ final class PlatformBridge
 
     /**
      * 1. Registrace globálního error handleru pro lepší zachytávání chyb v rámci knihovny.
+     *
+     * @return void
      */
     private function bootErrorHandler(): void
     {
@@ -107,7 +109,9 @@ final class PlatformBridge
      * Cesta ke JSON konfiguračním souborům se řeší přes PlatformBridgeConfig:
      *   - Explicitní withConfigPath() má přednost
      *   - Fallback: PathResolver::resolvedConfigPath()
-     * Package defaults slouží jako fallback pro ConfigLoader.
+     *   - Package defaults slouží jako fallback pro ConfigLoader.
+     *
+     * @return void
      */
     private function bootConfig(): void
     {
@@ -125,6 +129,8 @@ final class PlatformBridge
 
     /**
      * 3. Inicializace šablonovacího enginu s cestami k šablonám a cache.
+     *
+     * @return void
      */
     private function bootTemplateEngine(): void
     {
@@ -137,6 +143,8 @@ final class PlatformBridge
 
     /**
      * 4. Registrace handlerů a vytvoření továrny na pole (FieldFactory).
+     *
+     * @return void
      */
     private function bootHandlers(): void
     {
@@ -146,6 +154,8 @@ final class PlatformBridge
 
     /**
      * 5. Inicializace rendereru formulářů s továrnou, konfigurací a šablonovacím enginem.
+     *
+     * @return void
      */
     private function bootFormRenderer(): void
     {
@@ -159,6 +169,8 @@ final class PlatformBridge
     /**
      * 6. Inicializace asset manageru pro správu a generování HTML assetů (CSS/JS).
      * URL se detekuje automaticky podle režimu (standalone vs vendor).
+     *
+     * @return void
      */
     private function bootAssetManager(): void
     {
@@ -167,6 +179,8 @@ final class PlatformBridge
 
     /**
      * 7. Inicializace podepisování parametrů, pokud je nastaven secret key.
+     *
+     * @return void
      */
     private function bootSecurity(): void
     {
@@ -205,7 +219,6 @@ final class PlatformBridge
      *
      * @param string $generatorId ID generátoru z konfigurace
      * @param array<string, mixed> $context Dynamické hodnoty pro injekci do bloků formuláře
-     *
      * @return array<int, array<string, mixed>> Pole sekcí s HTML obsahem
      */
     private function renderForm(string $generatorId, array $context = []): array
@@ -217,8 +230,7 @@ final class PlatformBridge
      * Vrátí kompletní HTML wrapper s formulářem.
      *
      * @param string $generatorId ID generátoru
-     * @param array<string, array<string, mixed>> $additionalParams Další parametry pro šablonu (např. 'inject' pro dynamické hodnoty)
-
+     * @param array<string, mixed> $additionalParams Další parametry pro šablonu (např. 'inject' pro dynamické hodnoty)
      * @return string Kompletní HTML výstup
      *
      * @example
@@ -255,7 +267,6 @@ final class PlatformBridge
      *
      * @param string $generatorId ID generátoru
      * @param array $extra Dodatečné parametry
-     *
      * @return array Sestavené parametry pro šablonu
      */
     private function buildParams(string $generatorId, array $extra): array

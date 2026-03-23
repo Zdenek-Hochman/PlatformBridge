@@ -12,10 +12,14 @@ namespace Zoom\PlatformBridge\Config;
  *   - standalone režim: balíček jako root projekt (XAMPP dev)
  *
  * Konfigurovatelné cesty:
- *   Pokud v kořeni hostitelské aplikace existuje soubor platformbridge.php,
+ *   Pokud v kořeni hostitelské aplikace existuje soubor platformbridge.json,
  *   PathResolver z něj při konstrukci načte uživatelské cesty (kam instalovat
  *   assety, config soubory apod.). Pokud soubor neexistuje, použijí se
  *   výchozí hardcodované cesty – zpětná kompatibilita je plně zachována.
+ *
+ * Bezpečnost:
+ *   JSON formát (místo dřívějšího PHP) eliminuje riziko Remote Code Execution.
+ *   Cesty jsou validovány proti path traversal útokům.
  *
  * @see InstallerConfig
  */
@@ -44,7 +48,7 @@ final class PathResolver
     private readonly bool $isVendor;
 
     /**
-     * Konfigurace instalačních cest (z platformbridge.php nebo výchozí)
+     * Konfigurace instalačních cest (z platformbridge.json nebo výchozí)
      */
     private readonly InstallerConfig $installerConfig;
 
@@ -64,7 +68,7 @@ final class PathResolver
         $this->isVendor = $forceVendor ?? $this->detectVendorMode();
         // Pokud jsme ve vendor režimu, projectRoot je 3 úrovně nad balíčkem (tj. kořen hostitelské aplikace), jinak je shodný s packageRoot
         $this->projectRoot = $this->isVendor ? dirname($this->packageRoot, 3) : $this->packageRoot;
-        // Načti konfiguraci cest z platformbridge.php (nebo výchozí hodnoty)
+        // Načti konfiguraci cest z platformbridge.json (nebo výchozí hodnoty)
         $this->installerConfig = new InstallerConfig($this->projectRoot);
     }
 
@@ -170,7 +174,7 @@ final class PathResolver
     /**
      * Vrací cestu ke složce s uživatelskou konfigurací platform-bridge v hostitelské aplikaci.
      * Výchozí: {projectRoot}/config/platform-bridge
-     * Konfigurovatelné přes platformbridge.php klíč 'json_path'.
+     * Konfigurovatelné přes platformbridge.json klíč 'json_path'.
      *
      * V hlavní aplikaci se cesta nastavuje přes PlatformBridgeBuilder::withConfigPath()
      * (ta má vždy přednost).
@@ -183,7 +187,7 @@ final class PathResolver
     /**
      * Vrací cestu k uživatelskému konfiguračnímu souboru bridge-config.php v hostitelské aplikaci.
      * Výchozí: {projectRoot}/public/bridge-config.php
-     * Konfigurovatelné přes platformbridge.php klíč 'bridge_config'.
+     * Konfigurovatelné přes platformbridge.json klíč 'bridge_config'.
      * V standalone režimu: cesta neexistuje → fallback na resources/stubs/bridge-config.php
      */
     public function userBridgeConfigFile(): string
@@ -195,7 +199,7 @@ final class PathResolver
      * Vrací cestu k uživatelskému bezpečnostnímu konfiguračnímu souboru.
      * Tento soubor NENÍ v public/ – je přístupný pouze internímu jádru.
      * Výchozí: {projectRoot}/config/security-config.php
-     * Konfigurovatelné přes platformbridge.php klíč 'security_config'.
+     * Konfigurovatelné přes platformbridge.json klíč 'security_config'.
      * V standalone režimu: cesta neexistuje → fallback na resources/stubs/security-config.php
      */
     public function userSecurityConfigFile(): string
@@ -215,7 +219,7 @@ final class PathResolver
     /**
      * Vrací cestu ke složce s public assety (JS/CSS) v hostitelské aplikaci.
      * Výchozí: {projectRoot}/public/platformbridge
-     * Konfigurovatelné přes platformbridge.php klíč 'assets_path'.
+     * Konfigurovatelné přes platformbridge.json klíč 'assets_path'.
      * Používá se POUZE ve vendor režimu (produkce).
      */
     public function publicAssetsPath(): string
@@ -226,7 +230,7 @@ final class PathResolver
     /**
      * Vrací cestu k publikovanému API endpointu v hostitelské aplikaci.
      * Výchozí: {projectRoot}/public/platformbridge/api.php
-     * Konfigurovatelné přes platformbridge.php klíč 'api_file'.
+     * Konfigurovatelné přes platformbridge.json klíč 'api_file'.
      */
     public function publicApiFile(): string
     {
@@ -236,7 +240,7 @@ final class PathResolver
     /**
      * Vrací cestu ke složce pro cache v hostitelské aplikaci.
      * Výchozí: {projectRoot}/var/cache
-     * Konfigurovatelné přes platformbridge.php klíč 'cache_path'.
+     * Konfigurovatelné přes platformbridge.json klíč 'cache_path'.
      */
     public function cachePath(): string
     {
@@ -325,16 +329,16 @@ final class PathResolver
     }
 
     /**
-     * Vrací cestu ke stub souboru platformbridge.php v balíčku.
+     * Vrací cestu ke stub souboru platformbridge.json v balíčku.
      * Používá se jako zdroj při publikování konfigurační mapy do hostitelské aplikace.
      */
     public function stubInstallerConfigFile(): string
     {
-        return $this->packageStubsPath() . '/platformbridge.php';
+        return $this->packageStubsPath() . '/platformbridge.json';
     }
 
     /**
-     * Vrací cestu k souboru platformbridge.php v kořeni hostitelské aplikace.
+     * Vrací cestu k souboru platformbridge.json v kořeni hostitelské aplikace.
      */
     public function userInstallerConfigFile(): string
     {

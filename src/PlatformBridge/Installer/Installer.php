@@ -15,9 +15,13 @@ use Zoom\PlatformBridge\Config\InstallerConfig;
  * režimu není instalace potřeba, vše se čte přímo ze zdrojových složek.
  *
  * Konfigurace cest:
- *   Pokud v kořeni hostitelské aplikace existuje soubor platformbridge.php,
+ *   Pokud v kořeni hostitelské aplikace existuje soubor platformbridge.json,
  *   Installer z něj načte uživatelské cesty (kam instalovat assety, config apod.).
  *   Pokud soubor neexistuje, použijou se výchozí hardcodované cesty.
+ *
+ * Bezpečnost:
+ *   Konfigurační soubor je JSON (ne PHP), takže nemůže obsahovat spustitelný kód.
+ *   Cesty jsou validovány proti path traversal v InstallerConfig.
  *
  * Použití:
  *   - CLI: php vendor/bin/platformbridge install [--force] [--only=assets,config,...]
@@ -137,9 +141,9 @@ final class Installer
      *
      * Funguje v obou režimech:
      *   - Vendor: balíček v vendor/zoom/platform-bridge/, deploy do hostující aplikace
-     *   - Standalone: balíček jako root projekt, deploy dle platformbridge.php
+     *   - Standalone: balíček jako root projekt, deploy dle platformbridge.json
      *
-     * Krok 'init' vždy nejdříve publikuje platformbridge.php do kořene projektu
+     * Krok 'init' vždy nejdříve publikuje platformbridge.json do kořene projektu
      * (pokud neexistuje), aby následující kroky měly k dispozici konfiguraci cest.
      *
      * Kroky: init → dirs → assets → api → config → security → cache
@@ -168,7 +172,7 @@ final class Installer
         }
         $this->info("");
 
-        // 1. Publikuj platformbridge.php (konfigurační mapa cest).
+        // 1. Publikuj platformbridge.json (konfigurační mapa cest).
         //    Po publikování se znovu načte InstallerConfig, aby následující
         //    kroky pracovaly s cestami zvolenými uživatelem.
         $this->runStep('init', $this->publishInstallerConfig(...));
@@ -186,7 +190,7 @@ final class Installer
 
     /**
      * Update – přepíše assety a API, ale NE konfiguraci a JSON.
-     * Vyžaduje předchozí install (platformbridge.php musí existovat).
+     * Vyžaduje předchozí install (platformbridge.json musí existovat).
      */
     public function update(): void
     {
@@ -215,7 +219,7 @@ final class Installer
     // ─── Publish kroky ───────────────────────────────────────
 
     /**
-     * Publikuje platformbridge.php (konfigurační mapa cest) do kořene hostitelské aplikace.
+     * Publikuje platformbridge.json (konfigurační mapa cest) do kořene hostitelské aplikace.
      *
      * ⚠️  Tento soubor je uživatelem spravovaný – --force ho NIKDY nepřepíše.
      * Uživatel v něm mění cesty; přepsání výchozím stubem by jeho změny zničilo.
@@ -231,7 +235,7 @@ final class Installer
         $label = InstallerConfig::CONFIG_FILE;
 
         // NIKDY nepřepisuj – uživatel tento soubor upravuje ručně.
-        // --force se na platformbridge.php nevztahuje (pouze na bridge-config, security-config apod.).
+        // --force se na platformbridge.json nevztahuje (pouze na bridge-config, security-config apod.).
         $written = $this->publisher->publish($stub, $target, overwrite: false);
         $this->info(
             $written
@@ -251,7 +255,7 @@ final class Installer
     /**
      * Znovu načte PathResolver a InstallerConfig.
      *
-     * Volá se po publikování platformbridge.php, aby install kroky
+     * Volá se po publikování platformbridge.json, aby install kroky
      * (dirs, assets, config, …) pracovaly s cestami z nového konfiguračního souboru.
      * Vypíše načtené cesty pro diagnostiku.
      */
@@ -358,7 +362,7 @@ final class Installer
      *
      * Projde všechny cesty z InstallerConfig a zajistí, že cílové adresáře
      * existují PŘED publikováním souborů. Tím se řeší situace, kdy:
-     *   - Uživatel má vlastní platformbridge.php s nestandardními cestami
+     *   - Uživatel má vlastní platformbridge.json s nestandardními cestami
      *   - Některé publish kroky jsou přeskočeny (soubor existuje)
      *   - Aplikace potřebuje adresáře ještě před prvním install
      */
