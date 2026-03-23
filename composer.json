@@ -21,10 +21,10 @@
     },
     "scripts": {
         "post-install-cmd": [
-			"@php bin/platformbridge install --vendor"
+			"@php bin/platformbridge install"
         ],
         "post-update-cmd": [
-            "@php bin/platformbridge update --vendor"
+            "@php bin/platformbridge update"
         ]
     },
     "extra": {

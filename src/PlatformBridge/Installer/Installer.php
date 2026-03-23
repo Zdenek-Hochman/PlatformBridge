@@ -135,9 +135,12 @@ final class Installer
      * Kompletní instalace – adresářová struktura + assety + API + konfigurace.
      * Konfigurace se NEPŘEPÍŠE pokud existuje (pokud není --force).
      *
-     * V standalone režimu:
-     *   - Bez platformbridge.php: instalace není potřeba (vše z resources/)
-     *   - S platformbridge.php: vytvoří adresáře a publikuje soubory dle konfigurace
+     * Funguje v obou režimech:
+     *   - Vendor: balíček v vendor/zoom/platform-bridge/, deploy do hostující aplikace
+     *   - Standalone: balíček jako root projekt, deploy dle platformbridge.php
+     *
+     * Krok 'init' vždy nejdříve publikuje platformbridge.php do kořene projektu
+     * (pokud neexistuje), aby následující kroky měly k dispozici konfiguraci cest.
      *
      * Kroky: init → dirs → assets → api → config → security → json → cache
      */
@@ -146,30 +149,8 @@ final class Installer
         $this->info("PlatformBridge Installer");
         $this->info("========================");
 
-        $installerConfig = $this->paths->installerConfig();
-
-        if (!$this->paths->isVendor()) {
-            if (!$installerConfig->hasCustomConfig()) {
-                $this->info("");
-                $this->info("  ⚠️  Standalone (dev) režim – instalace není potřeba.");
-                $this->info("     V localhost se vše čte přímo ze zdrojových složek.");
-                $this->info("     Installer je určen pro vendor režim (produkce).");
-                $this->info("");
-                $this->info("  Tip: Přepni do vendor režimu nebo spusť z hostitelské aplikace:");
-                $this->info("       php vendor/bin/platformbridge install");
-                $this->info("");
-                $this->info("  V CI/CD prostředí použij --vendor pro vynucení vendor režimu:");
-                $this->info("       php vendor/bin/platformbridge install --vendor");
-                $this->info("");
-                $this->info("  Pro standalone s vlastní konfigurací:");
-                $this->info("       1. Vytvořte soubor " . InstallerConfig::CONFIG_FILE . " v kořeni projektu");
-                $this->info("       2. Spusťte install znovu");
-                return;
-            }
-            $this->info("Mode: standalone (s " . InstallerConfig::CONFIG_FILE . ")");
-        } else {
-            $this->info("Mode: vendor");
-        }
+        $mode = $this->paths->isVendor() ? 'vendor' : 'standalone';
+        $this->info("Mode: {$mode}");
 
         if ($this->force) {
             $this->info("Flag: --force (overwrite configs)");
@@ -179,14 +160,20 @@ final class Installer
         }
 
         // Vypiš zdroj konfigurace cest
+        $installerConfig = $this->paths->installerConfig();
         if ($installerConfig->hasCustomConfig()) {
             $this->info("Config: " . InstallerConfig::CONFIG_FILE . " (uživatelské cesty)");
         } else {
-            $this->info("Config: výchozí cesty (" . InstallerConfig::CONFIG_FILE . " nenalezen)");
+            $this->info("Config: výchozí cesty (" . InstallerConfig::CONFIG_FILE . " zatím nenalezen)");
         }
         $this->info("");
 
+        // 1. Publikuj platformbridge.php (konfigurační mapa cest).
+        //    Po publikování se znovu načte InstallerConfig, aby následující
+        //    kroky pracovaly s cestami zvolenými uživatelem.
         $this->runStep('init', $this->publishInstallerConfig(...));
+
+        // 2. Vytvoř adresářovou strukturu + publikuj soubory
         $this->runStep('dirs', $this->ensureDirectoryStructure(...));
         $this->runStep('assets', $this->publishAssets(...));
         $this->runStep('api', $this->publishApiEndpoint(...));
@@ -200,21 +187,25 @@ final class Installer
 
     /**
      * Update – přepíše assety a API, ale NE konfiguraci a JSON.
+     * Vyžaduje předchozí install (platformbridge.php musí existovat).
      */
     public function update(): void
     {
         $this->info("PlatformBridge Updater");
         $this->info("======================");
 
-        if (!$this->paths->isVendor() && !$this->paths->installerConfig()->hasCustomConfig()) {
+        if (!$this->paths->installerConfig()->hasCustomConfig()) {
             $this->info("");
-            $this->info("  ⚠️  Standalone (dev) režim – update není potřeba.");
-            $this->info("     V localhost se vše čte přímo ze zdrojových složek.");
+            $this->info("  ⚠️  Soubor " . InstallerConfig::CONFIG_FILE . " nenalezen.");
+            $this->info("     Nejprve spusťte install pro vytvoření konfigurace:");
+            $this->info("       php vendor/bin/platformbridge install");
             $this->info("");
-            $this->info("  V CI/CD prostředí použij --vendor pro vynucení vendor režimu:");
-            $this->info("       php vendor/bin/platformbridge update --vendor");
             return;
         }
+
+        $mode = $this->paths->isVendor() ? 'vendor' : 'standalone';
+        $this->info("Mode: {$mode}");
+        $this->info("");
 
         $this->runStep('assets', $this->publishAssets(...));
         $this->runStep('api', $this->publishApiEndpoint(...));
@@ -227,7 +218,9 @@ final class Installer
     /**
      * Publikuje platformbridge.php (konfigurační mapa cest) do kořene hostitelské aplikace.
      * Bez --force se existující soubor nepřepisuje.
-     * Tento krok je volitelný – pokud soubor neexistuje, použijou se výchozí cesty.
+     *
+     * Po úspěšném publikování znovu načte PathResolver, aby následující
+     * install kroky pracovaly s nově zvolenými cestami.
      */
     public function publishInstallerConfig(): void
     {
@@ -241,6 +234,21 @@ final class Installer
             ? "  ✅ Published: {$label}"
             : "  ⏭️  Skipped:   {$label} (exists)"
         );
+
+        // Znovu načti PathResolver – konfigurační soubor nyní existuje
+        // a InstallerConfig z něj přečte uživatelské cesty pro zbylé kroky.
+        $this->reloadPaths();
+    }
+
+    /**
+     * Znovu načte PathResolver a InstallerConfig.
+     *
+     * Volá se po publikování platformbridge.php, aby install kroky
+     * (dirs, assets, config, …) pracovaly s cestami z nového konfiguračního souboru.
+     */
+    private function reloadPaths(): void
+    {
+        $this->paths = new PathResolver($this->paths->packageRoot(), $this->forceVendor);
     }
 
     /**
