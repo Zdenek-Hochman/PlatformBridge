@@ -107,9 +107,8 @@ final class PlatformBridgeConfig
                 "Config path does not exist: {$this->configPath}\n"
                 . $diagnostic
                 . $mismatchWarning
-                . "Spusťte 'php vendor/bin/platformbridge install' pro vytvoření adresářové struktury,\n"
-                . "nebo zkontrolujte konfiguraci v platformbridge.php (klíč 'json_path').\n"
-                . "⚠️  Po změně cest v platformbridge.php vždy spusťte install znovu."
+                . "Ověřte, že cesta předaná přes withConfigPath() existuje,\n"
+                . "nebo spusťte 'php vendor/bin/platformbridge install' pro vytvoření adresářové struktury."
             );
         }
 
@@ -141,8 +140,6 @@ final class PlatformBridgeConfig
 
         $lines[] = "Diagnostika:";
         $lines[] = "  platformbridge.php: " . (file_exists($configFile) ? $configFile : 'NENALEZEN');
-        $lines[] = "  json_path (z config): '" . $installerConfig->jsonPath() . "'";
-        $lines[] = "  resolved config path: " . $resolver->resolvedConfigPath();
         $lines[] = "  actual config path:   " . $this->configPath;
         $lines[] = "  project root: " . $resolver->projectRoot();
         $lines[] = "  režim: " . ($resolver->isVendor() ? 'vendor' : 'standalone');
@@ -154,10 +151,7 @@ final class PlatformBridgeConfig
 
     /**
      * Detekuje nesoulad mezi předanou configPath a cestou, kterou by PathResolver
-     * vypočítal z aktuálního platformbridge.php. Pokud se liší, vrátí varování.
-     *
-     * Typický scénář: withConfigPath() nastaví starou cestu, ale platformbridge.php
-     * byla mezitím editována na jinou json_path.
+     * vypočítal. Pokud se liší, vrátí varování.
      */
     private function buildPathMismatchWarning(): string
     {
@@ -174,11 +168,10 @@ final class PlatformBridgeConfig
             return '';
         }
 
-        return "⚠️  NESOULAD CES: configPath se liší od platformbridge.php!\n"
+        return "⚠️  configPath se liší od výchozí cesty PathResolveru.\n"
              . "     Předáno:    {$this->configPath}\n"
-             . "     Očekáváno:  {$expectedPath}\n"
-             . "     Pravděpodobná příčina: withConfigPath() přepisuje cestu z platformbridge.php.\n"
-             . "     V vendor režimu odstraňte volání withConfigPath() – cesty řídí platformbridge.php.\n\n";
+             . "     Výchozí:    {$expectedPath}\n"
+             . "     To je v pořádku, pokud je cesta nastavena přes withConfigPath().\n\n";
     }
 
     /**
@@ -201,6 +194,17 @@ final class PlatformBridgeConfig
     public function getApiUrl(): string
     {
         return $this->apiUrl;
+    }
+
+    /**
+     * Vrátí cestu ke složce s JSON konfigurací (blocks.json, layouts.json, generators.json).
+     *
+     * @return string Absolutní cesta ke složce s konfigurací.
+     * @internal
+     */
+    public function getConfigPath(): string
+    {
+        return $this->configPath;
     }
 
     /**

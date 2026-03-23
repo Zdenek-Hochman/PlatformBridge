@@ -30,10 +30,6 @@ return [
     // ⚠️  Tento soubor by NEMĚL být ve veřejně přístupné složce!
     'security_config' => 'config/security-config.php',
 
-    // ─── JSON konfigurace ───────────────────────────────────────
-    // Složka pro blocks.json, layouts.json, generators.json
-    'json_path' => 'config/platform-bridge',
-
     // ─── Cache ──────────────────────────────────────────────────
     // Složka pro cache kompilovaných šablon
     'cache_path' => 'var/cache',

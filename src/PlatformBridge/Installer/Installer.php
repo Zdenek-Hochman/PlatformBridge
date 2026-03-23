@@ -29,7 +29,7 @@ use Zoom\PlatformBridge\Config\InstallerConfig;
  *                     Užitečné v CI/CD (TeamCity), kde složková struktura neodpovídá
  *                     standardní Composer instalaci.
  *   --only=<kroky>    Spustí jen vybrané kroky (čárkou oddělené):
- *                       init, assets, api, config, security, json, cache
+ *                       init, assets, api, config, security, cache
  *
  * @see InstallerConfig
  */
@@ -48,7 +48,7 @@ final class Installer
     private array $only = [];
 
     /** @var list<string> Povolené názvy kroků pro --only */
-    private const ALLOWED_STEPS = ['init', 'dirs', 'assets', 'api', 'config', 'security', 'json', 'cache'];
+    private const ALLOWED_STEPS = ['init', 'dirs', 'assets', 'api', 'config', 'security', 'cache'];
 
     public function __construct(?string $packageRoot = null, ?bool $forceVendor = null)
     {
@@ -142,7 +142,7 @@ final class Installer
      * Krok 'init' vždy nejdříve publikuje platformbridge.php do kořene projektu
      * (pokud neexistuje), aby následující kroky měly k dispozici konfiguraci cest.
      *
-     * Kroky: init → dirs → assets → api → config → security → json → cache
+     * Kroky: init → dirs → assets → api → config → security → cache
      */
     public function install(): void
     {
@@ -179,7 +179,6 @@ final class Installer
         $this->runStep('api', $this->publishApiEndpoint(...));
         $this->runStep('config', $this->publishConfig(...));
         $this->runStep('security', $this->publishSecurityConfig(...));
-        $this->runStep('json', $this->publishJson(...));
         $this->runStep('cache', $this->ensureCacheDir(...));
 
         $this->info("\n✅ PlatformBridge installed successfully!");
@@ -268,7 +267,6 @@ final class Installer
             $this->info("       assets_path:     " . $config->assetsPath());
             $this->info("       bridge_config:   " . $config->bridgeConfig());
             $this->info("       security_config: " . $config->securityConfig());
-            $this->info("       json_path:       " . $config->jsonPath());
             $this->info("       cache_path:      " . $config->cachePath());
             $this->info("       api_file:        " . $config->apiFile());
             $this->info("");
@@ -312,38 +310,6 @@ final class Installer
             ? "  ✅ Published: {$label}"
             : "  ⏭️  Skipped:   {$label} (exists)"
         );
-    }
-
-    /**
-     * Publikuje JSON soubory.
-     * Cílová složka se čte z InstallerConfig (nebo výchozí).
-     * Bez --force se existující nepřepisují.
-     */
-    public function publishJson(): void
-    {
-        $defaults = $this->paths->packageDefaultsPath();
-        $target = $this->paths->userJsonPath();
-        $label = $this->paths->installerConfig()->jsonPath();
-
-        foreach (['blocks.json', 'layouts.json', 'generators.json'] as $file) {
-            $source = $defaults . '/' . $file;
-
-            if (!file_exists($source)) {
-                $this->info("  ⚠️  Source not found: {$file} (skipped)");
-                continue;
-            }
-
-            $written = $this->publisher->publish(
-                $source,
-                $target . '/' . $file,
-                overwrite: $this->force
-            );
-            $this->info(
-                $written
-                ? "  ✅ Published: {$label}/{$file}"
-                : "  ⏭️  Skipped:   {$label}/{$file} (exists)"
-            );
-        }
     }
 
     /**
@@ -406,7 +372,6 @@ final class Installer
             $config->assetsPath()                   => 'assets (JS/CSS)',
             dirname($config->bridgeConfig())        => 'bridge config',
             dirname($config->securityConfig())      => 'security config',
-            $config->jsonPath()                      => 'JSON config',
             $config->cachePath()                     => 'cache',
             dirname($config->apiFile())              => 'API endpoint',
         ];

@@ -19,7 +19,6 @@ namespace Zoom\PlatformBridge\Config;
  *       'assets_path'     => 'public/platformbridge',
  *       'bridge_config'   => 'public/bridge-config.php',
  *       'security_config' => 'config/security-config.php',
- *       'json_path'       => 'config/platform-bridge',
  *       'cache_path'      => 'var/cache',
  *       'api_file'        => 'public/platformbridge/api.php',
  *   ];
@@ -36,7 +35,6 @@ final class InstallerConfig
         'assets_path'     => 'public/platformbridge',
         'bridge_config'   => 'public/bridge-config.php',
         'security_config' => 'config/security-config.php',
-        'json_path'       => 'config/platform-bridge',
         'cache_path'      => 'var/cache',
         'api_file'        => 'public/platformbridge/api.php',
     ];
@@ -118,12 +116,6 @@ final class InstallerConfig
     public function securityConfig(): string
     {
         return $this->config['security_config'];
-    }
-
-    /** Relativní cesta ke složce s JSON konfigurací */
-    public function jsonPath(): string
-    {
-        return $this->config['json_path'];
     }
 
     /** Relativní cesta ke cache složce */

@@ -48,7 +48,7 @@ final class PlatformBridge
      */
     public static function create(): PlatformBridgeBuilder
     {
-		(new ErrorHandler(new ErrorRenderer()))->register();
+        (new ErrorHandler(new ErrorRenderer()))->register();
 
         return new PlatformBridgeBuilder();
     }
@@ -104,16 +104,17 @@ final class PlatformBridge
     /**
      * 2. Načtení konfigurace (bloky, layouty, generátory) s validací.
      *
-     * Cesty se řeší centrálně přes PathResolver:
-     *   - Standalone (dev): userConfigPath = resources/config
-     *   - Vendor (produkce): userConfigPath = {projectRoot}/config/platform-bridge
+     * Cesta ke JSON konfiguračním souborům se řeší přes PlatformBridgeConfig:
+     *   - Explicitní withConfigPath() má přednost
+     *   - Fallback: PathResolver::resolvedConfigPath()
+     * Package defaults slouží jako fallback pro ConfigLoader.
      */
     private function bootConfig(): void
     {
         $paths = $this->config->getPathResolver();
 
         $loader = new ConfigLoader(
-            $paths->resolvedUserConfigPath(),
+            $this->config->getConfigPath(),
             $paths->packageDefaultsPath(),
             new ConfigValidator()
         );

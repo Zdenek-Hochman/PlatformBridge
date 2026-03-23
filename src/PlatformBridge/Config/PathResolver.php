@@ -22,6 +22,13 @@ namespace Zoom\PlatformBridge\Config;
 final class PathResolver
 {
     /**
+     * Výchozí relativní cesta ke složce s JSON konfigurací (blocks.json, …).
+     * Používá se pro standalone kontexty (např. ApiHandler), kde není k dispozici Builder.
+     * V hlavní aplikaci se cesta nastavuje přes PlatformBridgeBuilder::withConfigPath().
+     */
+    private const DEFAULT_JSON_PATH = 'config/platform-bridge';
+
+    /**
      * Kořenová cesta balíčku (tj. složka platform-bridge)
      * Např. .../vendor/zoom/platform-bridge nebo root projektu v standalone režimu
      */
@@ -165,11 +172,13 @@ final class PathResolver
     /**
      * Vrací cestu ke složce s uživatelskou konfigurací platform-bridge v hostitelské aplikaci.
      * Výchozí: {projectRoot}/config/platform-bridge
-     * Konfigurovatelné přes platformbridge.php klíč 'json_path'.
+     *
+     * Poznámka: Tato cesta je hardcoded konvence pro standalone kontexty (ApiHandler apod.).
+     * V hlavní aplikaci se cesta nastavuje přes PlatformBridgeBuilder::withConfigPath().
      */
     public function userConfigPath(): string
     {
-        return $this->projectRoot . '/' . $this->installerConfig->jsonPath();
+        return $this->projectRoot . '/' . self::DEFAULT_JSON_PATH;
     }
 
     /**
@@ -237,16 +246,17 @@ final class PathResolver
 
     /**
      * Vrátí cestu ke konfiguraci:
-     *   - Vendor mód:     vždy user cesta z platformbridge.php (json_path).
+     *   - Vendor mód:     vždy user cesta (výchozí konvence config/platform-bridge).
      *                     Neexistence složky → validace v PlatformBridgeConfig vyhodí
      *                     srozumitelnou chybu se správnou cestou.
      *   - Standalone mód: user cesta pokud má JSON soubory, jinak package defaults.
+     *
+     * Poznámka: V hlavní aplikaci se tato metoda používá pouze jako fallback.
+     * Přednost má vždy PlatformBridgeBuilder::withConfigPath().
      */
     public function resolvedConfigPath(): string
     {
         if ($this->isVendor) {
-            // Ve vendor režimu vždy použij cestu z platformbridge.php.
-            // Tichý fallback na package defaults by skryl chybnou konfiguraci.
             return $this->userConfigPath();
         }
 

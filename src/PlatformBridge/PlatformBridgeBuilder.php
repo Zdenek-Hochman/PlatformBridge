@@ -142,38 +142,27 @@ final class PlatformBridgeBuilder
     /**
      * Resolví cestu ke konfiguraci (JSON soubory).
      *
-     * Vendor režim: VŽDY PathResolver (platformbridge.php je single source of truth).
-     *   Změna json_path v platformbridge.php se okamžitě projeví bez změny kódu aplikace.
-     *   Explicitní withConfigPath() je ve vendor režimu ignorován – vše se řídí
-     *   platformbridge.php, aby nebyl dvojí zdroj pravdy.
-     *
-     * Standalone režim: Explicitní withConfigPath() má přednost, jinak PathResolver.
+     * Explicitní withConfigPath() má vždy přednost (v obou režimech).
+     * Fallback: PathResolver::resolvedConfigPath() (standalone hledá JSON soubory
+     * v uživatelské složce, jinak package defaults).
      *
      * @return string Absolutní cesta ke složce s JSON konfigurací
      */
     private function resolveConfigPath(): string
     {
-        if ($this->paths->isVendor()) {
-            return $this->paths->resolvedConfigPath();
-        }
-
         return $this->configPath ?? $this->paths->resolvedConfigPath();
     }
 
     /**
      * Resolví cestu ke složce se šablonami (views).
      *
-     * Vendor režim: VŽDY package views (z balíčku).
-     * Standalone režim: Explicitní withViewsPath() má přednost, jinak package views.
+     * Explicitní withViewsPath() má vždy přednost (v obou režimech).
+     * Fallback: PathResolver::packageViewsPath() (šablony z balíčku).
      *
      * @return string Absolutní cesta ke složce s views
      */
     private function resolveViewsPath(): string
     {
-        if ($this->paths->isVendor()) {
-            return $this->paths->packageViewsPath();
-        }
-
         return $this->viewsPath ?? $this->paths->packageViewsPath();
     }
 
