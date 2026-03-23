@@ -96,16 +96,24 @@ final class PlatformBridgeConfig
      */
     private function validatePaths(): void
     {
+        // Clear PHP stat cache to ensure we see the real filesystem state,
+        // not stale cached results from a previous check in the same request.
+        clearstatcache(true, $this->configPath);
+
         if (!is_dir($this->configPath)) {
             $diagnostic = $this->buildPathDiagnostic();
+            $mismatchWarning = $this->buildPathMismatchWarning();
             throw new \InvalidArgumentException(
                 "Config path does not exist: {$this->configPath}\n"
                 . $diagnostic
+                . $mismatchWarning
                 . "Spusťte 'php vendor/bin/platformbridge install' pro vytvoření adresářové struktury,\n"
                 . "nebo zkontrolujte konfiguraci v platformbridge.php (klíč 'json_path').\n"
                 . "⚠️  Po změně cest v platformbridge.php vždy spusťte install znovu."
             );
         }
+
+        clearstatcache(true, $this->viewsPath);
 
         if (!is_dir($this->viewsPath)) {
             throw new \InvalidArgumentException(
@@ -134,12 +142,43 @@ final class PlatformBridgeConfig
         $lines[] = "Diagnostika:";
         $lines[] = "  platformbridge.php: " . (file_exists($configFile) ? $configFile : 'NENALEZEN');
         $lines[] = "  json_path (z config): '" . $installerConfig->jsonPath() . "'";
+        $lines[] = "  resolved config path: " . $resolver->resolvedConfigPath();
+        $lines[] = "  actual config path:   " . $this->configPath;
         $lines[] = "  project root: " . $resolver->projectRoot();
         $lines[] = "  režim: " . ($resolver->isVendor() ? 'vendor' : 'standalone');
         $lines[] = "  custom config: " . ($installerConfig->hasCustomConfig() ? 'ANO' : 'NE (výchozí cesty)');
         $lines[] = '';
 
         return implode("\n", $lines) . "\n";
+    }
+
+    /**
+     * Detekuje nesoulad mezi předanou configPath a cestou, kterou by PathResolver
+     * vypočítal z aktuálního platformbridge.php. Pokud se liší, vrátí varování.
+     *
+     * Typický scénář: withConfigPath() nastaví starou cestu, ale platformbridge.php
+     * byla mezitím editována na jinou json_path.
+     */
+    private function buildPathMismatchWarning(): string
+    {
+        $resolver = $this->pathResolver;
+        if ($resolver === null) {
+            return '';
+        }
+
+        $expectedPath = $resolver->resolvedConfigPath();
+        $normalizedExpected = str_replace('\\', '/', rtrim($expectedPath, '/\\'));
+        $normalizedActual   = str_replace('\\', '/', rtrim($this->configPath, '/\\'));
+
+        if ($normalizedExpected === $normalizedActual) {
+            return '';
+        }
+
+        return "⚠️  NESOULAD CES: configPath se liší od platformbridge.php!\n"
+             . "     Předáno:    {$this->configPath}\n"
+             . "     Očekáváno:  {$expectedPath}\n"
+             . "     Pravděpodobná příčina: withConfigPath() přepisuje cestu z platformbridge.php.\n"
+             . "     V vendor režimu odstraňte volání withConfigPath() – cesty řídí platformbridge.php.\n\n";
     }
 
     /**
