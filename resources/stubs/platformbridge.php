@@ -37,4 +37,9 @@ return [
     // ─── API endpoint ───────────────────────────────────────────
     // Cesta k publikovanému API souboru
     'api_file' => 'public/platformbridge/api.php',
+
+    // ─── JSON konfigurace ───────────────────────────────────────
+    // Složka s JSON konfiguračními soubory (blocks.json, layouts.json, generators.json).
+    // Používá se jako fallback, pokud cesta není nastavena přes withConfigPath().
+    'json_path' => 'config/platform-bridge',
 ];

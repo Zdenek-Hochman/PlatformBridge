@@ -37,6 +37,7 @@ final class InstallerConfig
         'security_config' => 'config/security-config.php',
         'cache_path'      => 'var/cache',
         'api_file'        => 'public/platformbridge/api.php',
+        'json_path'       => 'config/platform-bridge',
     ];
 
     /** @var array<string, string> Zvalidované relativní cesty */
@@ -130,6 +131,12 @@ final class InstallerConfig
         return $this->config['api_file'];
     }
 
+    /** Relativní cesta ke složce s JSON konfigurací (blocks.json, layouts.json, …) */
+    public function jsonPath(): string
+    {
+        return $this->normalizeRelativePath($this->config['json_path']);
+    }
+
     // ─── Meta ────────────────────────────────────────────────
 
     /** Zda byl nalezen uživatelský platformbridge.php */
@@ -148,6 +155,18 @@ final class InstallerConfig
     public static function defaults(): array
     {
         return self::DEFAULTS;
+    }
+
+    /**
+     * Normalizuje relativní cestu – odstraní úvodní './' a trailing lomítka.
+     */
+    private function normalizeRelativePath(string $path): string
+    {
+        $path = rtrim($path, '/\\');
+        if (str_starts_with($path, './')) {
+            $path = substr($path, 2);
+        }
+        return $path;
     }
 
     /** Vrátí celé konfigurační pole */

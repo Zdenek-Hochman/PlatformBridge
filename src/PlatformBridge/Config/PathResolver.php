@@ -22,9 +22,7 @@ namespace Zoom\PlatformBridge\Config;
 final class PathResolver
 {
     /**
-     * Výchozí relativní cesta ke složce s JSON konfigurací (blocks.json, …).
-     * Používá se pro standalone kontexty (např. ApiHandler), kde není k dispozici Builder.
-     * V hlavní aplikaci se cesta nastavuje přes PlatformBridgeBuilder::withConfigPath().
+     * @deprecated Nahrazeno InstallerConfig::jsonPath(). Konstanta ponechána pro zpětnou kompatibilitu.
      */
     private const DEFAULT_JSON_PATH = 'config/platform-bridge';
 
@@ -172,13 +170,14 @@ final class PathResolver
     /**
      * Vrací cestu ke složce s uživatelskou konfigurací platform-bridge v hostitelské aplikaci.
      * Výchozí: {projectRoot}/config/platform-bridge
+     * Konfigurovatelné přes platformbridge.php klíč 'json_path'.
      *
-     * Poznámka: Tato cesta je hardcoded konvence pro standalone kontexty (ApiHandler apod.).
-     * V hlavní aplikaci se cesta nastavuje přes PlatformBridgeBuilder::withConfigPath().
+     * V hlavní aplikaci se cesta nastavuje přes PlatformBridgeBuilder::withConfigPath()
+     * (ta má vždy přednost).
      */
     public function userConfigPath(): string
     {
-        return $this->projectRoot . '/' . self::DEFAULT_JSON_PATH;
+        return $this->projectRoot . '/' . $this->installerConfig->jsonPath();
     }
 
     /**
@@ -206,7 +205,7 @@ final class PathResolver
 
     /**
      * Vrací cestu ke složce s uživatelskými JSON soubory v hostitelské aplikaci.
-     * (Shodné s userConfigPath, pro čitelnost kódu.)
+     * Alias pro userConfigPath().
      */
     public function userJsonPath(): string
     {

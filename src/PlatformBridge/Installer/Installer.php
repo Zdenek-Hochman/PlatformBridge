@@ -374,6 +374,7 @@ final class Installer
             dirname($config->securityConfig())      => 'security config',
             $config->cachePath()                     => 'cache',
             dirname($config->apiFile())              => 'API endpoint',
+            $config->jsonPath()                      => 'JSON config (blocks, layouts, …)',
         ];
 
         $created = 0;
