@@ -236,14 +236,22 @@ final class PathResolver
     }
 
     /**
-     * Vrátí cestu ke konfiguraci s fallbackem.
-     * Priorita: user config → package defaults
+     * Vrátí cestu ke konfiguraci:
+     *   - Vendor mód:     vždy user cesta z platformbridge.php (json_path).
+     *                     Neexistence složky → validace v PlatformBridgeConfig vyhodí
+     *                     srozumitelnou chybu se správnou cestou.
+     *   - Standalone mód: user cesta pokud má JSON soubory, jinak package defaults.
      */
     public function resolvedConfigPath(): string
     {
+        if ($this->isVendor) {
+            // Ve vendor režimu vždy použij cestu z platformbridge.php.
+            // Tichý fallback na package defaults by skryl chybnou konfiguraci.
+            return $this->userConfigPath();
+        }
+
+        // Standalone: použij user cestu jen pokud má JSON soubory (dev/test bez install)
         $userPath = $this->userConfigPath();
-        // Respektuj uživatelskou cestu z InstallerConfig v obou režimech
-        // (vendor i standalone s vlastním platformbridge.php)
         if (is_dir($userPath) && $this->hasJsonFiles($userPath)) {
             return $userPath;
         }

@@ -50,30 +50,29 @@ final class ApiHandler
     }
 
     /**
-	 * Inicializační metoda pro automatickou detekci cest ke konfiguračním souborům.
-	 *
-	 * @return self Instance třídy ApiHandler s načtenými cestami ke konfiguracím.
-	 */
-	public static function bootstrap(): self
-	{
-		$paths = new PathResolver();
+     * Inicializační metoda pro automatickou detekci cest ke konfiguračním souborům.
+     *
+     * @return self Instance třídy ApiHandler s načtenými cestami ke konfiguracím.
+     */
+    public static function bootstrap(): self
+    {
+        $paths = new PathResolver();
 
-		if (!defined('BRIDGE_BOOTSTRAPPED')) {
-			define('BRIDGE_BOOTSTRAPPED', true);
-		}
+        if (!defined('BRIDGE_BOOTSTRAPPED')) {
+            define('BRIDGE_BOOTSTRAPPED', true);
+        }
 
-		$configPath = $paths->resolvedBridgeConfigFile();
-		$securityConfigPath = $paths->resolvedSecurityConfigFile();
-		$configDir = $paths->resolvedConfigPath();
+        $configPath = $paths->resolvedBridgeConfigFile();
+        $securityConfigPath = $paths->resolvedSecurityConfigFile();
 
-		return new self($configPath, $securityConfigPath, $configDir);
-	}
+        return new self($configPath, $securityConfigPath);
+    }
 
-	/**
-	 * Zpracuje příchozí HTTP požadavek a odešle odpověď ve formátu JSON.
-	 *
-	 * @return void Metoda nevrací žádnou hodnotu.
-	 */
+    /**
+     * Zpracuje příchozí HTTP požadavek a odešle odpověď ve formátu JSON.
+     *
+     * @return void Metoda nevrací žádnou hodnotu.
+     */
     public function handle(): void
     {
         header('Content-Type: application/json; charset=UTF-8');
@@ -85,16 +84,16 @@ final class ApiHandler
         }
     }
 
-	/**
-	 * Zpracuje příchozí požadavek v několika krocích:
-	 *  1. Načte vstupní data z HTTP požadavku.
-	 *  2. Ověří podpis a validitu vstupních dat.
-	 *  3. Rozpozná cílový endpoint na základě parametrů.
-	 *  4. Zavolá poskytovatele AI s požadovanými daty.
-	 *  5. Odešle úspěšnou odpověď zpět klientovi.
-	 *
-	 * @return void Metoda nevrací žádnou hodnotu.
-	 */
+    /**
+     * Zpracuje příchozí požadavek v několika krocích:
+     *  1. Načte vstupní data z HTTP požadavku.
+     *  2. Ověří podpis a validitu vstupních dat.
+     *  3. Rozpozná cílový endpoint na základě parametrů.
+     *  4. Zavolá poskytovatele AI s požadovanými daty.
+     *  5. Odešle úspěšnou odpověď zpět klientovi.
+     *
+     * @return void Metoda nevrací žádnou hodnotu.
+     */
     private function processRequest(): void
     {
         $input    = $this->parseInput();
@@ -255,13 +254,13 @@ final class ApiHandler
         ], JSON_UNESCAPED_UNICODE);
     }
 
-	/**
-	 * Načte konfiguraci ze zadaného souboru.
-	 *
-	 * @param string $path Cesta k souboru s konfigurací.
-	 * @param string $label Označení konfigurace pro chybové hlášení.
-	 * @return array Vrací pole s konfigurací.
-	 */
+    /**
+     * Načte konfiguraci ze zadaného souboru.
+     *
+     * @param string $path Cesta k souboru s konfigurací.
+     * @param string $label Označení konfigurace pro chybové hlášení.
+     * @return array Vrací pole s konfigurací.
+     */
     private function loadConfig(string $path, string $label): array
     {
         if (!file_exists($path)) {
@@ -278,7 +277,7 @@ final class ApiHandler
         $config = require $path;
 
         if (!is_array($config)) {
-			self::sendRawError(
+            self::sendRawError(
                 AiException::invalidRequest("{$label} config must return an array.")
             );
             exit;
@@ -287,11 +286,11 @@ final class ApiHandler
         return $config;
     }
 
-	/**
-	 * Odešle chybovou odpověď ve formátu JSON.
-	 *
-	 * @param \Throwable $e Výjimka nebo chyba, která má být odeslána.
-	 */
+    /**
+     * Odešle chybovou odpověď ve formátu JSON.
+     *
+     * @param \Throwable $e Výjimka nebo chyba, která má být odeslána.
+     */
     private static function sendRawError(\Throwable $e): void
     {
         $status = self::resolveHttpStatus($e);
@@ -324,16 +323,20 @@ final class ApiHandler
         ], JSON_UNESCAPED_UNICODE);
     }
 
-	/**
-	 * Určí HTTP status kód na základě typu výjimky.
-	 *
-	 * @param \Throwable $e Výjimka, pro kterou se určuje status kód.
-	 * @return int Vrací odpovídající HTTP status kód.
-	 */
+    /**
+     * Určí HTTP status kód na základě typu výjimky.
+     *
+     * @param \Throwable $e Výjimka, pro kterou se určuje status kód.
+     * @return int Vrací odpovídající HTTP status kód.
+     */
     private static function resolveHttpStatus(\Throwable $e): int
     {
-        if ($e instanceof SecurityException) return 403;
-        if ($e instanceof \JsonException) return 500;
+        if ($e instanceof SecurityException) {
+            return 403;
+        }
+        if ($e instanceof \JsonException) {
+            return 500;
+        }
 
         if ($e instanceof AiException) {
             return match ($e->getCode()) {
@@ -348,12 +351,12 @@ final class ApiHandler
         return 500;
     }
 
-	/**
-	 * Určí typ chyby na základě typu výjimky.
-	 *
-	 * @param \Throwable $e Výjimka, pro kterou se určuje typ chyby.
-	 * @return string Vrací řetězec reprezentující typ chyby.
-	 */
+    /**
+     * Určí typ chyby na základě typu výjimky.
+     *
+     * @param \Throwable $e Výjimka, pro kterou se určuje typ chyby.
+     * @return string Vrací řetězec reprezentující typ chyby.
+     */
     private static function resolveErrorType(\Throwable $e): string
     {
         return match (true) {
