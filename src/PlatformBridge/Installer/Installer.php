@@ -217,10 +217,13 @@ final class Installer
 
     /**
      * Publikuje platformbridge.php (konfigurační mapa cest) do kořene hostitelské aplikace.
-     * Bez --force se existující soubor nepřepisuje.
      *
-     * Po úspěšném publikování znovu načte PathResolver, aby následující
-     * install kroky pracovaly s nově zvolenými cestami.
+     * ⚠️  Tento soubor je uživatelem spravovaný – --force ho NIKDY nepřepíše.
+     * Uživatel v něm mění cesty; přepsání výchozím stubem by jeho změny zničilo.
+     * Soubor se publikuje POUZE pokud ještě neexistuje.
+     *
+     * Po publikování (nebo ověření existence) znovu načte PathResolver,
+     * aby následující install kroky pracovaly s cestami z aktuálního souboru.
      */
     public function publishInstallerConfig(): void
     {
@@ -228,12 +231,18 @@ final class Installer
         $target = $this->paths->userInstallerConfigFile();
         $label = InstallerConfig::CONFIG_FILE;
 
-        $written = $this->publisher->publish($stub, $target, overwrite: $this->force);
+        // NIKDY nepřepisuj – uživatel tento soubor upravuje ručně.
+        // --force se na platformbridge.php nevztahuje (pouze na bridge-config, security-config apod.).
+        $written = $this->publisher->publish($stub, $target, overwrite: false);
         $this->info(
             $written
             ? "  ✅ Published: {$label}"
-            : "  ⏭️  Skipped:   {$label} (exists)"
+            : "  ⏭️  Skipped:   {$label} (exists – user config preserved)"
         );
+
+        if ($this->force && !$written) {
+            $this->info("           ℹ️  --force does not overwrite {$label} (user-maintained file)");
+        }
 
         // Znovu načti PathResolver – konfigurační soubor nyní existuje
         // a InstallerConfig z něj přečte uživatelské cesty pro zbylé kroky.
@@ -245,10 +254,25 @@ final class Installer
      *
      * Volá se po publikování platformbridge.php, aby install kroky
      * (dirs, assets, config, …) pracovaly s cestami z nového konfiguračního souboru.
+     * Vypíše načtené cesty pro diagnostiku.
      */
     private function reloadPaths(): void
     {
         $this->paths = new PathResolver($this->paths->packageRoot(), $this->forceVendor);
+
+        // Diagnostický výpis – ukáže, s jakými cestami installer pracuje
+        $config = $this->paths->installerConfig();
+        if ($config->hasCustomConfig()) {
+            $this->info("");
+            $this->info("  📋 Loaded paths from " . InstallerConfig::CONFIG_FILE . ":");
+            $this->info("       assets_path:     " . $config->assetsPath());
+            $this->info("       bridge_config:   " . $config->bridgeConfig());
+            $this->info("       security_config: " . $config->securityConfig());
+            $this->info("       json_path:       " . $config->jsonPath());
+            $this->info("       cache_path:      " . $config->cachePath());
+            $this->info("       api_file:        " . $config->apiFile());
+            $this->info("");
+        }
     }
 
     /**

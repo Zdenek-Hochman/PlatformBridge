@@ -54,6 +54,13 @@ final class InstallerConfig
     {
         $configFile = rtrim($projectRoot, '/\\') . DIRECTORY_SEPARATOR . self::CONFIG_FILE;
 
+        // Invaliduj OPcache pro tento soubor, aby PHP vždy četl aktuální verzi.
+        // Bez toho může runtime po editaci platformbridge.php použít zakešovanou
+        // bytecode se starými cestami (opcache.revalidate_freq = 2s výchozí).
+        if (function_exists('opcache_invalidate') && file_exists($configFile)) {
+            opcache_invalidate($configFile, true);
+        }
+
         if (file_exists($configFile)) {
             $loaded = require $configFile;
 

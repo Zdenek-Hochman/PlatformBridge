@@ -148,36 +148,145 @@ final class PlatformBridgeBuilder
     /**
      * Vrátí výslednou URL pro assety.
      *
+     * Dynamicky resolví URL z InstallerConfig (platformbridge.php) a DOCUMENT_ROOT.
+     * Respektuje uživatelské cesty – pokud uživatel změní assets_path v
+     * platformbridge.php, URL se automaticky přepočítá.
+     *
      * Priorita:
-     *   1. Explicitně nastavená URL přes withAssetUrl()
-     *   2. Auto-detekce:
-     *      - Standalone (dev): '/dist'
-     *      - Vendor (prod): '/platformbridge' nebo '/public/platformbridge'
+     *   1. DOCUMENT_ROOT detekce z konfigurované cesty (publicAssetsPath / packageDistPath)
+     *   2. Fallback: odvozeno z InstallerConfig.assetsPath() (strip 'public/' prefix)
      *
      * @return string URL ke složce s assety
      */
     private function resolveAssetUrl(): string
     {
-        return \Zoom\PlatformBridge\Installer\Installer::getDefaultAssetUrl(
-            $this->paths->packageRoot()
-        );
+        // Absolutní cesta k assets na disku (dle platformbridge.php)
+        $targetPath = $this->paths->isVendor()
+            ? $this->paths->publicAssetsPath()
+            : $this->paths->packageDistPath();
+
+        // Zkus resolvovat URL z DOCUMENT_ROOT
+        $url = $this->resolveUrlFromDocRoot($targetPath);
+        if ($url !== null) {
+            return $url;
+        }
+
+        // Fallback: odvoď URL z konfigurované cesty
+        if ($this->paths->isVendor()) {
+            return $this->stripPublicPrefix($this->paths->installerConfig()->assetsPath());
+        }
+
+        return '/dist';
     }
 
     /**
      * Vrátí výslednou URL pro API endpoint.
      *
-     * Priorita:
-     *   1. Explicitně nastavená URL přes withApiUrl()
-     *   2. Auto-detekce:
-     *      - Standalone (dev): '/resources/stubs/api.php'
-     *      - Vendor (prod): '/public/platformbridge/api.php'
+     * Dynamicky resolví URL z InstallerConfig (platformbridge.php) a DOCUMENT_ROOT.
+     * Respektuje uživatelské cesty – pokud uživatel změní api_file v
+     * platformbridge.php, URL se automaticky přepočítá.
      *
      * @return string URL k API endpointu
      */
     private function resolveApiUrl(): string
     {
-        return \Zoom\PlatformBridge\Installer\Installer::getDefaultApiUrl(
-            $this->paths->packageRoot()
-        );
+        // Absolutní cesta k API souboru na disku (dle platformbridge.php)
+        $targetPath = $this->paths->isVendor()
+            ? $this->paths->publicApiFile()
+            : $this->paths->stubApiFile();
+
+        // Zkus resolvovat URL z DOCUMENT_ROOT
+        $url = $this->resolveUrlFromDocRoot($targetPath);
+        if ($url !== null) {
+            return $url;
+        }
+
+        // Fallback: odvoď URL z konfigurované cesty
+        if ($this->paths->isVendor()) {
+            return '/' . ltrim($this->stripPublicPrefix($this->paths->installerConfig()->apiFile()), '/');
+        }
+
+        return '/resources/stubs/api.php';
+    }
+
+    /**
+     * Resolví URL relativní k DOCUMENT_ROOT z absolutní cesty na disku.
+     *
+     * @param string $absolutePath Absolutní cesta k souboru/složce
+     * @return string|null URL nebo null pokud nelze resolvovat
+     */
+    private function resolveUrlFromDocRoot(string $absolutePath): ?string
+    {
+        if (php_sapi_name() === 'cli' || empty($_SERVER['DOCUMENT_ROOT'])) {
+            return null;
+        }
+
+        $docRoot = realpath($_SERVER['DOCUMENT_ROOT']);
+        if ($docRoot === false) {
+            return null;
+        }
+
+        $docRoot = str_replace('\\', '/', rtrim($docRoot, '/\\'));
+
+        // Zkus realpath (preferováno – resolvuje symlinky)
+        $realPath = realpath($absolutePath);
+        if ($realPath !== false) {
+            $realPath = str_replace('\\', '/', rtrim($realPath, '/\\'));
+            if (str_starts_with($realPath, $docRoot . '/')) {
+                return substr($realPath, strlen($docRoot));
+            }
+        }
+
+        // Zkus normalizovanou cestu přímo (složka nemusí ještě existovat)
+        $normalized = str_replace('\\', '/', rtrim($absolutePath, '/\\'));
+        if (str_starts_with($normalized, $docRoot . '/')) {
+            return substr($normalized, strlen($docRoot));
+        }
+
+        // Project root je pod nebo nad doc root
+        $projectRoot = str_replace('\\', '/', rtrim($this->paths->projectRoot(), '/\\'));
+        $realProject = realpath($this->paths->projectRoot());
+        if ($realProject !== false) {
+            $realProject = str_replace('\\', '/', rtrim($realProject, '/\\'));
+        } else {
+            $realProject = $projectRoot;
+        }
+
+        if (str_starts_with($realProject, $docRoot . '/') || $realProject === $docRoot) {
+            // Project root je v doc root → relativní URL
+            $basePath = ($realProject === $docRoot) ? '' : substr($realProject, strlen($docRoot));
+            $relPath = $this->paths->isVendor()
+                ? $this->stripPublicPrefix($this->paths->installerConfig()->assetsPath())
+                : '/dist';
+            return $basePath . $relPath;
+        }
+
+        return null;
+    }
+
+    /**
+     * Odstraní prefix 'public/' z relativní cesty a vrátí URL tvar.
+     *
+     * Příklady:
+     *   'public/platformbridge'     → '/platformbridge'
+     *   'public/custom/assets'      → '/custom/assets'
+     *   'web/assets'                → '/web/assets' (neznámý prefix ponechán)
+     *
+     * @param string $relativePath Relativní cesta z InstallerConfig
+     * @return string URL tvar cesty
+     */
+    private function stripPublicPrefix(string $relativePath): string
+    {
+        // Běžné public složky v PHP frameworcích
+        $publicPrefixes = ['public/', 'web/', 'www/', 'htdocs/', 'public_html/'];
+
+        foreach ($publicPrefixes as $prefix) {
+            if (str_starts_with($relativePath, $prefix)) {
+                return '/' . substr($relativePath, strlen($prefix));
+            }
+        }
+
+        // Žádný známý prefix → vrať jako URL od root
+        return '/' . ltrim($relativePath, '/');
     }
 }

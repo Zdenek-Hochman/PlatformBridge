@@ -97,10 +97,13 @@ final class PlatformBridgeConfig
     private function validatePaths(): void
     {
         if (!is_dir($this->configPath)) {
+            $diagnostic = $this->buildPathDiagnostic();
             throw new \InvalidArgumentException(
                 "Config path does not exist: {$this->configPath}\n"
+                . $diagnostic
                 . "Spusťte 'php vendor/bin/platformbridge install' pro vytvoření adresářové struktury,\n"
-                . "nebo zkontrolujte konfiguraci v platformbridge.php (klíč 'json_path')."
+                . "nebo zkontrolujte konfiguraci v platformbridge.php (klíč 'json_path').\n"
+                . "⚠️  Po změně cest v platformbridge.php vždy spusťte install znovu."
             );
         }
 
@@ -110,6 +113,33 @@ final class PlatformBridgeConfig
                 . "Spusťte 'php vendor/bin/platformbridge install' nebo ověřte konfiguraci."
             );
         }
+    }
+
+    /**
+     * Sestaví diagnostický řetězec pro chybovou hlášku.
+     * Pomáhá identifikovat, odkud se cesta vzala a zda platformbridge.php
+     * skutečně obsahuje očekávané hodnoty.
+     */
+    private function buildPathDiagnostic(): string
+    {
+        $resolver = $this->pathResolver;
+        if ($resolver === null) {
+            return '';
+        }
+
+        $lines = [];
+        $installerConfig = $resolver->installerConfig();
+        $configFile = $resolver->userInstallerConfigFile();
+
+        $lines[] = "Diagnostika:";
+        $lines[] = "  platformbridge.php: " . (file_exists($configFile) ? $configFile : 'NENALEZEN');
+        $lines[] = "  json_path (z config): '" . $installerConfig->jsonPath() . "'";
+        $lines[] = "  project root: " . $resolver->projectRoot();
+        $lines[] = "  režim: " . ($resolver->isVendor() ? 'vendor' : 'standalone');
+        $lines[] = "  custom config: " . ($installerConfig->hasCustomConfig() ? 'ANO' : 'NE (výchozí cesty)');
+        $lines[] = '';
+
+        return implode("\n", $lines) . "\n";
     }
 
     /**
