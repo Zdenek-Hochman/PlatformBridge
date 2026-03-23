@@ -4,17 +4,20 @@ declare(strict_types=1);
 
 namespace Zoom\PlatformBridge\Config;
 
+use Zoom\PlatformBridge\Security\JsonGuard;
+
 /**
- * Načítá uživatelskou konfiguraci instalačních cest z platformbridge.json
- * v kořeni hostitelské aplikace.
+ * Načítá uživatelskou konfiguraci instalačních cest z platformbridge.json.php
+ * (nebo zpětně kompatibilního platformbridge.json) v kořeni hostitelské aplikace.
  *
  * Pokud soubor neexistuje, vrací výchozí hodnoty (zpětná kompatibilita).
  * Tím je zajištěno, že installer i runtime PathResolver fungují:
  *   - bez konfigurace → výchozí cesty (public/platformbridge, config/…)
- *   - s platformbridge.json → uživatelem definované cesty
+ *   - s platformbridge.json.php → uživatelem definované cesty
  *
- * Soubor platformbridge.json je JSON s relativními cestami od kořene projektu:
+ * Formát souboru (JSON data uvnitř PHP exit guardu):
  *
+ *   <?php header('HTTP/1.1 403 Forbidden'); exit; ?>
  *   {
  *       "assets_path":     "public/platformbridge",
  *       "bridge_config":   "public/bridge-config.php",
@@ -31,10 +34,26 @@ namespace Zoom\PlatformBridge\Config;
  *   Na rozdíl od PHP souboru (require) nelze přes JSON injektovat backdoor ani
  *   žádný executable payload. Soubor je čten přes file_get_contents + json_decode.
  *   Cesty jsou navíc validovány proti path traversal útokům.
+ *
+ *   PHP exit guard v .json.php souboru zajišťuje, že při přístupu přes webový
+ *   prohlížeč se zobrazí HTTP 403 Forbidden – JSON obsah zůstane skrytý.
+ *   Toto funguje na jakémkoli PHP hostingu bez nutnosti .htaccess nebo
+ *   konfigurace serveru. Viz {@see JsonGuard}.
+ *
+ * Priorita načítání:
+ *   1. platformbridge.json.php (chráněný formát – preferovaný)
+ *   2. platformbridge.json     (nechráněný – zpětná kompatibilita, s varováním)
+ *   3. platformbridge.php      (starý PHP formát – chyba s pokyny k migraci)
  */
 final class InstallerConfig
 {
-    /** Název konfiguračního souboru hledaného v project root */
+    /** Název chráněného konfiguračního souboru (.json.php s PHP exit guardem) */
+    public const CONFIG_FILE_PROTECTED = 'platformbridge.json.php';
+
+    /**
+     * Název nechráněného konfiguračního souboru (zpětná kompatibilita).
+     * Nové instalace vždy vytvoří CONFIG_FILE_PROTECTED.
+     */
     public const CONFIG_FILE = 'platformbridge.json';
 
     /**
@@ -68,33 +87,55 @@ final class InstallerConfig
     /** Indikuje, zda byl nalezen a načten uživatelský konfigurační soubor */
     private readonly bool $hasCustomConfig;
 
+    /** Indikuje, zda je konfigurace uložena v chráněném formátu (.json.php) */
+    private readonly bool $isProtected;
+
     /**
      * @param string $projectRoot Absolutní cesta ke kořeni hostitelské aplikace
      */
     public function __construct(string $projectRoot)
     {
         $root = rtrim($projectRoot, '/\\');
-        $configFile = $root . DIRECTORY_SEPARATOR . self::CONFIG_FILE;
+
+        // Cesty ke konfiguračním souborům (v pořadí priority)
+        $protectedFile = $root . DIRECTORY_SEPARATOR . self::CONFIG_FILE_PROTECTED;
+        $plainFile = $root . DIRECTORY_SEPARATOR . self::CONFIG_FILE;
+        $legacyFile = $root . DIRECTORY_SEPARATOR . self::LEGACY_CONFIG_FILE;
 
         // Detekce starého PHP formátu → srozumitelná chybová hláška pro migraci
-        $legacyFile = $root . DIRECTORY_SEPARATOR . self::LEGACY_CONFIG_FILE;
-        if (!file_exists($configFile) && file_exists($legacyFile)) {
+        if (!file_exists($protectedFile) && !file_exists($plainFile) && file_exists($legacyFile)) {
             throw new \RuntimeException(
                 'Legacy PHP config file detected: ' . self::LEGACY_CONFIG_FILE . '. '
                 . 'PlatformBridge now uses JSON format for security. '
-                . 'Run "php vendor/bin/platformbridge init" to generate ' . self::CONFIG_FILE . ', '
+                . 'Run "php vendor/bin/platformbridge init" to generate ' . self::CONFIG_FILE_PROTECTED . ', '
                 . 'then transfer your settings and delete ' . self::LEGACY_CONFIG_FILE . '.'
             );
         }
 
-        if (file_exists($configFile)) {
-            $loaded = $this->loadAndValidateJson($configFile);
-
+        if (file_exists($protectedFile)) {
+            // Chráněný formát (.json.php) – preferovaný
+            $loaded = $this->loadAndValidateJson($protectedFile);
             $this->config = array_merge(self::DEFAULTS, array_intersect_key($loaded, self::DEFAULTS));
             $this->hasCustomConfig = true;
+            $this->isProtected = true;
+        } elseif (file_exists($plainFile)) {
+            // Nechráněný formát (.json) – zpětná kompatibilita
+            $loaded = $this->loadAndValidateJson($plainFile);
+            $this->config = array_merge(self::DEFAULTS, array_intersect_key($loaded, self::DEFAULTS));
+            $this->hasCustomConfig = true;
+            $this->isProtected = false;
+
+            // Varování: nechráněný soubor je přístupný přes web
+            trigger_error(
+                'PlatformBridge: ' . self::CONFIG_FILE . ' is not protected against web access. '
+                . 'Run "php vendor/bin/platformbridge install --only=init" to upgrade '
+                . 'to secured ' . self::CONFIG_FILE_PROTECTED . ' format.',
+                E_USER_NOTICE
+            );
         } else {
             $this->config = self::DEFAULTS;
             $this->hasCustomConfig = false;
+            $this->isProtected = false;
         }
     }
 
@@ -119,7 +160,7 @@ final class InstallerConfig
         $fileSize = filesize($configFile);
         if ($fileSize === false || $fileSize > $maxSize) {
             throw new \RuntimeException(
-                self::CONFIG_FILE . ' is too large (max ' . ($maxSize / 1024) . ' KB). '
+                basename($configFile) . ' is too large (max ' . ($maxSize / 1024) . ' KB). '
                 . 'This may indicate file corruption or a security issue.'
             );
         }
@@ -127,26 +168,31 @@ final class InstallerConfig
         $content = file_get_contents($configFile);
         if ($content === false || trim($content) === '') {
             throw new \RuntimeException(
-                self::CONFIG_FILE . ' is empty or unreadable.'
+                basename($configFile) . ' is empty or unreadable.'
             );
         }
+
+        // Odstraň PHP exit guard pokud je přítomen (.json.php formát)
+        $content = JsonGuard::strip($content);
 
         $loaded = json_decode($content, true, 4, JSON_THROW_ON_ERROR);
 
         if (!is_array($loaded)) {
             throw new \RuntimeException(
-                self::CONFIG_FILE . ' must contain a JSON object, got ' . gettype($loaded)
+                basename($configFile) . ' must contain a JSON object, got ' . gettype($loaded)
             );
         }
 
         // Filtrovat meta klíče ($schema, $comment) – nejsou konfigurační
         $loaded = array_filter($loaded, static fn (string $key) => !str_starts_with($key, '$'), ARRAY_FILTER_USE_KEY);
 
+        $configBasename = basename($configFile);
+
         // Neznámé klíče → varování
         $unknown = array_diff_key($loaded, self::DEFAULTS);
         if ($unknown !== []) {
             trigger_error(
-                self::CONFIG_FILE . ': unknown keys ignored: ' . implode(', ', array_keys($unknown)),
+                $configBasename . ': unknown keys ignored: ' . implode(', ', array_keys($unknown)),
                 E_USER_NOTICE
             );
         }
@@ -155,7 +201,7 @@ final class InstallerConfig
         foreach ($loaded as $key => $value) {
             if (isset(self::DEFAULTS[$key]) && !is_string($value)) {
                 throw new \RuntimeException(
-                    self::CONFIG_FILE . ": key '{$key}' must be a string, got " . gettype($value)
+                    $configBasename . ": key '{$key}' must be a string, got " . gettype($value)
                 );
             }
         }
@@ -185,7 +231,7 @@ final class InstallerConfig
         // Null byte injection
         if (str_contains($value, "\0")) {
             throw new \RuntimeException(
-                self::CONFIG_FILE . ": key '{$key}' contains null byte – possible injection attack."
+                "Config: key '{$key}' contains null byte – possible injection attack."
             );
         }
 
@@ -193,7 +239,7 @@ final class InstallerConfig
         $normalized = str_replace('\\', '/', $value);
         if (str_contains($normalized, '../') || str_contains($normalized, '..\\') || $normalized === '..') {
             throw new \RuntimeException(
-                self::CONFIG_FILE . ": key '{$key}' contains path traversal ('..') – not allowed. "
+                "Config: key '{$key}' contains path traversal ('..') – not allowed. "
                 . 'Use only relative paths within the project root.'
             );
         }
@@ -201,7 +247,7 @@ final class InstallerConfig
         // Absolutní cesty (Linux /path nebo Windows C:\path)
         if (str_starts_with($normalized, '/') || preg_match('/^[a-zA-Z]:[\\\\\\/]/', $value)) {
             throw new \RuntimeException(
-                self::CONFIG_FILE . ": key '{$key}' must be a relative path, got absolute: '{$value}'. "
+                "Config: key '{$key}' must be a relative path, got absolute: '{$value}'. "
                 . 'All paths are relative to the project root.'
             );
         }
@@ -247,14 +293,26 @@ final class InstallerConfig
 
     // ─── Meta ────────────────────────────────────────────────
 
-    /** Zda byl nalezen uživatelský platformbridge.php */
+    /** Zda byl nalezen uživatelský konfigurační soubor */
     public function hasCustomConfig(): bool
     {
         return $this->hasCustomConfig;
     }
 
-    /** Název konfiguračního souboru */
+    /** Zda je konfigurace v chráněném .json.php formátu */
+    public function isProtected(): bool
+    {
+        return $this->isProtected;
+    }
+
+    /** Název preferovaného konfiguračního souboru (chráněný) */
     public static function configFileName(): string
+    {
+        return self::CONFIG_FILE_PROTECTED;
+    }
+
+    /** Název nechráněného konfiguračního souboru (legacy) */
+    public static function plainConfigFileName(): string
     {
         return self::CONFIG_FILE;
     }

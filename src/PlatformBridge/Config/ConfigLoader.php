@@ -5,16 +5,22 @@ declare(strict_types=1);
 namespace Zoom\PlatformBridge\Config;
 
 use Zoom\PlatformBridge\Config\Exception\ConfigException;
+use Zoom\PlatformBridge\Security\JsonGuard;
 
 /**
  * Načítá konfigurační JSON soubory pro PlatformBridge.
  *
  * Podporuje fallback mechaniku:
- *   1. Uživatelský soubor (config/platform-bridge/*.json)
- *   2. Package default  (vendor/.../resources/defaults/*.json)
+ *   1. Uživatelský soubor chráněný (config/platform-bridge/*.json.php)
+ *   2. Uživatelský soubor nechráněný (config/platform-bridge/*.json)
+ *   3. Package default  (vendor/.../resources/defaults/*.json)
  *
  * Strategie: Pokud existuje uživatelský soubor → použij POUZE ten (full override).
  *            Pokud neexistuje → použij package default.
+ *
+ * Bezpečnost:
+ *   Chráněné soubory (.json.php) obsahují PHP exit guard, který brání
+ *   zobrazení JSON obsahu přes webový prohlížeč. Viz {@see JsonGuard}.
  */
 final class ConfigLoader
 {
@@ -67,10 +73,11 @@ final class ConfigLoader
      * Načte a zparsuje JSON soubor s fallbackem.
      *
      * Priorita:
-     *   1. Uživatelský soubor (userConfigPath/filename)
-     *   2. Package default (packageDefaultsPath/filename)
+     *   1. Uživatelský soubor chráněný (userConfigPath/filename.php)
+     *   2. Uživatelský soubor nechráněný (userConfigPath/filename)
+     *   3. Package default (packageDefaultsPath/filename)
      *
-     * @param string $filename Název souboru k načtení
+     * @param string $filename Název souboru k načtení (např. blocks.json)
      *
      * @return array Parsovaná data z JSON souboru
      *
@@ -78,13 +85,20 @@ final class ConfigLoader
      */
     private function loadJsonFile(string $filename): array
     {
-        // 1. User override
+        // 1. User override – chráněný formát (.json.php)
+        $protectedFilename = JsonGuard::protectedFilename($filename);
+        $userProtected = $this->userConfigPath . DIRECTORY_SEPARATOR . $protectedFilename;
+        if (file_exists($userProtected)) {
+            return $this->parseJsonFile($userProtected, $filename);
+        }
+
+        // 2. User override – nechráněný formát (.json)
         $userFile = $this->userConfigPath . DIRECTORY_SEPARATOR . $filename;
         if (file_exists($userFile)) {
             return $this->parseJsonFile($userFile, $filename);
         }
 
-        // 2. Package default
+        // 3. Package default
         $defaultFile = $this->packageDefaultsPath . DIRECTORY_SEPARATOR . $filename;
         if (file_exists($defaultFile)) {
             return $this->parseJsonFile($defaultFile, $filename);
@@ -110,6 +124,9 @@ final class ConfigLoader
         if ($content === false) {
             throw ConfigException::fileNotFound($path);
         }
+
+        // Odstraní PHP exit guard pokud je přítomen (.json.php formát)
+        $content = JsonGuard::strip($content);
 
         try {
             $data = json_decode($content, true, 512, JSON_THROW_ON_ERROR);

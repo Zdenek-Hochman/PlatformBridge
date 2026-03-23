@@ -6,6 +6,7 @@ namespace Zoom\PlatformBridge\Installer;
 
 use Zoom\PlatformBridge\Config\PathResolver;
 use Zoom\PlatformBridge\Config\InstallerConfig;
+use Zoom\PlatformBridge\Security\JsonGuard;
 
 /**
  * Instalátor PlatformBridge balíčku (vendor-only).
@@ -52,7 +53,7 @@ final class Installer
     private array $only = [];
 
     /** @var list<string> Povolené názvy kroků pro --only */
-    private const ALLOWED_STEPS = ['init', 'dirs', 'assets', 'api', 'config', 'security', 'cache'];
+    private const ALLOWED_STEPS = ['init', 'dirs', 'assets', 'api', 'config', 'security', 'cache', 'guard'];
 
     public function __construct(?string $packageRoot = null, ?bool $forceVendor = null)
     {
@@ -146,7 +147,7 @@ final class Installer
      * Krok 'init' vždy nejdříve publikuje platformbridge.json do kořene projektu
      * (pokud neexistuje), aby následující kroky měly k dispozici konfiguraci cest.
      *
-     * Kroky: init → dirs → assets → api → config → security → cache
+     * Kroky: init → dirs → guard → assets → api → config → security → cache
      */
     public function install(): void
     {
@@ -166,19 +167,21 @@ final class Installer
         // Vypiš zdroj konfigurace cest
         $installerConfig = $this->paths->installerConfig();
         if ($installerConfig->hasCustomConfig()) {
-            $this->info("Config: " . InstallerConfig::CONFIG_FILE . " (uživatelské cesty)");
+            $protLabel = $installerConfig->isProtected() ? ' (chráněný)' : ' (⚠️ nechráněný!)';
+            $this->info("Config: " . InstallerConfig::CONFIG_FILE_PROTECTED . $protLabel);
         } else {
-            $this->info("Config: výchozí cesty (" . InstallerConfig::CONFIG_FILE . " zatím nenalezen)");
+            $this->info("Config: výchozí cesty (" . InstallerConfig::CONFIG_FILE_PROTECTED . " zatím nenalezen)");
         }
         $this->info("");
 
-        // 1. Publikuj platformbridge.json (konfigurační mapa cest).
+        // 1. Publikuj platformbridge.json.php (konfigurační mapa cest).
         //    Po publikování se znovu načte InstallerConfig, aby následující
         //    kroky pracovaly s cestami zvolenými uživatelem.
         $this->runStep('init', $this->publishInstallerConfig(...));
 
         // 2. Vytvoř adresářovou strukturu + publikuj soubory
         $this->runStep('dirs', $this->ensureDirectoryStructure(...));
+        $this->runStep('guard', $this->publishDirectoryGuards(...));
         $this->runStep('assets', $this->publishAssets(...));
         $this->runStep('api', $this->publishApiEndpoint(...));
         $this->runStep('config', $this->publishConfig(...));
@@ -199,7 +202,7 @@ final class Installer
 
         if (!$this->paths->installerConfig()->hasCustomConfig()) {
             $this->info("");
-            $this->info("  ⚠️  Soubor " . InstallerConfig::CONFIG_FILE . " nenalezen.");
+            $this->info("  ⚠️  Soubor " . InstallerConfig::CONFIG_FILE_PROTECTED . " nenalezen.");
             $this->info("     Nejprve spusťte install pro vytvoření konfigurace:");
             $this->info("       php vendor/bin/platformbridge install");
             $this->info("");
@@ -219,11 +222,20 @@ final class Installer
     // ─── Publish kroky ───────────────────────────────────────
 
     /**
-     * Publikuje platformbridge.json (konfigurační mapa cest) do kořene hostitelské aplikace.
+     * Publikuje platformbridge.json.php (chráněná konfigurační mapa cest) do kořene hostitelské aplikace.
      *
      * ⚠️  Tento soubor je uživatelem spravovaný – --force ho NIKDY nepřepíše.
      * Uživatel v něm mění cesty; přepsání výchozím stubem by jeho změny zničilo.
      * Soubor se publikuje POUZE pokud ještě neexistuje.
+     *
+     * Bezpečnost:
+     *   Soubor je vytvořen ve formátu .json.php s PHP exit guardem.
+     *   Při přístupu přes webový prohlížeč se zobrazí HTTP 403 Forbidden.
+     *   JSON data jsou čitelná pouze přes file_get_contents v PHP aplikaci.
+     *
+     * Migrace:
+     *   Pokud existuje starý nechráněný platformbridge.json, automaticky
+     *   se zkonvertuje na platformbridge.json.php a starý soubor se smaže.
      *
      * Po publikování (nebo ověření existence) znovu načte PathResolver,
      * aby následující install kroky pracovaly s cestami z aktuálního souboru.
@@ -231,24 +243,33 @@ final class Installer
     public function publishInstallerConfig(): void
     {
         $stub = $this->paths->stubInstallerConfigFile();
-        $target = $this->paths->userInstallerConfigFile();
-        $label = InstallerConfig::CONFIG_FILE;
+        $targetProtected = $this->paths->userInstallerConfigFileProtected();
+        $targetPlain = $this->paths->userInstallerConfigFile();
+        $label = InstallerConfig::CONFIG_FILE_PROTECTED;
+
+        // Migrace: starý nechráněný .json → nový chráněný .json.php
+        if (!file_exists($targetProtected) && file_exists($targetPlain)) {
+            JsonGuard::convertToProtected($targetPlain, $targetProtected, deleteSource: true);
+            $this->info("  🔒 Migrated: " . InstallerConfig::CONFIG_FILE . " → " . InstallerConfig::CONFIG_FILE_PROTECTED);
+            $this->info("     Starý nechráněný soubor " . InstallerConfig::CONFIG_FILE . " byl odstraněn.");
+            $this->reloadPaths();
+            return;
+        }
 
         // NIKDY nepřepisuj – uživatel tento soubor upravuje ručně.
-        // --force se na platformbridge.json nevztahuje (pouze na bridge-config, security-config apod.).
-        $written = $this->publisher->publish($stub, $target, overwrite: false);
-        $this->info(
-            $written
-            ? "  ✅ Published: {$label}"
-            : "  ⏭️  Skipped:   {$label} (exists – user config preserved)"
-        );
+        // --force se na platformbridge.json.php nevztahuje.
+        if (!file_exists($targetProtected)) {
+            $this->publisher->publishProtected($stub, $targetProtected, overwrite: false);
+            $this->info("  ✅ Published: {$label} (secured with PHP exit guard)");
+        } else {
+            $this->info("  ⏭️  Skipped:   {$label} (exists – user config preserved)");
+        }
 
-        if ($this->force && !$written) {
+        if ($this->force && file_exists($targetProtected)) {
             $this->info("           ℹ️  --force does not overwrite {$label} (user-maintained file)");
         }
 
         // Znovu načti PathResolver – konfigurační soubor nyní existuje
-        // a InstallerConfig z něj přečte uživatelské cesty pro zbylé kroky.
         $this->reloadPaths();
     }
 
@@ -266,14 +287,62 @@ final class Installer
         // Diagnostický výpis – ukáže, s jakými cestami installer pracuje
         $config = $this->paths->installerConfig();
         if ($config->hasCustomConfig()) {
+            $protLabel = $config->isProtected() ? '🔒 protected' : '⚠️  unprotected';
             $this->info("");
-            $this->info("  📋 Loaded paths from " . InstallerConfig::CONFIG_FILE . ":");
+            $this->info("  📋 Loaded paths from " . InstallerConfig::CONFIG_FILE_PROTECTED . " ({$protLabel}):");
             $this->info("       assets_path:     " . $config->assetsPath());
             $this->info("       bridge_config:   " . $config->bridgeConfig());
             $this->info("       security_config: " . $config->securityConfig());
             $this->info("       cache_path:      " . $config->cachePath());
             $this->info("       api_file:        " . $config->apiFile());
             $this->info("");
+        }
+    }
+
+    /**
+     * Vytvoří ochranné index.php soubory v adresářích s citlivými daty.
+     *
+     * Tyto sentinel soubory:
+     *   - Brání directory listing (výpis obsahu adresáře)
+     *   - Vrací HTTP 403 Forbidden při přímém přístupu na URL adresáře
+     *   - Fungují na jakémkoli PHP hostingu bez konfigurace serveru
+     *
+     * Chráněné adresáře:
+     *   - json_path (blocks.json, layouts.json, generators.json)
+     *   - cache_path (šablonová cache)
+     *   - adresář s konfigurací (security-config.php nadřazený adresář)
+     */
+    private function publishDirectoryGuards(): void
+    {
+        $config = $this->paths->installerConfig();
+        $projectRoot = $this->paths->projectRoot();
+
+        // Adresáře, které potřebují ochranný index.php
+        $protectedDirs = [
+            $config->jsonPath()  => 'JSON config (blocks, layouts, generators)',
+            $config->cachePath() => 'template cache',
+        ];
+
+        // Nadřazený adresář security configu (pokud není root)
+        $securityDir = dirname($config->securityConfig());
+        if ($securityDir !== '.' && $securityDir !== '') {
+            $protectedDirs[$securityDir] = 'security config';
+        }
+
+        $guardCount = 0;
+        foreach ($protectedDirs as $relDir => $label) {
+            $absDir = $projectRoot . '/' . $relDir;
+            if (is_dir($absDir)) {
+                $created = JsonGuard::createDirectoryGuard($absDir);
+                if ($created) {
+                    $this->info("  🔒 Guard:    {$relDir}/index.php ({$label})");
+                    $guardCount++;
+                }
+            }
+        }
+
+        if ($guardCount === 0) {
+            $this->info("  ✅ Directory guards: OK (all guards in place)");
         }
     }
 

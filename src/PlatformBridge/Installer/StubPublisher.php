@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Zoom\PlatformBridge\Installer;
 
+use Zoom\PlatformBridge\Security\JsonGuard;
+
 /**
  * Bezpečné publikování souborů se skip logikou.
  *
@@ -61,6 +63,41 @@ final class StubPublisher
         }
 
         return $count;
+    }
+
+    /**
+     * Publikuje JSON soubor s PHP exit guardem (ochrana proti web přístupu).
+     *
+     * Přečte zdrojový JSON, obalí ho PHP exit guardem a zapíše do cíle.
+     * Cílový soubor by měl mít příponu .json.php.
+     *
+     * @param string $source Zdrojový .json soubor
+     * @param string $target Cílový .json.php soubor
+     * @param bool $overwrite Přepsat existující soubor
+     * @return bool True pokud byl soubor zapsán
+     */
+    public function publishProtected(string $source, string $target, bool $overwrite = false): bool
+    {
+        if (!file_exists($source)) {
+            throw new \RuntimeException("Source file not found: {$source}");
+        }
+
+        if (!$overwrite && file_exists($target)) {
+            $this->published[] = ['source' => $source, 'target' => $target, 'skipped' => true];
+            return false;
+        }
+
+        $jsonContent = file_get_contents($source);
+        if ($jsonContent === false) {
+            throw new \RuntimeException("Cannot read source file: {$source}");
+        }
+
+        // Pokud zdroj již obsahuje guard (re-publish), extrahuj čistý JSON
+        $jsonContent = JsonGuard::strip($jsonContent);
+
+        JsonGuard::writeProtected($target, $jsonContent);
+        $this->published[] = ['source' => $source, 'target' => $target, 'skipped' => false];
+        return true;
     }
 
     /** @return list<array{source: string, target: string, skipped: bool}> */

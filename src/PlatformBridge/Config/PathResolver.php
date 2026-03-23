@@ -339,10 +339,20 @@ final class PathResolver
 
     /**
      * Vrací cestu k souboru platformbridge.json v kořeni hostitelské aplikace.
+     * Toto je starý nechráněný formát – používá se pro detekci migrace.
      */
     public function userInstallerConfigFile(): string
     {
         return $this->projectRoot . '/' . InstallerConfig::CONFIG_FILE;
+    }
+
+    /**
+     * Vrací cestu k chráněnému souboru platformbridge.json.php v kořeni hostitelské aplikace.
+     * Toto je preferovaný formát s PHP exit guardem proti webovému přístupu.
+     */
+    public function userInstallerConfigFileProtected(): string
+    {
+        return $this->projectRoot . '/' . InstallerConfig::CONFIG_FILE_PROTECTED;
     }
 
     private function hasJsonFiles(string $dir): bool
