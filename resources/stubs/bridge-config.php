@@ -19,15 +19,10 @@ if (!defined('BRIDGE_BOOTSTRAPPED')) {
     die('Access denied.');
 }
 
-$isHttps  = !empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off';
-$protocol = $isHttps ? 'https' : 'http';
-$host     = $_SERVER['HTTP_HOST'] ?? 'localhost';
-$baseHost = "{$protocol}://{$host}";
-
 return [
     // ─── AI Provider ────────────────────────────────────────────
     // API klíč pro autentizaci vůči AI provideru
-    'api_key'     => '5bb61ad879da490705dd959e4cbc3fa6675990e2016b65bc50b695a4f7c4f63a',
+    'api_key'     => 'CHANGE-ME-your-api-key-here',
 
     // Timeout HTTP požadavku na AI v sekundách
     'timeout'     => 30,
@@ -36,7 +31,69 @@ return [
     'max_retries' => 3,
 
     // URL AI API endpointu, kam se odesílají AJAX požadavky
-    'base_url'    => $baseHost . '/ai/TEST/',
-    // 'base_url'    => 'https://api.virtualzoom.com/v2/AI/',
-	// 'base_url'    => $baseHost . '/Test/vendor/zoom/platform-bridge/src/PlatformBridge/AI/TEST/',
+    // Nastavte na konkrétní URL vašeho prostředí (nedoporučuje se dynamická detekce z $_SERVER)
+    'base_url'    => 'https://your-domain.com/platformbridge/api.php',
+
+    // ─── Endpointy ──────────────────────────────────────────────
+    // Registrace vlastních AI endpointů.
+    //
+    // K dispozici jsou 3 úrovně konfigurace — od nejjednodušší po nejflexibilnější:
+    //
+    // ── Úroveň 1: Deklarativní pole (doporučeno pro většinu případů) ──
+    //
+    // Povinné klíče:
+    //   generator_id    (string|null) — ID generátoru v generators.json
+    //   response_type   (string)      — Typ odpovědi: 'string' | 'array' | 'nested'
+    //   template        (string)      — Cesta k šabloně pro renderování
+    //
+    // Volitelné klíče:
+    //   variant_key     (string|null) — Klíč ve vstupu pro detekci varianty
+    //   variants        (array)       — Deklarativní pravidla dle varianty:
+    //       'remove_fields' => ['pole_k_odstraneni'],
+    //       'keep_fields'   => ['pole_k_ponechani'],
+    //       'defaults'      => ['pole' => 'výchozí_hodnota'],
+    //
+    // Příklad:
+    //   'CreateSubject' => [
+    //       'generator_id'  => 'subject',
+    //       'response_type' => 'nested',
+    //       'template'      => '/Components/NestedResult',
+    //       'variant_key'   => 'type',
+    //       'variants'      => [
+    //           'template' => ['remove_fields' => ['topic_source']],
+    //           'custom'   => ['remove_fields' => ['template_id', 'topic_source']],
+    //       ],
+    //   ],
+    //
+    // ── Úroveň 2: Callable transform (pro složitější logiku transformace) ──
+    //
+    // Přidejte klíč 'transform' s callable — má NEJVYŠŠÍ prioritu (přepíše 'variants').
+    // Funguje stejně jako dřívější metoda transformInput() — můžete ohýbat výstup libovolně.
+    //
+    // Příklad:
+    //   'CreateSubject' => [
+    //       'generator_id'  => 'subject',
+    //       'response_type' => 'nested',
+    //       'template'      => '/Components/NestedResult',
+    //       'variant_key'   => 'type',
+    //       'transform'     => function(array $input, mixed ...$context): array {
+    //           $variant = $context[0] ?? null;  // 'template', 'custom', ...
+    //           if ($variant === 'template') {
+    //               unset($input['topic_source']);
+    //               $input['mode'] = 'guided';
+    //           }
+    //           return $input;
+    //       },
+    //   ],
+    //
+    // ── Úroveň 3: Vlastní třída (maximum flexibility) ──
+    //
+    // Pro pokročilé případy — vlastní třída dědící z EndpointDefinition.
+    // Umožňuje vytvářet libovolné metody (transformTemplateVariant, transformCustomVariant atd.)
+    // a plně kontrolovat chování endpointu.
+    //
+    // Příklad:
+    //   'CreateSubject' => \App\Endpoints\CreateSubjectEndpoint::class,
+    //
+    'endpoints' => [],
 ];

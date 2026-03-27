@@ -24,7 +24,7 @@ $bridge = PlatformBridge::create()
     // Pro standalone režim: explicitní cesty ke konfiguraci
     // Ve vendor režimu se cesty resolví automaticky přes PathResolver
     ->withConfigPath(__DIR__ . '/resources/defaults')
-    ->withViewsPath(__DIR__ . '/resources/views')
+    // ->withViewsPath(__DIR__ . '/resources/views')
     // ->withLocale('cs');
     // HMAC podepisování - zapnout/vypnout (secret key se načítá z bridge-config.php)
     ->withSecretKey(true)

@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Zoom\PlatformBridge\Installer;
+namespace Zoom\PlatformBridge\Installer\Publisher;
 
 use Zoom\PlatformBridge\Security\JsonGuard;
 
@@ -96,6 +96,54 @@ final class StubPublisher
         $jsonContent = JsonGuard::strip($jsonContent);
 
         JsonGuard::writeProtected($target, $jsonContent);
+        $this->published[] = ['source' => $source, 'target' => $target, 'skipped' => false];
+        return true;
+    }
+
+    /**
+     * Publikuje soubor s nahrazením placeholderů v obsahu.
+     *
+     * Čte zdrojový soubor, provede str_replace na zadaných párech
+     * a zapíše výsledek do cíle. Skip logika je stejná jako u publish().
+     *
+     * @param string               $source       Zdrojový stub soubor
+     * @param string               $target       Cílový soubor
+     * @param array<string,string>  $replacements Mapa placeholder → hodnota
+     * @param bool                  $overwrite    Přepsat existující soubor
+     * @return bool True pokud byl soubor zapsán
+     */
+    public function publishWithReplacements(
+        string $source,
+        string $target,
+        array $replacements,
+        bool $overwrite = false,
+    ): bool {
+        if (!file_exists($source)) {
+            throw new \RuntimeException("Source file not found: {$source}");
+        }
+
+        if (!$overwrite && file_exists($target)) {
+            $this->published[] = ['source' => $source, 'target' => $target, 'skipped' => true];
+            return false;
+        }
+
+        $content = file_get_contents($source);
+        if ($content === false) {
+            throw new \RuntimeException("Cannot read source file: {$source}");
+        }
+
+        $content = str_replace(
+            array_keys($replacements),
+            array_values($replacements),
+            $content,
+        );
+
+        $dir = dirname($target);
+        if (!is_dir($dir)) {
+            mkdir($dir, 0755, true);
+        }
+
+        file_put_contents($target, $content);
         $this->published[] = ['source' => $source, 'target' => $target, 'skipped' => false];
         return true;
     }

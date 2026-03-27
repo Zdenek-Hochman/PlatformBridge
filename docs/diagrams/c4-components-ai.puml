@@ -10,9 +10,9 @@ Container_Boundary(apiHandlerBound, "HTTP API Handler (ApiHandler.php)") {
 }
 
 Container_Boundary(aiSys, "AI Layer") {
-    Component(endpointRegistry, "EndpointRegistry", "class (singleton)", "Registr EndpointDefinition instancí.\nLazy-load přes registerClass.\nVýchozí: CreateSubjectEndpoint.")
+    Component(endpointRegistry, "EndpointRegistry", "class (singleton)", "Registr EndpointDefinition instancí.\nLazy-load přes registerClass.\nEndpointy se registrují z bridge-config.php.")
     Component(endpointDef, "EndpointDefinition", "abstract class", "Abstrakce AI endpointu.\nDefines: getEndpoint(), getResponseType(),\ngetTemplate(), createRequest(),\ndetectVariant(), transformInput().")
-    Component(createSubject, "CreateSubjectEndpoint", "extends EndpointDefinition", "Implementace pro endpoint\n'CreateSubject'.\nPodporuje varianty: template / custom.\nResponse: RESPONSE_NESTED.")
+    Component(userEndpoint, "Uživatelský Endpoint", "extends EndpointDefinition", "Implementace vytvořená uživatelem\nmimo vendor. Registrována\nv bridge-config.php → endpoints.")
     Component(aiRequest, "AiRequest", "class", "Fluent builder HTTP požadavku.\nMetoda, endpoint, prompt,\nquery params, hlavičky.")
     Component(aiClient, "AiClient", "class", "Odesílá HTTP požadavky přes cURL.\nRetry logika (max 3 pokusy).\nHází AiException při chybě.")
     Component(aiClientConfig, "AiClientConfig", "class", "Konfigurace AI klienta:\nAPI klíč, base URL, timeouty,\nSSL verifikace, debug mode.")
@@ -44,8 +44,8 @@ Rel(apiHandler, aiResponseRenderer, "8. Renderuje HTML", "AiResponseRenderer::cr
 
 ' EndpointRegistry
 Rel(endpointRegistry, endpointDef, "Spravuje a vrací instance")
-Rel(endpointRegistry, createSubject, "Výchozí registrace")
-Rel(createSubject, endpointDef, "Rozšiřuje")
+Rel(endpointRegistry, userEndpoint, "Registrace z bridge-config.php")
+Rel(userEndpoint, endpointDef, "Rozšiřuje")
 
 ' Request building
 Rel(endpointDef, aiRequest, "6. Sestaví přes", "EndpointDefinition::createRequest()")

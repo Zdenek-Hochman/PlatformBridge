@@ -108,20 +108,20 @@ export class MessageRenderer {
 		const timer = this.timers.get(el);
 		if (timer) {
 			clearTimeout(timer);
-			this.timers.delete(el);
+			// this.timers.delete(el);
 		}
 
 		// Trigger leaving animation
-		el.classList.add(NOTIFICATION.LEAVING);
+		// el.classList.add(NOTIFICATION.LEAVING);
 
 		const remove = () => {
-			el.remove();
-			this.active = this.active.filter(n => n !== el);
+			// el.remove();
+			// this.active = this.active.filter(n => n !== el);
 		};
 
-		el.addEventListener('animationend', remove, { once: true });
+		// el.addEventListener('animationend', remove, { once: true });
 		// Fallback pokud animace nefiruje (display:none, reduced-motion…)
-		setTimeout(remove, 500);
+		// setTimeout(remove, 500);
 	}
 
 	/**
@@ -129,7 +129,7 @@ export class MessageRenderer {
 	 */
 	clear(): void {
 		for (const el of [...this.active]) {
-			this.dismiss(el);
+			// this.dismiss(el);
 		}
 	}
 
@@ -163,7 +163,7 @@ export class MessageRenderer {
 	private enforceLimit(): void {
 		while (this.active.length >= this.options.maxVisible) {
 			const oldest = this.active[0];
-			if (oldest) this.dismiss(oldest);
+			// if (oldest) this.dismiss(oldest);
 		}
 	}
 

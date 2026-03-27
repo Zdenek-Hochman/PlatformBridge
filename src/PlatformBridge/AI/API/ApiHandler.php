@@ -13,7 +13,8 @@ use Zoom\PlatformBridge\AI\AiResponseRenderer;
 use Zoom\PlatformBridge\Config\ConfigLoader;
 use Zoom\PlatformBridge\Config\ConfigManager;
 use Zoom\PlatformBridge\Config\ConfigValidator;
-use Zoom\PlatformBridge\Config\PathResolver;
+use Zoom\PlatformBridge\Paths\PathResolver;
+use Zoom\PlatformBridge\Paths\PathResolverFactory;
 use Zoom\PlatformBridge\Security\SecurityException;
 use Zoom\PlatformBridge\Security\SignedParams;
 
@@ -36,18 +37,35 @@ final class ApiHandler
     private function __construct(
         private readonly string $configPath,
         private readonly string $securityConfigPath,
+        private PathResolver $paths,
     ) {
         $this->config = $this->loadConfig($this->configPath, 'Bridge');
         $this->securityConfig = $this->loadConfig($this->securityConfigPath, 'Security');
+		$this->paths = $paths;
+
+		// Registrace uživatelských endpointů z bridge-config.php
+		$this->registerUserEndpoints();
     }
 
-    /**
-     * Tovární metoda s explicitními cestami.
-     */
-    public static function create(string $configPath, string $securityConfigPath): self
+	public function getPathResolver(): PathResolver
     {
-        return new self($configPath, $securityConfigPath);
+        return $this->paths;
     }
+
+	/**
+	 * Registruje uživatelské endpointy z bridge-config.php ('endpoints' klíč).
+	 *
+	 * Voláno automaticky při konstrukci ApiHandleru.
+	 * Pokud klíč 'endpoints' chybí nebo je prázdné pole, registrace se přeskočí.
+	 */
+	private function registerUserEndpoints(): void
+	{
+		$endpoints = $this->config['endpoints'] ?? [];
+
+		if (!empty($endpoints) && is_array($endpoints)) {
+			EndpointRegistry::getInstance()->registerFromConfig($endpoints);
+		}
+	}
 
     /**
      * Inicializační metoda pro automatickou detekci cest ke konfiguračním souborům.
@@ -56,16 +74,16 @@ final class ApiHandler
      */
     public static function bootstrap(): self
     {
-        $paths = new PathResolver();
+        $paths = PathResolverFactory::auto(dirname(__DIR__, 4));
 
         if (!defined('BRIDGE_BOOTSTRAPPED')) {
             define('BRIDGE_BOOTSTRAPPED', true);
         }
 
-        $configPath = $paths->resolvedBridgeConfigFile();
-        $securityConfigPath = $paths->resolvedSecurityConfigFile();
+        $configPath = $paths->bridgeConfigFile();
+        $securityConfigPath = $paths->securityConfigFile();
 
-        return new self($configPath, $securityConfigPath);
+        return new self($configPath, $securityConfigPath, $paths);
     }
 
     /**
@@ -156,10 +174,11 @@ final class ApiHandler
     {
         $name = $params['config']['endpoint'] ?? throw AiException::invalidRequest('Chybí název endpointu v konfiguraci.');
 
-        $paths = new PathResolver();
+        $configPath = $params['config']['config_path'] ?? $this->getPathResolver()->configPath();
+
         $loader = new ConfigLoader(
-            $paths->userConfigPath(),
-            $paths->packageDefaultsPath(),
+            $configPath,
+            $this->getPathResolver(),
             new ConfigValidator(),
         );
 
@@ -219,7 +238,7 @@ final class ApiHandler
     {
         $parsed = $endpoint->parseResponse($response->getResponse());
 
-        $html = AiResponseRenderer::create()->render(
+        $html = AiResponseRenderer::create($this->getPathResolver(), [])->render(
             $parsed,
             $endpoint->getActiveTemplate(),
             [

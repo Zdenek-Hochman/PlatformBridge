@@ -10,7 +10,7 @@ participant "ApiHandler.php" as api
 participant "ConfigManager" as cm
 participant "SignedParams" as sp
 participant "EndpointRegistry" as er
-participant "CreateSubjectEndpoint\n(EndpointDefinition)" as ep
+participant "UserEndpoint\n(EndpointDefinition)" as ep
 participant "AiRequest" as req
 participant "AiClient" as client
 participant "AiClientConfig" as clientCfg
@@ -42,7 +42,7 @@ deactivate sp
 
 api -> er : 5. EndpointRegistry::getInstance()\n   ->getOrFail($action)
 activate er
-er -> er : Lazy-load: new CreateSubjectEndpoint()
+er -> er : Lazy-load: new UserEndpoint()\n(z bridge-config.php endpoints)
 er -> ep : setConfigManager($configManager)
 er --> api : $endpoint
 deactivate er

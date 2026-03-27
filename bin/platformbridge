@@ -2,85 +2,52 @@
 <?php
 
 /**
- * PlatformBridge CLI
+ * PlatformBridge CLI – Installer & Updater
  *
- * Instalace a aktualizace assetů a konfigurace (vendor-only).
- * V standalone/dev režimu instalace není potřeba – vše se čte přímo ze zdrojových složek.
+ * Tento soubor se spouští výhradně jako vendor binary přes Composer:
+ *   vendor/zoom/platform-bridge/bin/platformbridge
  *
- * Usage:
- *   php vendor/bin/platformbridge init                   - Vygeneruj platformbridge.json (před install)
- *   php vendor/bin/platformbridge install [options]      - Kompletní instalace
- *   php vendor/bin/platformbridge update [options]       - Aktualizace assetů a API
- *   php vendor/bin/platformbridge publish:config         - Publikuje bridge-config.php
- *   php vendor/bin/platformbridge publish:security-config - Publikuje security-config.php
- *   php vendor/bin/platformbridge publish:json           - Publikuje JSON soubory
- *
- * Options:
- *   --force           Přepíše i existující konfigurační soubory
- *   --vendor          Vynutí vendor režim (obejde autodetekci složkové struktury)
- *   --only=<kroky>    Spustí jen vybrané kroky (čárkou oddělené):
- *                       init, dirs, assets, api, config, security, json, cache
- *
- * Examples:
- *   php vendor/bin/platformbridge init                     - Vygeneruj konfiguraci cest
- *   php vendor/bin/platformbridge init --vendor            - Vygeneruj konfiguraci (CI/CD)
- *   php vendor/bin/platformbridge install                  - Nainstaluje vše
- *   php vendor/bin/platformbridge install --force          - Nainstaluje vše, přepíše konfigurace
- *   php vendor/bin/platformbridge install --only=assets    - Nainstaluje pouze assety
- *   php vendor/bin/platformbridge install --only=config,security - Pouze konfiguraci
- *   php vendor/bin/platformbridge install --vendor         - Vynutí vendor režim (CI/CD)
- *
- * Doporučený workflow:
- *   1. php vendor/bin/platformbridge init       ← Vygeneruj platformbridge.json
- *   2. Upravte platformbridge.json (nastavte vlastní cesty)
- *   3. php vendor/bin/platformbridge install    ← Nainstalujte dle konfigurace
- *
- * @see \Zoom\PlatformBridge\Installer\Installer
+ * Cesta k autoloaderu je proto vždy vendor/autoload.php (3× dirname z bin/).
  */
 
-// Detekce autoloaderu - podporuje vendor i standalone režim
-$autoloaderFound = false;
-$autoloadPaths = [
-    __DIR__ . '/../../../autoload.php',          // vendor/zoom/platform-bridge/bin → vendor/autoload.php
-    __DIR__ . '/../vendor/autoload.php',         // standalone: bin → vendor/autoload.php
-];
+// ─── Autoloader ──────────────────────────────────────────────
 
-foreach ($autoloadPaths as $autoloadPath) {
-    if (file_exists($autoloadPath)) {
-        require_once $autoloadPath;
-        $autoloaderFound = true;
-        break;
-    }
-}
+$autoloadPath = dirname(__DIR__, 3) . '/autoload.php';
 
-if (!$autoloaderFound) {
-    fwrite(STDERR, "Error: Could not find autoload.php. Run 'composer install' first.\n");
+if (!file_exists($autoloadPath)) {
+    fwrite(STDERR, <<<'ERR'
+
+  [ERROR] Nebyl nalezen vendor/autoload.php.
+
+  Tento skript lze spouštět pouze jako Composer vendor binary.
+  Ujistěte se, že jste spustili `composer install` v hostitelském projektu.
+
+ERR);
     exit(1);
 }
 
+require_once $autoloadPath;
+
 use Zoom\PlatformBridge\Installer\Installer;
 
-// Parsování příkazu a CLI argumentů
-$command = $argv[1] ?? null;
-$cliArgs = array_slice($argv, 2); // Argumenty za příkazem (--force, --only=...)
+// ─── Parsování CLI ───────────────────────────────────────────
 
-// Help / žádný příkaz
+$command  = $argv[1] ?? null;
+$cliArgs  = array_slice($argv, 2);
+
 if ($command === null || $command === '--help' || $command === '-h') {
     printUsage();
     exit(0);
 }
+
+// ─── Spuštění příkazu ────────────────────────────────────────
 
 $installer = new Installer();
 $installer->applyCliOptions($cliArgs);
 
 switch ($command) {
     case 'init':
-        $installer->applyCliOptions($cliArgs);
-        $installer->publishInstallerConfig();
-        echo PHP_EOL;
-        echo "  ℹ️  Edit platformbridge.json to configure your paths, then run:" . PHP_EOL;
-        echo "     php vendor/bin/platformbridge install" . PHP_EOL;
-        echo PHP_EOL;
+        $installer->init();
         break;
 
     case 'install':
@@ -91,75 +58,55 @@ switch ($command) {
         $installer->update();
         break;
 
-    case 'publish:config':
-        $installer->applyCliOptions($cliArgs);
-        $installer->publishConfig();
-        break;
-
-    case 'publish:security-config':
-        $installer->applyCliOptions($cliArgs);
-        $installer->publishSecurityConfig();
-        break;
-
-    case 'publish:json':
-        $installer->applyCliOptions($cliArgs);
-        $installer->publishJson();
-        break;
-
     default:
-        fwrite(STDERR, "Unknown command: {$command}\n\n");
+        fwrite(STDERR, "  [ERROR] Neznámý příkaz: {$command}\n\n");
         printUsage();
         exit(1);
 }
 
+// ─── Help ────────────────────────────────────────────────────
+
 function printUsage(): void
 {
     $usage = <<<'USAGE'
-PlatformBridge CLI – Installer & Updater (vendor-only)
+PlatformBridge CLI v1.0
+=======================
 
-Usage:
-  platformbridge <command> [options]
+Instalační a aktualizační nástroj pro PlatformBridge.
+Spouští se výhradně jako Composer vendor binary.
 
-Commands:
-  init                    Generate platformbridge.json config (run before install)
-  install                 Publish assets, API endpoint, config and JSON files
-  update                  Update assets and API endpoint (keeps config)
-  publish:config          Publish bridge-config.php to public/ (API settings)
-  publish:security-config Publish security-config.php to config/ (HMAC keys)
-  publish:json            Publish JSON config files
+Použití:
+  platformbridge <příkaz> [volby]
 
-Options:
-  --force                 Overwrite existing config files (default: skip if exists)
-  --vendor                Force vendor mode (bypass folder-based auto-detection).
-                          Useful in CI/CD (TeamCity) where folder structure differs
-                          from standard Composer layout.
-  --only=<steps>          Run only specific steps (comma-separated):
-                            init, dirs, assets, api, config, security, json, cache
-  --help, -h              Show this help
+Příkazy:
+  init      Inicializace konfiguračního souboru platformbridge.json.php
+            (migrace / publish / přeskočení dle aktuálního stavu)
+  install   Kompletní instalace – init, adresáře, guardy, assety,
+            API endpoint, bridge-config, security-config, cache
+  update    Aktualizace assetů a API endpointu (konfigurace zůstane)
 
-Recommended workflow:
-  1. platformbridge init                  Generate platformbridge.json
-  2. Edit platformbridge.json             Set your custom paths
-  3. platformbridge install               Install using your paths
+Volby:
+  --force          Přepsat i existující konfigurační soubory
+                   (výchozí: přeskočit pokud existují)
+  --only=<kroky>   Spustit jen vybrané kroky (čárkou oddělené):
+                     init, dirs, guard, assets, api, config, security, cache
+  --help, -h       Zobrazit tuto nápovědu
 
-Examples:
-  platformbridge init                           Generate config file
-  platformbridge install                        Full install
-  platformbridge install --force                Full install, overwrite configs
-  platformbridge install --only=assets          Install only JS/CSS assets
-  platformbridge install --only=config,security Install only config files
-  platformbridge install --vendor               Force vendor mode (CI/CD)
+Příklady:
+  platformbridge install                         Kompletní instalace
+  platformbridge install --force                 Instalace s přepsáním konfigurací
+  platformbridge install --only=assets           Pouze publikace JS/CSS assetů
+  platformbridge install --only=config,security  Pouze konfigurační soubory
+  platformbridge init                            Pouze inicializace konfigurace
+  platformbridge update                          Aktualizace assetů + API
 
-Security:
-  platformbridge.json uses JSON format (not PHP) to prevent code injection.
-  All paths are validated against path traversal attacks.
-  Place platformbridge.json in the project root (NOT in public/).
+Kroky (install):
+  init → dirs → guard → assets → api → config → security → cache
 
-Note:
-  In standalone/dev mode, if no platformbridge.json config exists, the installer
-  is not needed – all files are read from source folders. If you create a
-  platformbridge.json with custom paths, the installer will create the directory
-  structure and publish files accordingly.
+Poznámka:
+  Ve standalone/dev režimu není installer potřeba – soubory se čtou
+  přímo ze zdrojových složek. Installer je určen pro vendor režim
+  (instalace přes Composer do hostitelské aplikace).
 USAGE;
 
     echo $usage . PHP_EOL;

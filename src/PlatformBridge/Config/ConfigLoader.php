@@ -5,18 +5,27 @@ declare(strict_types=1);
 namespace Zoom\PlatformBridge\Config;
 
 use Zoom\PlatformBridge\Config\Exception\ConfigException;
+use Zoom\PlatformBridge\Paths\PathResolver;
 use Zoom\PlatformBridge\Security\JsonGuard;
 
 /**
  * Načítá konfigurační JSON soubory pro PlatformBridge.
  *
- * Podporuje fallback mechaniku:
+ * Podporuje fallback mechaniku řízenu přes {@see PathResolver}:
+ *
+ * Vendor režim (balíček nainstalován přes Composer):
  *   1. Uživatelský soubor chráněný (config/platform-bridge/*.json.php)
  *   2. Uživatelský soubor nechráněný (config/platform-bridge/*.json)
- *   3. Package default  (vendor/.../resources/defaults/*.json)
+ *   → Pokud neexistuje → vyhodí výjimku (žádný tichý fallback na defaults).
+ *
+ * Standalone režim (dev/XAMPP):
+ *   1. Uživatelský soubor chráněný (config/platform-bridge/*.json.php)
+ *   2. Uživatelský soubor nechráněný (config/platform-bridge/*.json)
+ *   3. Package default  (resources/defaults/*.json)
  *
  * Strategie: Pokud existuje uživatelský soubor → použij POUZE ten (full override).
- *            Pokud neexistuje → použij package default.
+ *            Pokud neexistuje a je vendor → chyba.
+ *            Pokud neexistuje a je standalone → package default.
  *
  * Bezpečnost:
  *   Chráněné soubory (.json.php) obsahují PHP exit guard, který brání
@@ -29,16 +38,15 @@ final class ConfigLoader
     private const GENERATORS_FILE = 'generators.json';
 
     /**
-     * @param string $userConfigPath     Cesta k uživatelské konfiguraci (může neexistovat)
-     * @param string $packageDefaultsPath Cesta k výchozím JSON souborům balíčku
-     * @param ConfigValidator $validator   Validátor konfigurací
+     * @param string $userConfigPath Cesta k uživatelské konfiguraci (může neexistovat)
+     * @param PathResolver $pathResolver Centrální resolver cest (vendor detekce + package defaults)
+     * @param ConfigValidator $validator Validátor konfigurací
      */
     public function __construct(
         private readonly string $userConfigPath,
-        private readonly string $packageDefaultsPath,
+        private readonly PathResolver $pathResolver,
         private readonly ConfigValidator $validator,
-    ) {
-    }
+    ) {}
 
     /**
      * Načte a zvaliduje všechny konfigurační soubory.
@@ -67,77 +75,55 @@ final class ConfigLoader
             'layouts' => $layouts,
             'generators' => $generators,
         ];
+
     }
 
-    /**
-     * Načte a zparsuje JSON soubor s fallbackem.
-     *
-     * Priorita:
-     *   1. Uživatelský soubor chráněný (userConfigPath/filename.php)
-     *   2. Uživatelský soubor nechráněný (userConfigPath/filename)
-     *   3. Package default (packageDefaultsPath/filename)
-     *
-     * @param string $filename Název souboru k načtení (např. blocks.json)
-     *
-     * @return array Parsovaná data z JSON souboru
-     *
-     * @throws ConfigException Pokud soubor neexistuje ani ve fallbacku
-     */
     private function loadJsonFile(string $filename): array
     {
-        // 1. User override – chráněný formát (.json.php)
-        $protectedFilename = JsonGuard::protectedFilename($filename);
-        $userProtected = $this->userConfigPath . DIRECTORY_SEPARATOR . $protectedFilename;
-        if (file_exists($userProtected)) {
-            return $this->parseJsonFile($userProtected, $filename);
-        }
+		$paths = $this->pathResolver->resolveConfigFiles($this->userConfigPath, $filename);
 
-        // 2. User override – nechráněný formát (.json)
-        $userFile = $this->userConfigPath . DIRECTORY_SEPARATOR . $filename;
-        if (file_exists($userFile)) {
-            return $this->parseJsonFile($userFile, $filename);
-        }
-
-        // 3. Package default
-        $defaultFile = $this->packageDefaultsPath . DIRECTORY_SEPARATOR . $filename;
-        if (file_exists($defaultFile)) {
-            return $this->parseJsonFile($defaultFile, $filename);
-        }
+		foreach ($paths as $path) {
+			if (file_exists($path)) {
+				return $this->decodeJsonFile($path, $filename);
+			}
+		}
 
         throw ConfigException::fileNotFound($filename);
     }
 
-    /**
-     * Parsuje JSON soubor.
-     *
-     * @param string $path     Absolutní cesta k souboru
-     * @param string $filename Název souboru pro chybové hlášky
-     *
-     * @return array Parsovaná data
-     *
-     * @throws ConfigException
-     */
-    private function parseJsonFile(string $path, string $filename): array
+	/**
+	 * Načte a dekóduje JSON soubor do asociativního pole.
+	 *
+	 * Nejprve načte obsah souboru, odstraní případnou ochrannou PHP hlavičku
+	 * ({@see JsonGuard}), a následně provede dekódování JSON s vyhazováním výjimek.
+	 *
+	 * Ověřuje také, že výsledná struktura je pole (objekt nebo pole v JSON).
+	 *
+	 * @param string $filePath Absolutní cesta k souboru na disku
+	 * @param string $displayName Název souboru pro účely chybových hlášek
+	 * @return array Dekódovaná JSON data jako asociativní pole
+	 *
+	 * @throws ConfigException Pokud soubor nelze načíst, JSON je nevalidní nebo má neočekávanou strukturu
+	 */
+    private function decodeJsonFile(string $filePath, string $displayName): array
     {
-        $content = file_get_contents($path);
-
-        if ($content === false) {
-            throw ConfigException::fileNotFound($path);
+        $raw = file_get_contents($filePath);
+        if ($raw === false) {
+            throw ConfigException::fileNotFound($filePath);
         }
 
-        // Odstraní PHP exit guard pokud je přítomen (.json.php formát)
-        $content = JsonGuard::strip($content);
+        $json = JsonGuard::strip($raw);
 
         try {
-            $data = json_decode($content, true, 512, JSON_THROW_ON_ERROR);
+            $data = json_decode($json, true, 512, JSON_THROW_ON_ERROR);
         } catch (\JsonException $e) {
-            throw ConfigException::invalidJson($path, $e->getMessage());
+            throw ConfigException::invalidJson($filePath, $e->getMessage());
         }
 
         if (!is_array($data)) {
             throw ConfigException::invalidStructure(
-                $filename,
-                "JSON root musí být objekt nebo pole."
+                $displayName,
+                'JSON root musí být objekt nebo pole.'
             );
         }
 

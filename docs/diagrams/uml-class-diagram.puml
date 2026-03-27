@@ -369,20 +369,44 @@ package "Zoom\\PlatformBridge\\AI\\API" #FFD0E8 {
     class EndpointRegistry {
         -{static} instance: self
         -endpoints: array
+        -endpointClasses: array
+        -endpointConfigs: array
         +{static} getInstance(): self
+        +{static} resetInstance(): void
         +registerClass(string, string): void
-        +registerDefaults(): void
+        +registerConfig(string, array): void
+        +registerFromConfig(array): self
         +get(string): ?EndpointDefinition
         +getOrFail(string): EndpointDefinition
+        +getAvailableEndpoints(): array
+        +hasEndpoints(): bool
     }
 
-    class CreateSubjectEndpoint extends EndpointDefinition {
-        +getEndpoint(): string
-        +getGeneratorId(): string
-        +getResponseType(): string
-        +getTemplate(): string
-        +transformInput(array, string): array
+    class ConfigurableEndpoint <<final>> {
+        -name: string
+        -config: array
+        #getEndpoint(): string
+        #getGeneratorId(): ?string
+        #getResponseType(): string
+        #getTemplate(): string
+        #transformInput(array, mixed...): array
+        -applyVariantRules(array, array): array
     }
+
+    EndpointDefinition <|-- ConfigurableEndpoint
+    EndpointRegistry --> ConfigurableEndpoint : creates
+
+    note right of EndpointRegistry
+        Endpointy se definují deklarativně v bridge-config.php:
+        'endpoints' => [
+            'CreateSubject' => [
+                'generator_id'  => 'subject',
+                'response_type' => 'nested',
+                'template'      => '/Components/NestedResult',
+            ],
+        ]
+        Žádné výchozí endpointy. Uživatel je vždy vytváří sám.
+    end note
 }
 
 ' ─────────────────────────────────────────────

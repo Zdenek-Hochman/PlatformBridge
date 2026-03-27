@@ -773,9 +773,8 @@ AI/
 ├── API/
 │   ├── ApiHandler.php     # JSON endpoint handler
 │   ├── SseApiHandler.php  # SSE streaming handler
-│   ├── BaseEndpoint.php   # Abstraktní endpoint
-│   ├── EndpointRegistry.php # Registr endpointů
-│   └── Endpoints/         # Konkrétní endpointy
+│   ├── EndpointDefinition.php # Abstraktní endpoint (uživatel dědí)
+│   └── EndpointRegistry.php # Registr endpointů (z bridge-config.php)
 └── SSE/
     ├── SseStream.php      # SSE output stream
     ├── SseEvent.php       # SSE event value object
@@ -1062,17 +1061,63 @@ $html = $bridge->renderFullForm('subject', [
 
 ### 10. Přidání vlastního endpointu
 
-Vytvořte třídu dědící z `BaseEndpoint` a zaregistrujte v `EndpointRegistry`:
+Endpointy se definují **deklarativně** jako pole v `bridge-config.php` — není potřeba vytvářet vlastní PHP třídy:
 
 ```php
-class MyCustomEndpoint extends BaseEndpoint
-{
-    public function getEndpoint(): string { return 'MyEndpoint'; }
-    public function getResponseType(): string { return 'array'; }
-    public function getTemplate(): string { return '/Components/SingleKeyResult'; }
-    public function getGeneratorId(): string { return 'my-generator'; }
-}
+return [
+    'api_key'   => '...',
+    'base_url'  => '...',
+    'endpoints' => [
+        'CreateSubject' => [
+            'generator_id'  => 'subject',        // ID generátoru v generators.json
+            'response_type' => 'nested',          // 'string' | 'array' | 'nested'
+            'template'      => '/Components/NestedResult',
+            'variant_key'   => 'topic_source',    // Klíč pro detekci varianty (null = bez variant)
+            'variants'      => [                  // Deklarativní pravidla dle varianty
+                'template' => [
+                    'remove_fields' => ['email_topic', 'topic_source'],
+                ],
+                'custom' => [
+                    'remove_fields' => ['template_id', 'topic_source'],
+                ],
+            ],
+        ],
+        'GenerateText' => [
+            'generator_id'  => 'text',
+            'response_type' => 'string',
+            'template'      => '/Components/SingleKeyResult',
+        ],
+    ],
+];
 ```
+
+#### Podporovaná pravidla pro `variants`
+
+| Pravidlo | Typ | Popis |
+|---|---|---|
+| `remove_fields` | `string[]` | Odstraní zadaná pole ze vstupu |
+| `keep_fields` | `string[]` | Ponechá pouze zadaná pole (whitelist) |
+| `defaults` | `array` | Doplní výchozí hodnoty pro chybějící klíče |
+
+#### Vlastní transformační funkce
+
+Pro složitější logiku lze místo `variants` použít callable:
+
+```php
+'CreateSubject' => [
+    'generator_id'  => 'subject',
+    'response_type' => 'nested',
+    'template'      => '/Components/NestedResult',
+    'transform'     => function(array $input, ?string $variant): array {
+        return match ($variant) {
+            'template' => array_diff_key($input, array_flip(['topic_source'])),
+            default    => $input,
+        };
+    },
+],
+```
+
+> **Poznámka:** Deklarativní `variants` a callable `transform` se vzájemně vylučují — `transform` má přednost.
 
 ---
 

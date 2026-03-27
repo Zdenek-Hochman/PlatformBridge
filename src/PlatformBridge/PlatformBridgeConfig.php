@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Zoom\PlatformBridge;
 
-use Zoom\PlatformBridge\Config\PathResolver;
+use Zoom\PlatformBridge\Paths\PathResolver;
 
 /**
  * Konfigurační objekt pro PlatformBridge.
@@ -21,9 +21,9 @@ final class PlatformBridgeConfig
     private ?int $resolvedTtl;
 
     public function __construct(
-        private string $configPath,
-        private string $viewsPath,
-        private string $cachePath,
+        private ?string $configPath,
+        private ?string $viewsPath,
+        private ?string $cachePath,
         private string $assetUrl,
         private string $apiUrl,
         private string $securityConfigPath,
@@ -32,8 +32,103 @@ final class PlatformBridgeConfig
         private ?int $paramsTtl = null,
         private ?PathResolver $pathResolver = null,
     ) {
-        $this->validatePaths();
         [$this->secretKey, $this->resolvedTtl] = $this->loadSecurityConfig();
+    }
+
+	public function getPathResolver(): PathResolver
+	{
+		return $this->pathResolver;
+	}
+
+    /**
+     * Vrátí cestu ke složce s JSON konfigurací (blocks.json, layouts.json, generators.json).
+     *
+     * @return string Absolutní cesta ke složce s konfigurací
+     * @internal
+     */
+    public function getConfigPath(): string
+    {
+		if ($this->configPath !== null) {
+       		 return $this->configPath;
+    	}
+
+        return $this->pathResolver->configPath();
+    }
+
+    /**
+     * Vrátí cestu ke složce se šablonami (views).
+     *
+     * @return string Absolutní cesta k šablonám
+     * @internal
+     */
+    public function getViewsPath(): string
+    {
+		if ($this->viewsPath !== null) {
+       		 return $this->viewsPath;
+    	}
+
+    	return $this->pathResolver->viewsPath();
+    }
+
+    /**
+     * Vrátí cestu ke složce pro cache šablon.
+     *
+     * @return string Absolutní cesta ke cache
+     * @internal
+     */
+    public function getCachePath(): string
+    {
+		if ($this->cachePath !== null) {
+			return $this->cachePath;
+    	}
+
+        return $this->pathResolver->cachePath();
+    }
+
+	/**
+     * Vrátí URL pro načítání assetů (JS/CSS).
+     *
+     * @return string URL k asset složce
+     * @internal Používá AssetManager
+     */
+    public function getAssetUrl(): string
+    {
+        return $this->assetUrl;
+    }
+
+    /**
+     * Vrátí URL k API endpointu.
+     *
+     * @return string URL k API endpointu
+     * @internal
+     */
+    public function getApiUrl(): string
+    {
+        return $this->apiUrl;
+    }
+
+	/**
+     * Vrátí secret key pro HMAC podepisování parametrů.
+     * Načítá se ze security-config.php pokud je HMAC zapnutý.
+     *
+     * @return string|null Tajný klíč nebo null, pokud není nastaven nebo je HMAC vypnutý
+     * @internal
+     */
+    public function getSecretKey(): ?string
+    {
+        return $this->secretKey;
+    }
+
+	/**
+     * Vrátí TTL (time-to-live) pro podepsané parametry v sekundách.
+     * Pokud není nastaveno, parametry nikdy neexpirují.
+     *
+     * @return int|null TTL v sekundách nebo null
+     * @internal
+     */
+    public function getParamsTtl(): ?int
+    {
+        return $this->resolvedTtl;
     }
 
     /**
@@ -94,92 +189,6 @@ final class PlatformBridgeConfig
     }
 
     /**
-     * Validuje existenci potřebných cest (adresáře s konfigurací a šablonami).
-     *
-     * @throws \InvalidArgumentException Pokud některá cesta neexistuje
-     */
-    private function validatePaths(): void
-    {
-        clearstatcache(true, $this->configPath);
-
-        if (!is_dir($this->configPath)) {
-            throw new \InvalidArgumentException("Config path does not exist: {$this->configPath}");
-        }
-
-        clearstatcache(true, $this->viewsPath);
-
-        if (!is_dir($this->viewsPath)) {
-            throw new \InvalidArgumentException("Views path does not exist: {$this->viewsPath}");
-        }
-    }
-
-    /**
-     * Vrátí URL pro načítání assetů (JS/CSS).
-     *
-     * @return string URL k asset složce
-     * @internal Používá AssetManager
-     */
-    public function getAssetUrl(): string
-    {
-        return $this->assetUrl;
-    }
-
-    /**
-     * Vrátí URL k API endpointu.
-     *
-     * @return string URL k API endpointu
-     * @internal
-     */
-    public function getApiUrl(): string
-    {
-        return $this->apiUrl;
-    }
-
-    /**
-     * Vrátí cestu ke složce s JSON konfigurací (blocks.json, layouts.json, generators.json).
-     *
-     * @return string Absolutní cesta ke složce s konfigurací
-     * @internal
-     */
-    public function getConfigPath(): string
-    {
-        return $this->configPath;
-    }
-
-    /**
-     * Vrátí cestu ke složce se šablonami (views).
-     *
-     * @return string Absolutní cesta k šablonám
-     * @internal
-     */
-    public function getViewsPath(): string
-    {
-        return $this->viewsPath;
-    }
-
-    /**
-     * Vrátí cestu ke složce pro cache šablon.
-     *
-     * @return string Absolutní cesta ke cache
-     * @internal
-     */
-    public function getCachePath(): string
-    {
-        return $this->cachePath;
-    }
-
-    /**
-     * Vrátí instanci PathResolver pro centrální resolverování cest.
-     *
-     * @return PathResolver Instance resolveru cest
-     * @internal
-     */
-    public function getPathResolver(): PathResolver
-    {
-        return $this->pathResolver ??= new PathResolver(dirname(__DIR__, 2));
-    }
-
-    /**
      * Vrátí aktuální nastavenou lokalizaci (jazyk).
      *
      * @return string Kód jazyka (např. "cs_CZ")
@@ -189,30 +198,6 @@ final class PlatformBridgeConfig
     // {
     //     return $this->locale;
     // }
-
-    /**
-     * Vrátí secret key pro HMAC podepisování parametrů.
-     * Načítá se ze security-config.php pokud je HMAC zapnutý.
-     *
-     * @return string|null Tajný klíč nebo null, pokud není nastaven nebo je HMAC vypnutý
-     * @internal
-     */
-    public function getSecretKey(): ?string
-    {
-        return $this->secretKey;
-    }
-
-    /**
-     * Vrátí TTL (time-to-live) pro podepsané parametry v sekundách.
-     * Pokud není nastaveno, parametry nikdy neexpirují.
-     *
-     * @return int|null TTL v sekundách nebo null
-     * @internal
-     */
-    public function getParamsTtl(): ?int
-    {
-        return $this->resolvedTtl;
-    }
 
     /**
      * Vrátí konfiguraci handlerů pro formulářová pole.

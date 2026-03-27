@@ -4,50 +4,49 @@ declare(strict_types=1);
 
 namespace Zoom\PlatformBridge\Installer;
 
-use Zoom\PlatformBridge\Config\PathResolver;
-use Zoom\PlatformBridge\Config\InstallerConfig;
-use Zoom\PlatformBridge\Security\JsonGuard;
+use Zoom\PlatformBridge\Paths\PathResolverFactory;
+use Zoom\PlatformBridge\Paths\PathResolver;
+use Zoom\PlatformBridge\Paths\PathsConfig;
+
+use Zoom\PlatformBridge\Installer\Publisher\StubPublisher;
+use Zoom\PlatformBridge\Installer\Provisioners\ConfigProvisioner;
+use Zoom\PlatformBridge\Installer\Provisioners\ProvisionResult;
+use Zoom\PlatformBridge\Installer\Provisioners\FileProvisioner;
+use Zoom\PlatformBridge\Installer\Provisioners\AssetProvisioner;
+use Zoom\PlatformBridge\Installer\Provisioners\DirectoryProvisioner;
 
 /**
- * Instalátor PlatformBridge balíčku (vendor-only).
+ * Orchestrátor instalačních kroků PlatformBridge.
  *
- * Zajišťuje publikování assetů (JS/CSS), API endpointu a konfigurace
- * do hostující aplikace. Funguje POUZE ve vendor režimu – v standalone/dev
- * režimu není instalace potřeba, vše se čte přímo ze zdrojových složek.
+ * Installer sám neobsahuje žádnou publish/guard/directory logiku –
+ * deleguje ji na specializované provisioner třídy:
  *
- * Konfigurace cest:
- *   Pokud v kořeni hostitelské aplikace existuje soubor platformbridge.json,
- *   Installer z něj načte uživatelské cesty (kam instalovat assety, config apod.).
- *   Pokud soubor neexistuje, použijou se výchozí hardcodované cesty.
+ *   - {@see ConfigProvisioner}    → init step (platformbridge.json.php lifecycle)
+ *   - {@see DirectoryProvisioner} → dirs, guard, cache steps
+ *   - {@see AssetProvisioner}     → assets step
+ *   - {@see FileProvisioner}      → api, config, security steps
  *
- * Bezpečnost:
- *   Konfigurační soubor je JSON (ne PHP), takže nemůže obsahovat spustitelný kód.
- *   Cesty jsou validovány proti path traversal v InstallerConfig.
+ * Každý provisioner vrací typované výsledky ({@see ProvisionResult}, {@see PublishResult}),
+ * Installer je pouze formátuje do CLI výstupu.
  *
- * Použití:
- *   - CLI: php vendor/bin/platformbridge install [--force] [--only=assets,config,...]
- *   - Programově: (new Installer())->install()
- *
- * CLI parametry:
- *   --force           Přepíše i existující konfigurační soubory
- *   --vendor          Vynutí vendor režim (obejde autodetekci podle složkové struktury).
- *                     Užitečné v CI/CD (TeamCity), kde složková struktura neodpovídá
- *                     standardní Composer instalaci.
- *   --only=<kroky>    Spustí jen vybrané kroky (čárkou oddělené):
- *                       init, assets, api, config, security, cache
- *
- * @see InstallerConfig
+ * Kroky: init → dirs → guard → assets → api → config → security → cache
  */
 final class Installer
 {
     private PathResolver $paths;
+
+    // ─── Provisioners ────────────────────────────────────────
+
     private StubPublisher $publisher;
+    private ConfigProvisioner $configProvisioner;
+    private FileProvisioner $fileProvisioner;
+    private AssetProvisioner $assetProvisioner;
+    private DirectoryProvisioner $directoryProvisioner;
+
+    // ─── Options ─────────────────────────────────────────────
 
     /** Přepsat i existující konfigurační soubory */
     private bool $force = false;
-
-    /** Vynutit vendor režim (obejde autodetekci) */
-    private ?bool $forceVendor = null;
 
     /** Pokud neprázdné, spustí jen vybrané kroky */
     private array $only = [];
@@ -55,11 +54,11 @@ final class Installer
     /** @var list<string> Povolené názvy kroků pro --only */
     private const ALLOWED_STEPS = ['init', 'dirs', 'assets', 'api', 'config', 'security', 'cache', 'guard'];
 
-    public function __construct(?string $packageRoot = null, ?bool $forceVendor = null)
+    public function __construct(?string $packageRoot = null)
     {
-        $this->forceVendor = $forceVendor;
-        $this->paths = new PathResolver($packageRoot, $forceVendor);
+        $this->paths = PathResolverFactory::auto($packageRoot ?? self::detectPackageRoot());
         $this->publisher = new StubPublisher();
+        $this->buildProvisioners();
     }
 
     // ─── CLI options ─────────────────────────────────────────
@@ -67,32 +66,19 @@ final class Installer
     /**
      * Nastaví --force (přepíše i existující konfigurační soubory).
      */
-    public function setForce(bool $force): self
+    private function setForce(bool $force): self
     {
         $this->force = $force;
         return $this;
     }
 
     /**
-     * Vynutí vendor režim bez ohledu na autodetekci složkové struktury.
-     * Užitečné v CI/CD prostředích (TeamCity), kde složková struktura
-     * neodpovídá standardní Composer instalaci a autodetekce selhává.
-     */
-    public function setVendorMode(bool $vendor): self
-    {
-        $this->forceVendor = $vendor;
-        // Přebuduj PathResolver s novým nastavením
-        $this->paths = new PathResolver($this->paths->packageRoot(), $vendor);
-        return $this;
-    }
-
-    /**
      * Nastaví --only filtr (spustí jen vybrané kroky).
      *
-     * @param list<string> $steps Názvy kroků: assets, api, config, security, json, cache
+     * @param list<string> $steps Názvy kroků
      * @throws \InvalidArgumentException Pokud obsahuje neplatný krok
      */
-    public function setOnly(array $steps): self
+    private function setOnly(array $steps): self
     {
         $invalid = array_diff($steps, self::ALLOWED_STEPS);
         if ($invalid !== []) {
@@ -101,6 +87,7 @@ final class Installer
                 . '. Allowed: ' . implode(', ', self::ALLOWED_STEPS)
             );
         }
+
         $this->only = $steps;
         return $this;
     }
@@ -108,18 +95,13 @@ final class Installer
     /**
      * Parsuje CLI argumenty z $argv a nastaví příslušné options.
      *
-     * @param list<string> $argv Argumenty příkazové řádky (bez názvu skriptu a příkazu)
+     * @param list<string> $argv Argumenty příkazové řádky
      */
     public function applyCliOptions(array $argv): self
     {
         foreach ($argv as $arg) {
             if ($arg === '--force') {
                 $this->setForce(true);
-                continue;
-            }
-
-            if ($arg === '--vendor') {
-                $this->setVendorMode(true);
                 continue;
             }
 
@@ -134,18 +116,10 @@ final class Installer
         return $this;
     }
 
-    // ─── Install / Update ────────────────────────────────────
+    // ─── Install ─────────────────────────────────────────────
 
     /**
-     * Kompletní instalace – adresářová struktura + assety + API + konfigurace.
-     * Konfigurace se NEPŘEPÍŠE pokud existuje (pokud není --force).
-     *
-     * Funguje v obou režimech:
-     *   - Vendor: balíček v vendor/zoom/platform-bridge/, deploy do hostující aplikace
-     *   - Standalone: balíček jako root projekt, deploy dle platformbridge.json
-     *
-     * Krok 'init' vždy nejdříve publikuje platformbridge.json do kořene projektu
-     * (pokud neexistuje), aby následující kroky měly k dispozici konfiguraci cest.
+     * Kompletní instalace – konfigurace, adresáře, assety, soubory.
      *
      * Kroky: init → dirs → guard → assets → api → config → security → cache
      */
@@ -154,335 +128,181 @@ final class Installer
         $this->info("PlatformBridge Installer");
         $this->info("========================");
 
-        $mode = $this->paths->isVendor() ? 'vendor' : 'standalone';
-        $this->info("Mode: {$mode}");
-
         if ($this->force) {
             $this->info("Flag: --force (overwrite configs)");
         }
+
         if ($this->only !== []) {
             $this->info("Flag: --only=" . implode(',', $this->only));
         }
 
-        // Vypiš zdroj konfigurace cest
-        $installerConfig = $this->paths->installerConfig();
-        if ($installerConfig->hasCustomConfig()) {
-            $protLabel = $installerConfig->isProtected() ? ' (chráněný)' : ' (⚠️ nechráněný!)';
-            $this->info("Config: " . InstallerConfig::CONFIG_FILE_PROTECTED . $protLabel);
-        } else {
-            $this->info("Config: výchozí cesty (" . InstallerConfig::CONFIG_FILE_PROTECTED . " zatím nenalezen)");
-        }
         $this->info("");
 
-        // 1. Publikuj platformbridge.json.php (konfigurační mapa cest).
-        //    Po publikování se znovu načte InstallerConfig, aby následující
-        //    kroky pracovaly s cestami zvolenými uživatelem.
-        $this->runStep('init', $this->publishInstallerConfig(...));
+        // 1. Zajisti konfigurační soubor (migrace / publish / skip)
+        $this->runStep('init', $this->stepInit(...));
 
-        // 2. Vytvoř adresářovou strukturu + publikuj soubory
-        $this->runStep('dirs', $this->ensureDirectoryStructure(...));
-        $this->runStep('guard', $this->publishDirectoryGuards(...));
-        $this->runStep('assets', $this->publishAssets(...));
-        $this->runStep('api', $this->publishApiEndpoint(...));
-        $this->runStep('config', $this->publishConfig(...));
-        $this->runStep('security', $this->publishSecurityConfig(...));
-        $this->runStep('cache', $this->ensureCacheDir(...));
+        // 2. Vytvoř adresářovou strukturu
+        $this->runStep('dirs', $this->stepDirs(...));
+
+        // 3. Publikuj ochranné guardy
+        $this->runStep('guard', $this->stepGuards(...));
+
+        // 4. Publikuj assety
+        $this->runStep('assets', $this->stepAssets(...));
+
+        // 5. Publikuj API endpoint
+        $this->runStep('api', $this->stepFile('api'));
+
+        // 6. Publikuj bridge config
+        $this->runStep('config', $this->stepFile('config'));
+
+        // 7. Publikuj security config
+        $this->runStep('security', $this->stepFile('security'));
+
+        // 8. Zajisti cache adresář
+        $this->runStep('cache', $this->stepCache(...));
 
         $this->info("\n✅ PlatformBridge installed successfully!");
     }
 
-    /**
-     * Update – přepíše assety a API, ale NE konfiguraci a JSON.
-     * Vyžaduje předchozí install (platformbridge.json musí existovat).
-     */
-    public function update(): void
-    {
-        $this->info("PlatformBridge Updater");
-        $this->info("======================");
-
-        if (!$this->paths->installerConfig()->hasCustomConfig()) {
-            $this->info("");
-            $this->info("  ⚠️  Soubor " . InstallerConfig::CONFIG_FILE_PROTECTED . " nenalezen.");
-            $this->info("     Nejprve spusťte install pro vytvoření konfigurace:");
-            $this->info("       php vendor/bin/platformbridge install");
-            $this->info("");
-            return;
-        }
-
-        $mode = $this->paths->isVendor() ? 'vendor' : 'standalone';
-        $this->info("Mode: {$mode}");
+	public function update(): void {
+		$this->info("PlatformBridge Updater");
+        $this->info("========================");
         $this->info("");
 
-        $this->runStep('assets', $this->publishAssets(...));
-        $this->runStep('api', $this->publishApiEndpoint(...));
+        // 1. Publikuj assety
+        $this->runStep('assets', $this->stepAssets(...));
 
-        $this->info("\n✅ PlatformBridge updated!");
-    }
+        // 2. Publikuj API endpoint
+        $this->runStep('api', $this->stepFile('api'));
+	}
 
-    // ─── Publish kroky ───────────────────────────────────────
+	public function init() {
+		$this->info("PlatformBridge Init");
+        $this->info("========================");
+        $this->info("");
+
+        $this->runStep('init', $this->stepInit(...));
+	}
+
+    // ─── Step implementations ────────────────────────────────
+    //
+    // Každá metoda pouze deleguje na provisioner a vypisuje výsledek.
+    // Žádná publish/guard/directory logika zde nepatří.
 
     /**
-     * Publikuje platformbridge.json.php (chráněná konfigurační mapa cest) do kořene hostitelské aplikace.
+     * Init step: provisioning konfiguračního souboru platformbridge.json.php.
      *
-     * ⚠️  Tento soubor je uživatelem spravovaný – --force ho NIKDY nepřepíše.
-     * Uživatel v něm mění cesty; přepsání výchozím stubem by jeho změny zničilo.
-     * Soubor se publikuje POUZE pokud ještě neexistuje.
-     *
-     * Bezpečnost:
-     *   Soubor je vytvořen ve formátu .json.php s PHP exit guardem.
-     *   Při přístupu přes webový prohlížeč se zobrazí HTTP 403 Forbidden.
-     *   JSON data jsou čitelná pouze přes file_get_contents v PHP aplikaci.
-     *
-     * Migrace:
-     *   Pokud existuje starý nechráněný platformbridge.json, automaticky
-     *   se zkonvertuje na platformbridge.json.php a starý soubor se smaže.
-     *
-     * Po publikování (nebo ověření existence) znovu načte PathResolver,
-     * aby následující install kroky pracovaly s cestami z aktuálního souboru.
+     * Po publikování/migraci znovu načte PathResolver a přebuduje provisioners,
+     * aby následující kroky pracovaly s cestami z nového konfiguračního souboru.
      */
-    public function publishInstallerConfig(): void
+    private function stepInit(): void
     {
-        $stub = $this->paths->stubInstallerConfigFile();
-        $targetProtected = $this->paths->userInstallerConfigFileProtected();
-        $targetPlain = $this->paths->userInstallerConfigFile();
-        $label = InstallerConfig::CONFIG_FILE_PROTECTED;
+        $result = $this->configProvisioner->provision();
 
-        // Migrace: starý nechráněný .json → nový chráněný .json.php
-        if (!file_exists($targetProtected) && file_exists($targetPlain)) {
-            JsonGuard::convertToProtected($targetPlain, $targetProtected, deleteSource: true);
-            $this->info("  🔒 Migrated: " . InstallerConfig::CONFIG_FILE . " → " . InstallerConfig::CONFIG_FILE_PROTECTED);
-            $this->info("     Starý nechráněný soubor " . InstallerConfig::CONFIG_FILE . " byl odstraněn.");
-            $this->reloadPaths();
-            return;
-        }
+        $this->info($result->message());
 
-        // NIKDY nepřepisuj – uživatel tento soubor upravuje ručně.
-        // --force se na platformbridge.json.php nevztahuje.
-        if (!file_exists($targetProtected)) {
-            $this->publisher->publishProtected($stub, $targetProtected, overwrite: false);
-            $this->info("  ✅ Published: {$label} (secured with PHP exit guard)");
-        } else {
-            $this->info("  ⏭️  Skipped:   {$label} (exists – user config preserved)");
-        }
-
-        if ($this->force && file_exists($targetProtected)) {
-            $this->info("           ℹ️  --force does not overwrite {$label} (user-maintained file)");
+        if ($this->force && $result === ProvisionResult::Skipped) {
+            $label = PathsConfig::CONFIG_FILE_PROTECTED;
+            $this->info("ℹ️  --force does not overwrite {$label} (user-maintained file)");
         }
 
         // Znovu načti PathResolver – konfigurační soubor nyní existuje
-        $this->reloadPaths();
+        if ($result->requiresReload()) {
+            $this->reloadPaths();
+        }
     }
 
     /**
-     * Znovu načte PathResolver a InstallerConfig.
+     * Dirs step: vytvoření adresářové struktury.
+     */
+    private function stepDirs(): void
+    {
+        foreach ($this->directoryProvisioner->ensureStructure() as $result) {
+            $this->info($result->message());
+        }
+    }
+
+    /**
+     * Guard step: ochranné index.php soubory v citlivých adresářích.
+     */
+    private function stepGuards(): void
+    {
+        foreach ($this->directoryProvisioner->ensureGuards() as $result) {
+            $this->info($result->message());
+        }
+    }
+
+    /**
+     * Assets step: publikace dist JS/CSS do cílové složky.
+     */
+    private function stepAssets(): void
+    {
+        foreach ($this->assetProvisioner->provision($this->publisher) as $result) {
+            $this->info($result->message());
+        }
+    }
+
+    /**
+     * Vrátí Closure pro publikaci konkrétního stub souboru (api/config/security).
+     */
+    private function stepFile(string $name): \Closure
+    {
+        return function () use ($name): void {
+            $result = $this->fileProvisioner->provision($name, $this->publisher, $this->force);
+            $this->info($result->message());
+        };
+    }
+
+    /**
+     * Cache step: zajištění existence cache adresáře.
+     */
+    private function stepCache(): void
+    {
+        $result = $this->directoryProvisioner->ensureCache();
+        $this->info($result->message());
+    }
+
+    // ─── Internal helpers ────────────────────────────────────
+
+    /**
+     * Vytvoří/znovu vytvoří všechny provisioner instance.
      *
-     * Volá se po publikování platformbridge.json, aby install kroky
-     * (dirs, assets, config, …) pracovaly s cestami z nového konfiguračního souboru.
-     * Vypíše načtené cesty pro diagnostiku.
+     * Volá se v konstruktoru a po reloadPaths() (když se změní konfigurace).
+     */
+    private function buildProvisioners(): void
+    {
+		$projectRoot = $this->paths->projectRoot();
+        $stubsPath = $this->paths->packageStubsPath();
+        $config = $this->paths->pathsConfig();
+
+        $this->configProvisioner = new ConfigProvisioner($projectRoot);
+
+        $this->fileProvisioner = new FileProvisioner($stubsPath, $projectRoot, $config);
+
+        $this->assetProvisioner = new AssetProvisioner(
+            distPath: $this->paths->packageRoot() . DIRECTORY_SEPARATOR . 'dist',
+            targetPath: $this->paths->assetsPath(),
+            label: $config->assets(),
+        );
+
+        $this->directoryProvisioner = new DirectoryProvisioner($projectRoot, $config);
+    }
+
+    /**
+     * Znovu načte PathResolver a přebuduje všechny provisioner instance.
+     *
+     * Volá se po provisioning konfiguračního souboru, aby následující
+     * install kroky pracovaly s cestami z nového/zmigrovaného souboru.
      */
     private function reloadPaths(): void
     {
-        $this->paths = new PathResolver($this->paths->packageRoot(), $this->forceVendor);
-
-        // Diagnostický výpis – ukáže, s jakými cestami installer pracuje
-        $config = $this->paths->installerConfig();
-        if ($config->hasCustomConfig()) {
-            $protLabel = $config->isProtected() ? '🔒 protected' : '⚠️  unprotected';
-            $this->info("");
-            $this->info("  📋 Loaded paths from " . InstallerConfig::CONFIG_FILE_PROTECTED . " ({$protLabel}):");
-            $this->info("       assets_path:     " . $config->assetsPath());
-            $this->info("       bridge_config:   " . $config->bridgeConfig());
-            $this->info("       security_config: " . $config->securityConfig());
-            $this->info("       cache_path:      " . $config->cachePath());
-            $this->info("       api_file:        " . $config->apiFile());
-            $this->info("");
-        }
+        $this->paths = PathResolverFactory::auto($this->paths->packageRoot());
+        $this->buildProvisioners();
     }
 
     /**
-     * Vytvoří ochranné index.php soubory v adresářích s citlivými daty.
-     *
-     * Tyto sentinel soubory:
-     *   - Brání directory listing (výpis obsahu adresáře)
-     *   - Vrací HTTP 403 Forbidden při přímém přístupu na URL adresáře
-     *   - Fungují na jakémkoli PHP hostingu bez konfigurace serveru
-     *
-     * Chráněné adresáře:
-     *   - json_path (blocks.json, layouts.json, generators.json)
-     *   - cache_path (šablonová cache)
-     *   - adresář s konfigurací (security-config.php nadřazený adresář)
-     */
-    private function publishDirectoryGuards(): void
-    {
-        $config = $this->paths->installerConfig();
-        $projectRoot = $this->paths->projectRoot();
-
-        // Adresáře, které potřebují ochranný index.php
-        $protectedDirs = [
-            $config->jsonPath()  => 'JSON config (blocks, layouts, generators)',
-            $config->cachePath() => 'template cache',
-        ];
-
-        // Nadřazený adresář security configu (pokud není root)
-        $securityDir = dirname($config->securityConfig());
-        if ($securityDir !== '.' && $securityDir !== '') {
-            $protectedDirs[$securityDir] = 'security config';
-        }
-
-        $guardCount = 0;
-        foreach ($protectedDirs as $relDir => $label) {
-            $absDir = $projectRoot . '/' . $relDir;
-            if (is_dir($absDir)) {
-                $created = JsonGuard::createDirectoryGuard($absDir);
-                if ($created) {
-                    $this->info("  🔒 Guard:    {$relDir}/index.php ({$label})");
-                    $guardCount++;
-                }
-            }
-        }
-
-        if ($guardCount === 0) {
-            $this->info("  ✅ Directory guards: OK (all guards in place)");
-        }
-    }
-
-    /**
-     * Publikuje bridge-config.php do hostující aplikace.
-     * Cílová cesta se čte z InstallerConfig (nebo výchozí).
-     * Bez --force se existující soubor nepřepisuje.
-     */
-    public function publishConfig(): void
-    {
-        $stub = $this->paths->stubBridgeConfigFile();
-        $target = $this->paths->userBridgeConfigFile();
-        $label = $this->paths->installerConfig()->bridgeConfig();
-
-        $written = $this->publisher->publish($stub, $target, overwrite: $this->force);
-        $this->info(
-            $written
-            ? "  ✅ Published: {$label}"
-            : "  ⏭️  Skipped:   {$label} (exists)"
-        );
-    }
-
-    /**
-     * Publikuje security-config.php do hostující aplikace.
-     * Cílová cesta se čte z InstallerConfig (nebo výchozí).
-     * Soubor se umístí MIMO public/ složku – přístupný pouze internímu jádru.
-     * Bez --force se existující soubor nepřepisuje.
-     */
-    public function publishSecurityConfig(): void
-    {
-        $stub = $this->paths->stubSecurityConfigFile();
-        $target = $this->paths->userSecurityConfigFile();
-        $label = $this->paths->installerConfig()->securityConfig();
-
-        $written = $this->publisher->publish($stub, $target, overwrite: $this->force);
-        $this->info(
-            $written
-            ? "  ✅ Published: {$label}"
-            : "  ⏭️  Skipped:   {$label} (exists)"
-        );
-    }
-
-    /**
-     * Publikuje dist/ assety do cílové složky (VŽDY přepíše).
-     * Cílová složka se čte z InstallerConfig (nebo výchozí).
-     */
-    private function publishAssets(): void
-    {
-        $distPath = $this->paths->packageDistPath();
-        $targetPath = $this->paths->publicAssetsPath();
-        $label = $this->paths->installerConfig()->assetsPath();
-
-        foreach (['js', 'css'] as $dir) {
-            $source = $distPath . '/' . $dir;
-            if (is_dir($source)) {
-                $count = $this->publisher->publishDirectory($source, $targetPath . '/' . $dir, overwrite: true);
-                $this->info("  ✅ Published: {$label}/{$dir}/ ({$count} files)");
-            } else {
-                $this->info("  ⚠️  Assets source not found: dist/{$dir}/");
-                $this->info("     Run 'npm run build' first to generate assets.");
-            }
-        }
-    }
-
-    /**
-     * Publikuje API endpoint.
-     * Cílová cesta se čte z InstallerConfig (nebo výchozí).
-     * Bez --force se existující soubor nepřepisuje.
-     */
-    private function publishApiEndpoint(): void
-    {
-        $stub = $this->paths->stubApiFile();
-        $target = $this->paths->publicApiFile();
-        $label = $this->paths->installerConfig()->apiFile();
-
-        $written = $this->publisher->publish($stub, $target, overwrite: $this->force);
-        $this->info(
-            $written
-            ? "  ✅ Published: {$label}"
-            : "  ⏭️  Skipped:   {$label} (exists)"
-        );
-    }
-
-    /**
-     * Vytvoří kompletní adresářovou strukturu podle InstallerConfig.
-     *
-     * Projde všechny cesty z InstallerConfig a zajistí, že cílové adresáře
-     * existují PŘED publikováním souborů. Tím se řeší situace, kdy:
-     *   - Uživatel má vlastní platformbridge.json s nestandardními cestami
-     *   - Některé publish kroky jsou přeskočeny (soubor existuje)
-     *   - Aplikace potřebuje adresáře ještě před prvním install
-     */
-    private function ensureDirectoryStructure(): void
-    {
-        $config = $this->paths->installerConfig();
-        $projectRoot = $this->paths->projectRoot();
-
-        // Sbírka adresářů, které je potřeba vytvořit
-        $dirs = [
-            $config->assetsPath()                   => 'assets (JS/CSS)',
-            dirname($config->bridgeConfig())        => 'bridge config',
-            dirname($config->securityConfig())      => 'security config',
-            $config->cachePath()                     => 'cache',
-            dirname($config->apiFile())              => 'API endpoint',
-            $config->jsonPath()                      => 'JSON config (blocks, layouts, …)',
-        ];
-
-        $created = 0;
-        foreach ($dirs as $relDir => $label) {
-            // Přeskoč "." (dirname vrací "." pokud cesta nemá parent)
-            if ($relDir === '.' || $relDir === '') {
-                continue;
-            }
-            $absDir = $projectRoot . '/' . $relDir;
-            if (!is_dir($absDir)) {
-                mkdir($absDir, 0755, true);
-                $this->info("  📁 Created: {$relDir}/ ({$label})");
-                $created++;
-            }
-        }
-
-        if ($created === 0) {
-            $this->info("  ✅ Directory structure: OK (all directories exist)");
-        }
-    }
-
-    private function ensureCacheDir(): void
-    {
-        $cache = $this->paths->cachePath();
-        $label = $this->paths->installerConfig()->cachePath();
-        if (!is_dir($cache)) {
-            mkdir($cache, 0755, true);
-            $this->info("  ✅ Created: {$label}/");
-        }
-    }
-
-    // ─── Helpers ─────────────────────────────────────────────
-
-    /**
-     * Spustí krok pouze pokud je v --only filteru (nebo pokud filtr není nastaven).
+     * Spustí krok pouze pokud je v --only filtru (nebo pokud filtr není nastaven).
      */
     private function runStep(string $name, \Closure $callback): void
     {
@@ -497,151 +317,12 @@ final class Installer
         echo $message . PHP_EOL;
     }
 
-    // ─── Static helpers (zachovány pro zpětnou kompatibilitu) ────
-
     /**
-     * Vrátí výchozí web-accessible URL pro assety.
-     *
-     * Dynamicky detekuje cestu z DOCUMENT_ROOT:
-     *   - Standalone (dev): cesta k dist/ složce
-     *   - Vendor (prod): cesta k public/platformbridge složce
-     *
-     * @param string $packageRoot Absolutní cesta ke kořeni balíčku
-     * @return string URL relativní k document root
+     * Autodetekce package root z umístění třídy.
+     * Installer.php žije v src/PlatformBridge/Installer/ → 4× dirname.
      */
-    public static function getDefaultAssetUrl(string $packageRoot): string
+    private static function detectPackageRoot(): string
     {
-        $isVendor = preg_match('#[\\\\/]vendor[\\\\/]#', $packageRoot) === 1;
-        $projectRoot = $isVendor ? dirname($packageRoot, 3) : $packageRoot;
-
-        if (php_sapi_name() !== 'cli' && !empty($_SERVER['DOCUMENT_ROOT'])) {
-            $url = self::resolveAssetUrlFromDocRoot($projectRoot, $isVendor);
-            if ($url !== null) {
-                return $url;
-            }
-        }
-
-        // Fallback:
-        // Vendor → /platformbridge (předpokládá doc root = {projectRoot}/public)
-        // Standalone → /dist (build output přímo z balíčku)
-        return $isVendor ? '/platformbridge' : '/dist';
-    }
-
-    /**
-     * Vypočítá URL k assets relativně k DOCUMENT_ROOT.
-     *
-     * Standalone (dev): resolvuje cestu k dist/ složce
-     * Vendor (prod): resolvuje cestu k public/platformbridge složce
-     *
-     * @param string $projectRoot Absolutní cesta ke kořeni projektu
-     * @param bool $isVendor Zda běžíme ve vendor režimu
-     */
-    private static function resolveAssetUrlFromDocRoot(string $projectRoot, bool $isVendor): ?string
-    {
-        $docRoot = realpath($_SERVER['DOCUMENT_ROOT']);
-        if ($docRoot === false) {
-            return null;
-        }
-
-        $docRoot = str_replace('\\', '/', rtrim($docRoot, '/\\'));
-
-        // Cílová složka závisí na režimu:
-        //   Vendor  → {projectRoot}/public/platformbridge
-        //   Standalone → {projectRoot}/dist
-        $targetSuffix = $isVendor
-            ? DIRECTORY_SEPARATOR . 'public' . DIRECTORY_SEPARATOR . 'platformbridge'
-            : DIRECTORY_SEPARATOR . 'dist';
-
-        $assetsPath = $projectRoot . $targetSuffix;
-        $realAssets = realpath($assetsPath);
-
-        if ($realAssets !== false) {
-            $realAssets = str_replace('\\', '/', rtrim($realAssets, '/\\'));
-            if (str_starts_with($realAssets, $docRoot . '/')) {
-                return substr($realAssets, strlen($docRoot));
-            }
-        }
-
-        $realProject = realpath($projectRoot);
-        if ($realProject === false) {
-            return null;
-        }
-        $realProject = str_replace('\\', '/', rtrim($realProject, '/\\'));
-
-        // Relativní suffix pro URL
-        $urlSuffix = $isVendor ? '/public/platformbridge' : '/dist';
-
-        if (str_starts_with($realProject, $docRoot . '/')) {
-            $basePath = substr($realProject, strlen($docRoot));
-            return $basePath . $urlSuffix;
-        }
-
-        if (str_starts_with($docRoot, $realProject . '/')) {
-            $subPath = substr($docRoot, strlen($realProject));
-            if (str_starts_with($urlSuffix, $subPath)) {
-                return substr($urlSuffix, strlen($subPath));
-            }
-        }
-
-        if ($realProject === $docRoot) {
-            return $urlSuffix;
-        }
-
-        return null;
-    }
-
-    public function getPackageRoot(): string
-    {
-        return $this->paths->packageRoot();
-    }
-
-    public function getProjectRoot(): string
-    {
-        return $this->paths->projectRoot();
-    }
-
-    /**
-     * Vrátí výchozí URL k API endpointu.
-     *
-     * Dynamicky detekuje cestu z DOCUMENT_ROOT:
-     *   - Standalone (dev): cesta k resources/stubs/api.php
-     *   - Vendor (prod): public/platformbridge/api.php
-     *
-     * @param string $packageRoot Absolutní cesta ke kořeni balíčku
-     * @return string URL relativní k document root
-     */
-    public static function getDefaultApiUrl(string $packageRoot): string
-    {
-        $vendorAutoload = dirname($packageRoot, 2) . DIRECTORY_SEPARATOR . 'autoload.php';
-        $isVendor = file_exists($vendorAutoload);
-
-        if ($isVendor) {
-            // Vendor (prod): API je v public/platformbridge/api.php
-            return rtrim(self::getDefaultAssetUrl($packageRoot), '/') . '/api.php';
-        }
-
-        // Standalone (dev): API endpoint je přímo v resources/stubs/api.php
-        $projectRoot = $packageRoot;
-
-        if (php_sapi_name() !== 'cli' && !empty($_SERVER['DOCUMENT_ROOT'])) {
-            $docRoot = realpath($_SERVER['DOCUMENT_ROOT']);
-            $realProject = realpath($projectRoot);
-
-            if ($docRoot !== false && $realProject !== false) {
-                $docRoot = str_replace('\\', '/', rtrim($docRoot, '/\\'));
-                $realProject = str_replace('\\', '/', rtrim($realProject, '/\\'));
-
-                if ($realProject === $docRoot) {
-                    return '/resources/stubs/api.php';
-                }
-
-                if (str_starts_with($realProject, $docRoot . '/')) {
-                    $basePath = substr($realProject, strlen($docRoot));
-                    return $basePath . '/resources/stubs/api.php';
-                }
-            }
-        }
-
-        return '/resources/stubs/api.php';
+        return dirname(__DIR__, 4);
     }
 }

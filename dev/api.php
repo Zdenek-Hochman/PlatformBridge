@@ -1,20 +1,19 @@
 <?php
 /**
- * PlatformBridge API Endpoint
+ * PlatformBridge API Endpoint – VÝVOJOVÁ VERZE
  *
- * Publikováno příkazem: php vendor/bin/platformbridge install
+ * Tento soubor slouží jako API vstupní bod pro lokální vývoj (localhost).
+ * Na rozdíl od resources/stubs/api.php neobsahuje žádné placeholdery –
+ * autoloader je resolvován přímo relativní cestou.
  *
- * Umístění:
- *   - Vendor (prod):     {projectRoot}/public/platformbridge/api.php
- *   - Standalone (dev):  {packageRoot}/d/platformbridge/api.php
+ * V produkci se tento soubor NEPOUŽÍVÁ. Installer publikuje
+ * resources/stubs/api.php s automaticky vypočtenou cestou k autoloaderu.
  *
- * Můžete přidat vlastní middleware, autentizaci apod.
- * Tento soubor se NEPŘEPISUJE při composer update.
+ * @see resources/stubs/api.php  Produkční šablona (stub)
  */
 
 // ─── Autoloader ─────────────────────────────────────────────────
-// Cesta je automaticky vypočtena installerem dle umístění api.php
-$autoloadPath = "{{AUTOLOAD_PATH}}";
+$autoloadPath = dirname(__DIR__) . '/vendor/autoload.php';
 
 if (!file_exists($autoloadPath)) {
     http_response_code(500);
@@ -34,8 +33,4 @@ if (!file_exists($autoloadPath)) {
 require_once $autoloadPath;
 
 // ─── Bootstrap ──────────────────────────────────────────────────
-// ApiHandler automaticky detekuje cesty přes PathResolver.
-// Konfigurace se načte z config/platform-bridge/bridge-config.php
-// s fallbackem na vendor defaults.
-
 \Zoom\PlatformBridge\AI\API\ApiHandler::bootstrap()->handle();

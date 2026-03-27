@@ -22,7 +22,6 @@ class AiClient
      */
     public function send($request): AiResponse
     {
-        //TODO: Vyřešit aby se sem vkládala adrese z bridge-config.php, ne hardcoded
         // GET parametry jdou do URL, BODY parametry do payloadu
         $url = $this->config->buildUrl($request->getEndpoint(), $request->getQueryParams());
         return $this->executeRequest($url, $request);

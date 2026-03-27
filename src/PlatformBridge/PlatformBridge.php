@@ -76,11 +76,6 @@ final class PlatformBridge
 
     /**
      * Inicializuje všechny hlavní komponenty knihovny PlatformBridge.
-     *
-     * Orchestrátor, který deleguje na specializované boot metody.
-     * Pořadí volání je důležité – pozdější kroky závisí na předchozích.
-     *
-     * @return void
      */
     private function boot(): void
     {
@@ -103,35 +98,35 @@ final class PlatformBridge
         (new ErrorHandler(new ErrorRenderer()))->register();
     }
 
-    /**
-     * 2. Načtení konfigurace (bloky, layouty, generátory) s validací.
-     *
-     * Cesta ke JSON konfiguračním souborům se řeší přes PlatformBridgeConfig:
-     *   - Explicitní withConfigPath() má přednost
-     *   - Fallback: PathResolver::resolvedConfigPath()
-     *   - Package defaults slouží jako fallback pro ConfigLoader.
-     *
-     * @return void
-     */
+	/**
+	 * Inicializuje konfigurační systém aplikace.
+	 *
+	 * Vytvoří instanci {@see ConfigLoader}, která načítá konfiguraci
+	 * z hlavní konfigurační cesty a defaultních balíčkových cest.
+	 * Následně inicializuje {@see ConfigManager} a spustí načtení konfigurace.
+	 *
+	 * @return void
+	 */
     private function bootConfig(): void
     {
-        $paths = $this->config->getPathResolver();
-
         $loader = new ConfigLoader(
             $this->config->getConfigPath(),
-            $paths->packageDefaultsPath(),
-            new ConfigValidator()
+            $this->config->getPathResolver(),
+            new ConfigValidator(),
         );
 
         $this->configManager = new ConfigManager($loader);
         $this->configManager->load();
     }
 
-    /**
-     * 3. Inicializace šablonovacího enginu s cestami k šablonám a cache.
-     *
-     * @return void
-     */
+	/**
+	 * Inicializuje šablonovací engine aplikace.
+	 *
+	 * Vytvoří instanci {@see Engine} s nastavením cest k šablonám a cache.
+	 * Debug režim je zde explicitně vypnutý.
+	 *
+	 * @return void
+	 */
     private function bootTemplateEngine(): void
     {
         $this->templateEngine = new Engine([
@@ -141,22 +136,28 @@ final class PlatformBridge
         ]);
     }
 
-    /**
-     * 4. Registrace handlerů a vytvoření továrny na pole (FieldFactory).
-     *
-     * @return void
-     */
+	/**
+	 * Inicializuje handlery a továrnu pro vytváření polí.
+	 *
+	 * Vytvoří registry handlerů pomocí interní factory metody
+	 * a následně inicializuje {@see FieldFactory}, která tyto handlery využívá.
+	 *
+	 * @return void
+	 */
     private function bootHandlers(): void
     {
         $this->handlerRegistry = $this->createHandlerRegistry();
         $this->fieldFactory = new FieldFactory($this->handlerRegistry);
     }
 
-    /**
-     * 5. Inicializace rendereru formulářů s továrnou, konfigurací a šablonovacím enginem.
-     *
-     * @return void
-     */
+	/**
+	 * Inicializuje renderer formulářů.
+	 *
+	 * Vytvoří instanci {@see FormRenderer}, která zajišťuje vykreslování formulářů
+	 * na základě field factory, konfigurace a šablonovacího enginu.
+	 *
+	 * @return void
+	 */
     private function bootFormRenderer(): void
     {
         $this->formRenderer = new FormRenderer(
@@ -166,22 +167,28 @@ final class PlatformBridge
         );
     }
 
-    /**
-     * 6. Inicializace asset manageru pro správu a generování HTML assetů (CSS/JS).
-     * URL se detekuje automaticky podle režimu (standalone vs vendor).
-     *
-     * @return void
-     */
+	/**
+	 * Inicializuje správce statických assetů.
+	 *
+	 * Vytvoří instanci {@see AssetManager} s base URL pro assety,
+	 * která se používá pro generování cest k CSS, JS a dalším zdrojům.
+	 *
+	 * @return void
+	 */
     private function bootAssetManager(): void
     {
         $this->assetManager = new AssetManager($this->config->getAssetUrl());
     }
 
-    /**
-     * 7. Inicializace podepisování parametrů, pokud je nastaven secret key.
-     *
-     * @return void
-     */
+	/**
+	 * Inicializuje bezpečnostní komponenty aplikace.
+	 *
+	 * Pokud je v konfiguraci dostupný secret key, vytvoří instanci {@see SignedParams}
+	 * pro podepisování a validaci parametrů s definovanou dobou platnosti (TTL).
+	 * V opačném případě zůstává funkcionalita nepodepsaných parametrů neaktivní.
+	 *
+	 * @return void
+ */
     private function bootSecurity(): void
     {
         $secretKey = $this->config->getSecretKey();
@@ -191,11 +198,14 @@ final class PlatformBridge
         }
     }
 
-    /**
-     * Vytvoří a nakonfiguruje registr handlerů.
-     *
-     * @return HandlerRegistry Nově vytvořený a nakonfigurovaný registr handlerů
-     */
+	/**
+	 * Vytvoří a nakonfiguruje registry handlerů.
+	 *
+	 * Na základě konfigurace instanciuje jednotlivé handlery a registruje je
+	 * do {@see HandlerRegistry}. Volitelně nastaví výchozí handler, pokud je definován.
+	 *
+	 * @return HandlerRegistry Inicializovaná registry handlerů
+	 */
     private function createHandlerRegistry(): HandlerRegistry
     {
         $handlersConfig = $this->config->getHandlersConfig();
@@ -272,8 +282,9 @@ final class PlatformBridge
     private function buildParams(string $generatorId, array $extra): array
     {
         $base = [
-            'endpoint'      => $this->configManager->getConfigValue($generatorId, 'endpoint'),
+            'endpoint'       => $this->configManager->getConfigValue($generatorId, 'endpoint'),
             'request_amount' => $this->configManager->getConfigValue($generatorId, 'api.request_amount'),
+            'config_path'    => $this->config->getConfigPath(),
         ];
 
         return [

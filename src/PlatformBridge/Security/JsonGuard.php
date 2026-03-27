@@ -5,34 +5,52 @@ declare(strict_types=1);
 namespace Zoom\PlatformBridge\Security;
 
 /**
- * Ochrana JSON konfiguracnich souboru pred primym pristupem z weboveho prohlizece.
+ * Zajišťuje ochranu JSON konfiguračních souborů proti přímému přístupu z webu.
  *
- * Problem:
- *   Pokud je koren projektu (nebo jeho cast) pristupny pres web server
- *   (napr. /www slozka), soubory .json jsou citelne pres URL.
- *   Utocnik tak muze ziskat strukturu aplikace, cesty, konfiguraci generatoru apod.
+ * ------------------------------------------------------------------------
+ * PROBLÉM
+ * ------------------------------------------------------------------------
+ * Pokud je část projektu veřejně dostupná (např. /www nebo /public),
+ * mohou být .json soubory přímo čitelné přes URL:
  *
- * Reseni - PHP Exit Guard:
- *   JSON data se ulozi do souboru s priponou .json.php. Soubor obsahuje
- *   PHP hlavicku s header(403) + exit() nasledovanou JSON daty.
+ * To může vést k úniku:
+ *   - struktury aplikace
+ *   - interních cest
+ *   - konfigurace generátorů / systémů
  *
- *   Pri pristupu pres prohlizec:
- *     -> web server preda soubor PHP enginu -> exit() -> HTTP 403 -> JSON zustane skryty
+ * ------------------------------------------------------------------------
+ * ŘEŠENÍ – "PHP EXIT GUARD"
+ * ------------------------------------------------------------------------
+ * JSON obsah se uloží do souboru s příponou:
  *
- *   Pri cteni aplikaci (file_get_contents):
- *     -> PHP se nespusti -> guard se programove odstrani -> JSON se normalne zparsuje
+ *   *.json.php
  *
- * Vyhody:
- *   - Funguje na JAKEMKOLI PHP hostingu (Apache, Nginx, IIS, LiteSpeed)
- *   - Nevyzaduje zmeny konfigurace serveru (.htaccess, nginx.conf, ...)
- *   - JSON data zustavaji cista - guard je jen obalujici ochranna vrstva
- *   - Zpetna kompatibilita - aplikace umi precist i nechranene .json soubory
- *   - Soubor .json.php nelze zneuzit k injekci kodu - obsah se cte pres
- *     file_get_contents + json_decode, nikdy pres require/include
+ * Na začátek souboru se vloží PHP blok:
+ *   - nastaví HTTP 403
+ *   - okamžitě ukončí skript (exit)
  *
- * Adresarova ochrana:
- *   Vedle ochrannych .json.php souboru trida generuje i index.php strazce,
- *   kteri brani directory listing v adresarich s konfiguraci.
+ * Výsledné chování:
+ *
+ *   ► Přístup přes prohlížeč:
+ *     PHP se vykoná → exit → JSON se nikdy nepošle ven
+ *
+ *   ► Přístup přes aplikaci (file_get_contents):
+ *     PHP se NEvykoná → guard se odstraní → JSON se normálně zpracuje
+ *
+ * ------------------------------------------------------------------------
+ * VÝHODY
+ * ------------------------------------------------------------------------
+ * - Nezávislé na serveru (funguje na Apache, Nginx, IIS…)
+ * - Není potřeba .htaccess / nginx.conf
+ * - JSON zůstává čistý (guard je jen obal)
+ * - Zpětná kompatibilita (.json funguje dál)
+ * - Bezpečné: obsah se nikdy nenačítá přes include/require
+ *
+ * ------------------------------------------------------------------------
+ * DOPLŇKOVÁ OCHRANA
+ * ------------------------------------------------------------------------
+ * Třída umí generovat:
+ *   - index.php v adresářích → zabrání directory listingu
  */
 final class JsonGuard
 {
@@ -45,14 +63,18 @@ final class JsonGuard
     /** PHP uzaviraci znacka jako bezpecny string */
     private const PHP_CLOSE = '?' . '>';
 
-    /**
-     * Vrati PHP exit guard hlavicku s komentarem pro uzivatele.
-     * Pouziva se pri generovani chranenych souboru.
-     *
-     * Poznamka: Implementovano jako metoda (ne konstanta/heredoc), protoze
-     * PHP tokenizer v nekterych verzich nespravne parsuje PHP oteviraci
-     * znacku uvnitr heredoc/nowdoc v class konstantach.
-     */
+	/**
+	 * Vrátí ochrannou PHP hlavičku pro konfigurační soubor.
+	 *
+	 * Generuje PHP kód, který zabrání přímému přístupu ke konfiguračnímu souboru
+	 * přes webový prohlížeč. Při pokusu o načtení souboru dojde k odeslání HTTP 403
+	 * a okamžitému ukončení skriptu.
+	 *
+	 * Tato hlavička je určena k vložení na začátek souboru obsahujícího citlivá data
+	 * (např. JSON konfiguraci), která následují až za uzavírací PHP značkou.
+	 *
+	 * @return string PHP kód ochranné hlavičky
+	 */
     private static function guardHeader(): string
     {
         return self::PHP_OPEN . "\n"
@@ -66,8 +88,6 @@ final class JsonGuard
             . "exit;\n"
             . self::PHP_CLOSE;
     }
-
-    // --- Ochrana obsahu -----------------------------------------------
 
     /**
      * Obali JSON obsah PHP exit guardem.
@@ -87,31 +107,35 @@ final class JsonGuard
      * @param string $content Obsah souboru (mozna s PHP guardem)
      * @return string Cisty JSON obsah
      */
-    public static function strip(string $content): string
-    {
-        if (!self::isProtected($content)) {
-            return $content;
-        }
+	public static function strip(string $content): string
+	{
+		if (!self::isProtected($content)) {
+			return $content;
+		}
 
-        // Hledame POSLEDNI uzaviraci PHP znacku - tj. skutecne uzavreni PHP bloku.
-        $needle = self::PHP_CLOSE;
-        $pos = strrpos($content, $needle);
-        if ($pos === false) {
-            return $content;
-        }
+		$closePos = strrpos($content, self::PHP_CLOSE);
 
-        return ltrim(substr($content, $pos + strlen($needle)));
-    }
+		if ($closePos === false) {
+			return $content;
+		}
 
-    /**
-     * Zjisti, zda obsah souboru obsahuje PHP exit guard.
-     */
+		$json = substr($content, $closePos + strlen(self::PHP_CLOSE));
+		return ltrim($json);
+	}
+
+	/**
+	 * Ověří, zda obsah obsahuje ochrannou PHP hlavičku.
+	 *
+	 * Kontroluje, zda obsah (po odstranění počátečních whitespace znaků)
+	 * začíná PHP otevírací značkou, což indikuje přítomnost ochranné hlavičky.
+	 *
+	 * @param string $content Obsah souboru (např. konfigurační soubor)
+	 * @return bool True pokud je obsah chráněný, jinak false
+	 */
     public static function isProtected(string $content): bool
     {
         return str_starts_with(ltrim($content), self::PHP_OPEN);
     }
-
-    // --- Souborove operace --------------------------------------------
 
     /**
      * Precte soubor a vrati cisty JSON obsah (automaticky odstrani guard).
@@ -138,9 +162,9 @@ final class JsonGuard
      */
     public static function writeProtected(string $path, string $jsonContent): void
     {
-        $dir = dirname($path);
-        if (!is_dir($dir)) {
-            mkdir($dir, 0755, true);
+        $directory = dirname($path);
+        if (!is_dir($directory)) {
+            mkdir($directory, 0755, true);
         }
         file_put_contents($path, self::protect($jsonContent));
     }
@@ -154,41 +178,39 @@ final class JsonGuard
      * @return bool True pokud byla konverze provedena
      * @throws \RuntimeException Pokud zdrojovy soubor nelze precist
      */
-    public static function convertToProtected(
-        string $sourcePath,
-        string $targetPath,
-        bool $deleteSource = true
-    ): bool {
+    public static function convertToProtected(string $sourcePath, string $targetPath, bool $deleteSource = true): bool {
         if (!file_exists($sourcePath)) {
             return false;
         }
 
-        $content = file_get_contents($sourcePath);
-        if ($content === false) {
+        $sourceContent = file_get_contents($sourcePath);
+        if ($sourceContent === false) {
             throw new \RuntimeException("Cannot read file for conversion: {$sourcePath}");
         }
 
-        // Pokud je obsah jiz chraneny, extrahuj cisty JSON
-        $jsonContent = self::strip($content);
+        $json = self::strip($sourceContent);
+        self::writeProtected($targetPath, $json);
 
-        self::writeProtected($targetPath, $jsonContent);
-
-        if ($deleteSource && $sourcePath !== $targetPath) {
+        $shouldDelete = $deleteSource && ($sourcePath !== $targetPath);
+        if ($shouldDelete) {
             unlink($sourcePath);
         }
 
         return true;
     }
 
-    // --- Adresarova ochrana -------------------------------------------
-
-    /**
-     * Vygeneruje obsah ochranneho index.php souboru pro adresar.
-     *
-     * Tento soubor brani vypisu obsahu adresare (directory listing)
-     * a vraci HTTP 403 pri primem pristupu na URL adresare.
-     * Slouzi jako doplnkova ochrana vedle .json.php souboru.
-     */
+	/**
+	 * Vrátí obsah ochranného souboru pro adresář (např. index.php).
+	 *
+	 * Generuje PHP kód, který zabrání přímému přístupu do adresáře přes webový prohlížeč.
+	 * Při pokusu o přístup vrátí HTTP 403 (Forbidden), nastaví textový výstup
+	 * a ukončí běh skriptu.
+	 *
+	 * Tento soubor je typicky generován automaticky (např. instalátorem)
+	 * a slouží k ochraně konfiguračních nebo interních souborů.
+	 *
+	 * @return string PHP kód ochranného souboru
+	 */
     public static function directoryGuardContent(): string
     {
         return self::PHP_OPEN . "\n"
@@ -212,44 +234,38 @@ final class JsonGuard
      */
     public static function createDirectoryGuard(string $directory): bool
     {
-        $directory = rtrim($directory, '/\\');
-        $indexFile = $directory . DIRECTORY_SEPARATOR . 'index.php';
+        $dir = rtrim($directory, '/\\');
+        $indexPath = $dir . DIRECTORY_SEPARATOR . 'index.php';
 
-        if (file_exists($indexFile)) {
+        if (file_exists($indexPath)) {
             return false;
         }
 
-        if (!is_dir($directory)) {
-            mkdir($directory, 0755, true);
+        if (!is_dir($dir)) {
+            mkdir($dir, 0755, true);
         }
 
-        file_put_contents($indexFile, self::directoryGuardContent());
+        file_put_contents($indexPath, self::directoryGuardContent());
         return true;
     }
 
-    // --- Pomocne metody -----------------------------------------------
-
-    /**
-     * Vrati chraneny nazev souboru pro dany .json soubor.
-     * Napr. "blocks.json" -> "blocks.json.php"
-     */
+	/**
+	 * Vrátí název souboru s ochrannou PHP příponou.
+	 *
+	 * Pokud již název obsahuje definovanou ochrannou příponu (např. .php),
+	 * vrátí jej beze změny. V opačném případě příponu automaticky přidá.
+	 *
+	 * Slouží k zajištění, že konfigurační soubory budou vždy chráněny
+	 * proti přímému přístupu přes webový server.
+	 *
+	 * @param string $jsonFilename Název souboru (např. config.json)
+	 * @return string Název souboru s ochrannou příponou (např. config.json.php)
+	 */
     public static function protectedFilename(string $jsonFilename): string
     {
         if (str_ends_with($jsonFilename, self::PROTECTED_EXTENSION)) {
             return $jsonFilename;
         }
         return $jsonFilename . '.php';
-    }
-
-    /**
-     * Vrati nechraneny nazev souboru (odstrani .php priponu).
-     * Napr. "blocks.json.php" -> "blocks.json"
-     */
-    public static function plainFilename(string $protectedFilename): string
-    {
-        if (str_ends_with($protectedFilename, self::PROTECTED_EXTENSION)) {
-            return substr($protectedFilename, 0, -4); // Remove .php
-        }
-        return $protectedFilename;
     }
 }

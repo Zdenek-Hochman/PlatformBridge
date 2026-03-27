@@ -809,22 +809,15 @@
       const timer = this.timers.get(el);
       if (timer) {
         clearTimeout(timer);
-        this.timers.delete(el);
       }
-      el.classList.add(NOTIFICATION.LEAVING);
       const remove = () => {
-        el.remove();
-        this.active = this.active.filter((n) => n !== el);
       };
-      el.addEventListener("animationend", remove, { once: true });
-      setTimeout(remove, 500);
     }
     /**
      * Odstraní všechny aktivní notifikace.
      */
     clear() {
       for (const el of [...this.active]) {
-        this.dismiss(el);
       }
     }
     // ─── Private ────────────────────────────────────────
@@ -851,7 +844,6 @@
     enforceLimit() {
       while (this.active.length >= this.options.maxVisible) {
         const oldest = this.active[0];
-        if (oldest) this.dismiss(oldest);
       }
     }
     /**
