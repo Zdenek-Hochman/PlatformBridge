@@ -1,71 +1,105 @@
 <?php
 
-declare(strict_types=1);
-
 namespace Zoom\PlatformBridge\Paths;
-
 /**
- * Konfigurace cest načtená z platformbridge.json.
+ * Value object pro konfiguraci cest načtenou z platformbridge.json.
  *
- * Sloučený value object — obsahuje validaci i přímé gettery na cesty.
- * Vytvářen přes {@see PathsLoader}.
+ * Uchovává validované cesty ke klíčovým souborům a adresářům projektu (assets, cache, api, security, bridge config).
+ * Zajišťuje bezpečnostní validaci a jednotný přístup ke konfiguraci napříč projektem.
+ *
+ * Vytvářejte pouze přes PathsLoader.
  */
 final class PathsConfig
 {
-    /** Název chráněného konfiguračního souboru (.json.php s PHP exit guardem) */
+    /**
+     * Název chráněného konfiguračního souboru (.json.php s PHP exit guardem)
+     */
     public const CONFIG_FILE_PROTECTED = 'platformbridge.json.php';
 
+    /**
+     * Název nechráněného konfiguračního souboru (čistý JSON)
+     */
     public const CONFIG_FILE = 'platformbridge.json';
 
     // ─── Konfigurační klíče (single source of truth pro názvy klíčů) ─
 
+    /** Klíč pro cestu k assets adresáři */
     public const KEY_ASSETS_PATH     = 'assets_path';
+    /** Klíč pro cestu ke konfiguračnímu souboru bridge */
     public const KEY_BRIDGE_CONFIG   = 'bridge_config';
+    /** Klíč pro cestu ke konfiguračnímu souboru zabezpečení */
     public const KEY_SECURITY_CONFIG = 'security_config';
+    /** Klíč pro cestu k adresáři cache */
     public const KEY_CACHE_PATH      = 'cache_path';
+    /** Klíč pro cestu k API souboru */
     public const KEY_API_FILE        = 'api_file';
 
-    // ─── Názvy stub souborů ──────────────────────────────────
-
+    /** Výchozí stub pro api.php */
     public const STUB_API      = 'api.php';
+    /** Výchozí stub pro bridge-config.php */
     public const STUB_BRIDGE   = 'bridge-config.php';
+    /** Výchozí stub pro security-config.php */
     public const STUB_SECURITY = 'security-config.php';
 
+    /**
+     * Validované konfigurační pole s cestami (klíč => hodnota)
+     * @var array<string, string>
+     */
     private readonly array $config;
 
     /**
+     * Vytvoří objekt s validovanou konfigurací cest.
+     *
      * @param array<string, string> $defaults Výchozí hodnoty cest
      * @param array<string, mixed>  $data     Načtená data z JSON souboru
      */
-    public function __construct(private readonly array $defaults, private readonly array $data)
-    {
+    public function __construct(
+        /** Výchozí hodnoty cest */
+        private readonly array $defaults,
+        /** Načtená data z JSON */
+        private readonly array $data
+    ) {
         $loaded = $this->validateData($data);
+        // Sloučí výchozí hodnoty s validovanými načtenými hodnotami
         $this->config = array_merge($this->defaults, array_intersect_key($loaded, $this->defaults));
     }
 
-    // ─── Path getters ────────────────────────────────────────
-
+    /**
+     * Vrací relativní cestu k assets adresáři.
+     */
     public function assets(): string
     {
         return $this->config[self::KEY_ASSETS_PATH];
     }
 
+    /**
+     * Vrací relativní cestu k adresáři cache.
+     */
     public function cache(): string
     {
         return $this->config[self::KEY_CACHE_PATH];
     }
 
+    /**
+     * Vrací relativní cestu k API souboru.
+     */
     public function api(): string
     {
         return $this->config[self::KEY_API_FILE];
     }
 
+    /**
+     * Vrací relativní cestu ke konfiguračnímu souboru zabezpečení.
+     */
     public function security(): string
     {
         return $this->config[self::KEY_SECURITY_CONFIG];
     }
 
-	public function bridge(): string
+    /**
+     * Vrací relativní cestu ke konfiguračnímu souboru bridge.
+     */
+    public function bridge(): string
     {
         return $this->config[self::KEY_BRIDGE_CONFIG];
     }
@@ -81,6 +115,7 @@ final class PathsConfig
      *   3. Všechny hodnoty musí být stringy
      *   4. Cesty jsou validovány proti path traversal (../, absolutní cesty, null bytes)
      *
+     * @param array<string, mixed> $data
      * @return array<string, string> Validované konfigurační pole
      * @throws \RuntimeException Pokud data obsahují nevalidní hodnoty
      */
@@ -100,21 +135,18 @@ final class PathsConfig
             );
         }
 
-        // Validace: všechny hodnoty musí být stringy
-        foreach ($loaded as $key => $value) {
-            if (isset($this->defaults[$key]) && !is_string($value)) {
-                throw new \RuntimeException(
-                    $configBasename . ": key '{$key}' must be a string, got " . gettype($value)
-                );
-            }
-        }
-
-        // Bezpečnostní validace cest – prevence path traversal
-        foreach ($loaded as $key => $value) {
-            if (isset($this->defaults[$key]) && is_string($value)) {
-                $this->validatePathSecurity($key, $value);
-            }
-        }
+		// Validace hodnot a bezpečnosti v jednom průchodu
+		foreach ($loaded as $key => $value) {
+			if (!isset($this->defaults[$key])) {
+				continue;
+			}
+			if (!is_string($value)) {
+				throw new \RuntimeException(
+					$configBasename . ": key '{$key}' must be a string, got " . gettype($value)
+				);
+			}
+			$this->validatePathSecurity($key, $value);
+		}
 
         return $loaded;
     }
@@ -127,6 +159,8 @@ final class PathsConfig
      *   - Absolutní cesty (začínající / nebo C:\)
      *   - Null bytes
      *
+     * @param string $key   Název konfiguračního klíče
+     * @param string $value Hodnota cesty
      * @throws \RuntimeException Pokud cesta obsahuje nebezpečný vzor
      */
     private function validatePathSecurity(string $key, string $value): void
@@ -141,7 +175,7 @@ final class PathsConfig
         }
 
         // Absolutní cesty (Linux /path nebo Windows C:\path)
-        if (str_starts_with($normalized, '/') || preg_match('/^[a-zA-Z]:[\\\\\\/]/', $value)) {
+        if (str_starts_with($normalized, '/') || preg_match('/^[a-zA-Z]:[\\\\\/]/', $value)) {
             throw new \RuntimeException(
                 "Config: key '{$key}' must be a relative path, got absolute: '{$value}'. "
                 . 'All paths are relative to the project root.'

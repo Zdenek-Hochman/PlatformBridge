@@ -1,32 +1,37 @@
 <?php
 
-use Zoom\PlatformBridge\AI\API\EndpointDefinition;
+use Zoom\PlatformBridge\AI\API\AttributeEndpoint;
+use Zoom\PlatformBridge\AI\API\Endpoint;
 
-class CreateSubjectEndpoint extends EndpointDefinition
+#[Endpoint(
+    name: 'CreateSubject',
+    generator: 'subject',
+    responseType: 'nested',
+    template: '/Components/NestedResult',
+    variantKey: 'type'
+)]
+class CreateSubjectEndpoint extends AttributeEndpoint
 {
-    protected ?string $variantKey = 'type';
+    protected function transformInput(array $input, mixed ...$context): array
+    {
+       	[$variant] = $context;
 
-    protected function getEndpoint(): string {
-        return 'CreateSubject';
+        return match ($variant) {
+            'template' => $this->transformTemplateVariant($input),
+            'custom' => $this->transformCustomVariant($input),
+            default => $input,
+        };
     }
 
-    protected function getResponseType(): string {
-        return self::RESPONSE_NESTED;
+	private function transformTemplateVariant(array $originalInput): array
+    {
+		$excludedKeys = ['email_topic', 'topic_source'];
+		return array_diff_key($originalInput, array_flip($excludedKeys));
     }
 
-    protected function getTemplate(): string {
-        return '/Components/NestedResult';
-    }
-
-    protected function getGeneratorId(): ?string {
-        return 'subject';
-    }
-
-    protected function transformInput(array $input, mixed ...$context): array {
-        $variant = $context[0] ?? null;
-        if ($variant === 'template') {
-            unset($input['topic_source']);
-        }
-        return $input;
+	private function transformCustomVariant(array $originalInput): array
+    {
+		$excludedKeys = ['template_id', 'topic_source'];
+		return array_diff_key($originalInput, array_flip($excludedKeys));
     }
 }

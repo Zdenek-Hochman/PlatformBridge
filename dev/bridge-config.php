@@ -32,14 +32,8 @@ return [
 
     // ─── Endpointy ──────────────────────────────────────────────
     // Registrace vlastních AI endpointů.
-    // Klíč = název endpointu, hodnota = konfigurační pole.
+    // Klíč = automaticky z #[Endpoint] atributu, hodnota = třída nebo pole s 'class'+'file'.
     'endpoints' => [
-		'CreateSubject' => \CreateSubjectEndpoint::class,
-
-        // 'CreateSubject' => [
-        //     'generator_id'  => 'subject',
-        //     'response_type' => 'nested',
-        //     'template'      => '/Components/NestedResult',
-        // ],
+		['class' => CreateSubjectEndpoint::class, 'file' => __DIR__ . '/../CreateSubjectEndpoint.php'],
     ],
 ];

@@ -8,10 +8,6 @@ composer.lock
 # Build output (generováno přes npm run build)
 /dist/
 
-# Generated at install (php vendor/bin/platformbridge install)
-/d/platformbridge/
-/public/platformbridge/
-
 # Cache files
 /var/cache/*.cache.php
 
@@ -32,3 +28,5 @@ Thumbs.db
 
 # Logs
 *.log
+
+demo.php

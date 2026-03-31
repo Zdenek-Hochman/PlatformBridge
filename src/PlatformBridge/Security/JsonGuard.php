@@ -5,52 +5,19 @@ declare(strict_types=1);
 namespace Zoom\PlatformBridge\Security;
 
 /**
- * Zajišťuje ochranu JSON konfiguračních souborů proti přímému přístupu z webu.
+ * Třída JsonGuard poskytuje bezpečnostní mechanismy pro ochranu citlivých JSON konfiguračních souborů
+ * před přímým přístupem přes webový server. Umožňuje:
  *
- * ------------------------------------------------------------------------
- * PROBLÉM
- * ------------------------------------------------------------------------
- * Pokud je část projektu veřejně dostupná (např. /www nebo /public),
- * mohou být .json soubory přímo čitelné přes URL:
+ * - Obalit JSON obsah PHP "exit guardem", který zabrání zobrazení obsahu přes prohlížeč (odesláním HTTP 403).
+ * - Detekovat a odstranit ochrannou PHP hlavičku z obsahu (pro zpětnou kompatibilitu a práci s čistým JSONem).
+ * - Bezpečně číst a zapisovat chráněné konfigurační soubory.
+ * - Konvertovat běžné .json soubory na chráněné .json.php soubory.
+ * - Generovat a vytvářet ochranné index.php soubory v adresářích, aby nebylo možné procházet adresářovou strukturu.
+ * - Zajistit, že všechny konfigurační soubory mají správnou ochrannou příponu.
  *
- * To může vést k úniku:
- *   - struktury aplikace
- *   - interních cest
- *   - konfigurace generátorů / systémů
+ * Typické použití je v rámci frameworku PlatformBridge pro ochranu konfigurací, které by neměly být veřejně přístupné.
  *
- * ------------------------------------------------------------------------
- * ŘEŠENÍ – "PHP EXIT GUARD"
- * ------------------------------------------------------------------------
- * JSON obsah se uloží do souboru s příponou:
- *
- *   *.json.php
- *
- * Na začátek souboru se vloží PHP blok:
- *   - nastaví HTTP 403
- *   - okamžitě ukončí skript (exit)
- *
- * Výsledné chování:
- *
- *   ► Přístup přes prohlížeč:
- *     PHP se vykoná → exit → JSON se nikdy nepošle ven
- *
- *   ► Přístup přes aplikaci (file_get_contents):
- *     PHP se NEvykoná → guard se odstraní → JSON se normálně zpracuje
- *
- * ------------------------------------------------------------------------
- * VÝHODY
- * ------------------------------------------------------------------------
- * - Nezávislé na serveru (funguje na Apache, Nginx, IIS…)
- * - Není potřeba .htaccess / nginx.conf
- * - JSON zůstává čistý (guard je jen obal)
- * - Zpětná kompatibilita (.json funguje dál)
- * - Bezpečné: obsah se nikdy nenačítá přes include/require
- *
- * ------------------------------------------------------------------------
- * DOPLŇKOVÁ OCHRANA
- * ------------------------------------------------------------------------
- * Třída umí generovat:
- *   - index.php v adresářích → zabrání directory listingu
+ * Všechny metody jsou statické, třída není určena k instancování.
  */
 final class JsonGuard
 {

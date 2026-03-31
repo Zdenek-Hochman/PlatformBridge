@@ -15,8 +15,16 @@ use Zoom\PlatformBridge\Config\ConfigManager;
  * - Vyhledání správného endpointu podle názvu
  * - Lazy loading definic
  * - Injektování ConfigManager pro dynamické načítání required polí
+ * - Čtení názvu endpointu z #[Endpoint] atributu (auto-discovery)
  *
- * Uživatel definuje endpointy deklarativně v bridge-config.php jako pole:
+ * Doporučený způsob — třída s atributem (bez pojmenovaného klíče):
+ *
+ *   'endpoints' => [
+ *       CreateSubjectEndpoint::class,
+ *       ['class' => AnotherEndpoint::class, 'file' => __DIR__ . '/../AnotherEndpoint.php'],
+ *   ]
+ *
+ * Legacy způsob — deklarativní pole s pojmenovaným klíčem:
  *
  *   'endpoints' => [
  *       'CreateSubject' => [
@@ -25,8 +33,6 @@ use Zoom\PlatformBridge\Config\ConfigManager;
  *           'template'      => '/Components/NestedResult',
  *       ],
  *   ]
- *
- * Pro pokročilé případy je možné předat i FQCN třídy dědící z EndpointDefinition.
  */
 class EndpointRegistry
 {
@@ -38,6 +44,9 @@ class EndpointRegistry
 
     /** @var array<string, array> Deklarativní konfigurace endpointů (pole parametrů) */
     private array $endpointConfigs = [];
+
+    /** @var array<string, callable> Callable transformace čekající na injekci do endpointů */
+    private array $pendingTransforms = [];
 
     /** ConfigManager pro dynamické načítání pravidel z JSON */
     private ?ConfigManager $configManager = null;
@@ -57,14 +66,6 @@ class EndpointRegistry
         }
         return self::$instance;
     }
-
-	/**
-	 * Resetuje singleton instanci (užitečné pro testování).
-	 */
-	public static function resetInstance(): void
-	{
-		self::$instance = null;
-	}
 
 	/**
 	 * Nastaví instanci ConfigManager pro registry a všechny endpointy.
@@ -91,19 +92,35 @@ class EndpointRegistry
 	 * Hromadně registruje endpointy z konfiguračního pole.
 	 *
 	 * Typicky se volá s hodnotou klíče 'endpoints' z bridge-config.php.
-	 * Podporuje dva formáty registrace:
+	 * Podporuje tři formáty registrace:
 	 *
-	 * 1. Deklarativní (doporučeno) — endpoint je konfigurace v poli:
-	 *    'CreateSubject' => [
-	 *        'generator_id'  => 'subject',
-	 *        'response_type' => 'nested',
-	 *        'template'      => '/Components/NestedResult',
-	 *    ]
+	 * Podporované formáty (od nejjednoduššího po nejflexibilnější):
 	 *
-	 * 2. Třídou (pokročilé) — endpoint je FQCN třídy dědící z EndpointDefinition:
-	 *    'CreateSubject' => \App\Endpoints\CreateSubjectEndpoint::class,
+	 * ── Formát A: Třída s #[Endpoint] atributem (DOPORUČENO) ──
+	 * Název endpointu se automaticky načte z atributu. Numerický klíč.
 	 *
-	 * @param array<string, array|class-string<EndpointDefinition>> $endpoints Mapa [název => konfigurace|třída]
+	 *   CreateSubjectEndpoint::class,
+	 *
+	 * ── Formát B: Třída s atributem + soubor (bez autoloadingu) ──
+	 *   ['class' => CreateSubjectEndpoint::class, 'file' => __DIR__ . '/../CreateSubjectEndpoint.php'],
+	 *
+	 * ── Formát C: Třída s atributem + runtime transform override ──
+	 *   ['class' => CreateSubjectEndpoint::class, 'transform' => fn(array $input, mixed ...$ctx) => $input],
+	 *
+	 * ── Formát D: Deklarativní pole (bez vlastní třídy) ──
+	 *   'CreateSubject' => [
+	 *       'generator_id'  => 'subject',
+	 *       'response_type' => 'nested',
+	 *       'template'      => '/Components/NestedResult',
+	 *   ],
+	 *
+	 * ── Formát E: Pojmenovaný klíč + class-string ──
+	 *   'CreateSubject' => \App\Endpoints\CreateSubjectEndpoint::class,
+	 *
+	 * Formáty A–C využívají #[Endpoint] atribut na třídě dědící z AttributeEndpoint.
+	 * Název endpointu se z atributu načte automaticky — nepotřebujete pojmenovaný klíč.
+	 *
+	 * @param array $endpoints Mapa/seznam registrací endpointů
 	 * @return self Vrací aktuální instanci registru pro řetězení metod.
 	 *
 	 * @throws \InvalidArgumentException Pokud je konfigurace neplatná.
@@ -111,24 +128,104 @@ class EndpointRegistry
 	public function registerFromConfig(array $endpoints): self
 	{
 		foreach ($endpoints as $name => $definition) {
+			// ── Formát A: Numerický klíč + class-string (atribut) ──
+			// Třída musí dědit z AttributeEndpoint a mít #[Endpoint('NázevEndpointu')] atribut.
+			// Název endpointu se automaticky načte z atributu. Vyžaduje funkční autoloading.
+			//
+			// Struktura v bridge-config.php:
+			//   'endpoints' => [
+			//       CreateSubjectEndpoint::class,
+			//       AnotherEndpoint::class,
+			//   ]
+			//
+			// → $name = 0 (int), $definition = 'App\Endpoints\CreateSubjectEndpoint' (string)
+			// → Výsledek: registerAttributeClass() → název z #[Endpoint], třída jako AttributeEndpoint
+			if (is_int($name) && is_string($definition)) {
+				$this->registerAttributeClass($definition);
+				continue;
+			}
+
+			// ── Formát B/C: Numerický klíč + pole s 'class' (atribut + file/transform) ──
+			// Stejné jako Formát A, ale s možností:
+			//   - 'file'      → require_once souboru (pro prostředí bez autoloadingu)
+			//   - 'transform' → runtime override transformace (callable)
+			//
+			// Struktura v bridge-config.php:
+			//   'endpoints' => [
+			      // B: Třída + soubor (bez autoloadingu)
+			//       ['class' => CreateSubjectEndpoint::class, 'file' => __DIR__ . '/../CreateSubjectEndpoint.php'],
+			//
+			      // C: Třída + runtime transform override
+			//       ['class' => CreateSubjectEndpoint::class, 'transform' => fn(array $input, mixed ...$ctx) => $input],
+			//
+			      // B+C: Třída + soubor + transform
+			//       [
+			//           'class'     => CreateSubjectEndpoint::class,
+			//           'file'      => __DIR__ . '/../CreateSubjectEndpoint.php',
+			//           'transform' => fn(array $input, mixed ...$ctx) => modifyInput($input),
+			//       ],
+			//   ]
+			//
+			// → $name = 0 (int), $definition = ['class' => '...', 'file' => '...', 'transform' => fn()]
+			// → Výsledek: registerAttributeClassFromArray() → název z #[Endpoint], třída jako AttributeEndpoint
+			if (is_int($name) && is_array($definition) && isset($definition['class'])) {
+				$this->registerAttributeClassFromArray($definition);
+				continue;
+			}
+
+			// ── Od tohoto bodu vyžadujeme pojmenovaný klíč (string) ──
+			// Pokud je klíč stále int a nedošlo k matchnutí výše, konfigurace je neplatná.
 			if (!is_string($name)) {
 				throw new \InvalidArgumentException(
-					"Neplatná konfigurace endpointu: klíč musí být string (název endpointu). Zkontrolujte 'endpoints' v bridge-config.php."
+					"Neplatná konfigurace endpointu: pro deklarativní konfiguraci musí být klíč string (název endpointu). "
+					. "Pro třídy s #[Endpoint] atributem použijte numerický index. Zkontrolujte 'endpoints' v bridge-config.php."
 				);
 			}
 
-			// Formát 1: Deklarativní pole → ConfigurableEndpoint
+			// ── Formát D: Deklarativní pole → ConfigurableEndpoint ──
+			// Nevyžaduje vlastní třídu — endpoint se sestaví z konfiguračního pole.
+			// Název endpointu = klíč pole. Vytvoří instanci ConfigurableEndpoint.
+			//
+			// Struktura v bridge-config.php:
+			//   'endpoints' => [
+			//       'CreateSubject' => [
+			//           'generator_id'  => 'subject',
+			//           'response_type' => 'nested',        // 'nested' | 'simple' | 'stream'
+			//           'template'      => '/Components/NestedResult',
+			//           'required'      => ['topic', 'style'],  // volitelně, jinak se načte z JSON
+			//       ],
+			//       'GenerateTitle' => [
+			//           'generator_id'  => 'title',
+			//           'response_type' => 'simple',
+			//           'template'      => '/Components/SimpleResult',
+			//       ],
+			//   ]
+			//
+			// → $name = 'CreateSubject' (string), $definition = ['generator_id' => '...', ...] (array)
+			// → Výsledek: registerConfig() → ConfigurableEndpoint s daným názvem a konfigurací
 			if (is_array($definition)) {
 				$this->registerConfig($name, $definition);
 				continue;
 			}
 
-			// Formát 2: Class-string → validace a lazy load
+			// ── Formát E: Pojmenovaný klíč + class-string ──
+			// Třída musí dědit z EndpointDefinition (ne nutně AttributeEndpoint).
+			// Název endpointu = klíč pole (ne z atributu). Vyžaduje funkční autoloading.
+			//
+			// Struktura v bridge-config.php:
+			//   'endpoints' => [
+			//       'CreateSubject' => \App\Endpoints\CreateSubjectEndpoint::class,
+			//       'GenerateTitle' => \App\Endpoints\GenerateTitleEndpoint::class,
+			//   ]
+			//
+			// → $name = 'CreateSubject' (string), $definition = 'App\Endpoints\CreateSubjectEndpoint' (string)
+			// → Výsledek: registerClass() → lazy-load třídy pod daným názvem
 			if (is_string($definition)) {
 				if (!class_exists($definition)) {
 					throw new \InvalidArgumentException(
 						"Třída endpointu '{$definition}' pro '{$name}' nebyla nalezena. "
-						. "Zkontrolujte autoloading a zda soubor existuje."
+						. "Zkontrolujte autoloading, nebo použijte formát s klíčem 'file':\n"
+						. "  '{$name}' => ['class' => \\{$definition}::class, 'file' => __DIR__ . '/path/to/{$definition}.php']"
 					);
 				}
 
@@ -148,6 +245,105 @@ class EndpointRegistry
 		}
 
 		return $this;
+	}
+
+	/**
+	 * Registruje třídu s #[Endpoint] atributem (autoloaded).
+	 *
+	 * Název endpointu se automaticky načte z atributu.
+	 * Třída musí dědit z AttributeEndpoint a mít #[Endpoint] atribut.
+	 *
+	 * @param class-string $className FQCN třídy
+	 *
+	 * @throws \InvalidArgumentException Pokud třída neexistuje nebo nemá správný atribut/dědičnost
+	 */
+	private function registerAttributeClass(string $className): void
+	{
+		if (!class_exists($className)) {
+			throw new \InvalidArgumentException(
+				"Třída endpointu '{$className}' nebyla nalezena. "
+				. "Zkontrolujte autoloading, nebo použijte formát s klíčem 'file':\n"
+				. "  ['class' => \\{$className}::class, 'file' => __DIR__ . '/path/to/file.php']"
+			);
+		}
+
+		$this->validateAttributeEndpointClass($className);
+
+		$endpointName = AttributeEndpoint::resolveEndpointName($className);
+		$this->registerClass($endpointName, $className);
+	}
+
+	/**
+	 * Registruje třídu s #[Endpoint] atributem z pole konfigurace.
+	 *
+	 * Podporuje klíče:
+	 *   - 'class'     (required) FQCN třídy
+	 *   - 'file'      (optional) Cesta k souboru pro require_once
+	 *   - 'transform' (optional) Callable pro runtime override transformace
+	 *
+	 * @param array $definition Pole s klíči 'class', volitelně 'file' a 'transform'
+	 *
+	 * @throws \InvalidArgumentException Pokud třída/soubor neexistuje nebo nemá správný atribut
+	 */
+	private function registerAttributeClassFromArray(array $definition): void
+	{
+		$className = $definition['class'];
+		$file = $definition['file'] ?? null;
+		$transform = $definition['transform'] ?? null;
+
+		if (!is_string($className)) {
+			throw new \InvalidArgumentException(
+				"Klíč 'class' pro endpoint musí být string (FQCN třídy)."
+			);
+		}
+
+		// Načti soubor pokud je uvedeno
+		if ($file !== null) {
+			if (!is_string($file) || !is_file($file)) {
+				throw new \InvalidArgumentException(
+					"Soubor '{$file}' pro endpoint třídy '{$className}' nebyl nalezen. "
+					. "Zkontrolujte cestu v klíči 'file' (tip: použijte __DIR__ pro relativní cestu)."
+				);
+			}
+			require_once $file;
+		}
+
+		if (!class_exists($className)) {
+			$hint = $file === null
+				? " Přidejte klíč 'file' s cestou k souboru, nebo zkontrolujte autoloading."
+				: " Soubor '{$file}' byl načten, ale třída v něm nebyla nalezena.";
+
+			throw new \InvalidArgumentException(
+				"Třída endpointu '{$className}' nebyla nalezena.{$hint}"
+			);
+		}
+
+		$this->validateAttributeEndpointClass($className);
+
+		$endpointName = AttributeEndpoint::resolveEndpointName($className);
+
+		// Pokud je transform, uložíme ho pro pozdější injekci při lazy-load
+		if ($transform !== null && is_callable($transform)) {
+			$this->pendingTransforms[$endpointName] = $transform;
+		}
+
+		$this->registerClass($endpointName, $className);
+	}
+
+	/**
+	 * Validuje, že třída dědí z AttributeEndpoint a má #[Endpoint] atribut.
+	 *
+	 * @param class-string $className FQCN třídy
+	 * @throws \InvalidArgumentException Pokud validace selže
+	 */
+	private function validateAttributeEndpointClass(string $className): void
+	{
+		if (!is_subclass_of($className, AttributeEndpoint::class)) {
+			throw new \InvalidArgumentException(
+				"Třída '{$className}' musí dědit ze Zoom\\PlatformBridge\\AI\\API\\AttributeEndpoint "
+				. "a mít atribut #[Endpoint(...)]."
+			);
+		}
 	}
 
     /**
@@ -177,8 +373,6 @@ class EndpointRegistry
      */
     public function get(string $endpointName): ?EndpointDefinition
     {
-		var_dump($this->endpoints); // Debug log
-
         // Nejdřív zkus již vytvořenou instanci
         if (isset($this->endpoints[$endpointName])) {
             return $this->endpoints[$endpointName];
@@ -192,6 +386,12 @@ class EndpointRegistry
 			// Injektuj ConfigManager pokud je k dispozici
             if ($this->configManager !== null) {
                 $endpoint->setConfigManager($this->configManager);
+            }
+
+            // Injektuj pending transform callable (z bridge-config registrace)
+            if (isset($this->pendingTransforms[$endpointName]) && $endpoint instanceof AttributeEndpoint) {
+                $endpoint->setTransform($this->pendingTransforms[$endpointName]);
+                unset($this->pendingTransforms[$endpointName]);
             }
 
             $this->endpoints[$endpointName] = $endpoint;
