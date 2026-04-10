@@ -1,6 +1,8 @@
 <?php
 
-namespace Zoom\PlatformBridge\Template;
+namespace PlatformBridge\Template;
+
+// use PlatformBridge\Translator\Translator;
 
 /**
  * TemplateEngine — vlastní šablonovací engine s kompilací do PHP a cache.
@@ -38,6 +40,7 @@ namespace Zoom\PlatformBridge\Template;
 final class Engine
 {
     private array $var = [];
+    // private ?Translator $translator = null;
 
     private static array $conf = [
         'checksum' => [],
@@ -309,6 +312,47 @@ final class Engine
             throw new \Exception($e->getMessage());
         }
     }
+
+    /**
+     * Nastaví Translator pro runtime překlady v šablonách.
+     * Umožňuje tag {_tran k='domain.key' d='default'} v TPL souborech.
+     *
+     * @param Translator $translator Instance překladače
+     * @return self Pro řetězení metod (fluent API)
+     */
+    // public function setTranslator(Translator $translator): self
+    // {
+    //     $this->translator = $translator;
+    //     return $this;
+    // }
+
+    /**
+     * Přeloží klíč ve formátu 'domain.key_path' za běhu.
+     * Volá se z kompilovaných šablon ({_tran} tag).
+     *
+     * Klíč se rozdělí na doménu (před první tečkou) a cestu klíče (zbytek).
+     * Např. 'errors.http.400' → domain='errors', key='http.400'
+     *
+     * @param string $key Klíč ve formátu 'domain.key_path'
+     * @param string $default Výchozí text pokud překlad neexistuje
+     * @return string Přeložený text
+     */
+    // public function translate(string $key, string $default = ''): string
+    // {
+    //     if ($this->translator === null) {
+    //         return $default !== '' ? $default : $key;
+    //     }
+
+    //     $dotPos = strpos($key, '.');
+    //     if ($dotPos === false) {
+    //         return $default !== '' ? $default : $key;
+    //     }
+
+    //     $domain = substr($key, 0, $dotPos);
+    //     $keyPath = substr($key, $dotPos + 1);
+
+    //     return $this->translator->t($domain, $keyPath, [], $default !== '' ? $default : null);
+    // }
 
     /**
      * Metoda pro konfiguraci nastavení šablony.

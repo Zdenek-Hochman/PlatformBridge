@@ -1,7 +1,8 @@
 <?php
+
 declare(strict_types=1);
 
-namespace Zoom\PlatformBridge\AI;
+namespace PlatformBridge\AI\Client;
 
 /**
  * Konfigurace AI klienta
@@ -18,7 +19,8 @@ class AiClientConfig
         public readonly bool $verifySsl = true,
         public readonly bool $debug = false,
         public readonly array $defaultHeaders = []
-    ) {}
+    ) {
+    }
 
     /**
      * Factory metoda pro vytvoření z pole

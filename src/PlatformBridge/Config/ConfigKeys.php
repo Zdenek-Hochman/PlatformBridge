@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Zoom\PlatformBridge\Config;
+namespace PlatformBridge\Config;
 
 /**
  * Definice klíčů používaných v konfiguračních JSON souborech.

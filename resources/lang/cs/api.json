@@ -1,0 +1,15 @@
+{
+    "response": {
+        "parse_error": "Nepodařilo se zpracovat odeslaná data.",
+        "missing_signed_params": "Chybí podepsané parametry (__ai_signed).",
+        "missing_endpoint": "Chybí název endpointu v konfiguraci.",
+        "config_not_found": "Konfigurační soubor nenalezen: {:path}",
+        "config_must_return_array": "Konfigurační soubor musí vracet pole.",
+        "api_key_required": "API key je povinný."
+    },
+    "sse": {
+        "server_error": "SSE chyba serveru ({:status}).",
+        "readable_stream_not_supported": "ReadableStream není podporován.",
+        "stream_aborted": "Stream byl zrušen nebo vypršel timeout."
+    }
+}

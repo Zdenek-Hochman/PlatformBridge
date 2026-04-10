@@ -1,8 +1,8 @@
 <?php
 
-namespace Zoom\PlatformBridge\Handler;
+namespace PlatformBridge\Handler;
 
-use Zoom\PlatformBridge\Handler\Fields\FieldHandler;
+use PlatformBridge\Handler\Fields\FieldHandler;
 
 /**
  * Registr handlerů pro výběr správného FieldHandleru podle bloku.

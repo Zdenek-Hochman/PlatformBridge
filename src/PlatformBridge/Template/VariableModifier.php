@@ -1,6 +1,6 @@
 <?php
 
-namespace Zoom\PlatformBridge\Template;
+namespace PlatformBridge\Template;
 
 const PHP_WRAP_START = '<?php ';
 const PHP_WRAP_END = ' ?>';

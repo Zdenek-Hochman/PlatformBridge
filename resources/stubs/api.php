@@ -1,4 +1,5 @@
 <?php
+
 /**
  * PlatformBridge API Endpoint
  *
@@ -38,4 +39,4 @@ require_once $autoloadPath;
 // Konfigurace se načte z config/platform-bridge/bridge-config.php
 // s fallbackem na vendor defaults.
 
-\Zoom\PlatformBridge\AI\API\ApiHandler::bootstrap()->handle();
+\PlatformBridge\AI\API\Core\ApiHandler::bootstrap()->handle();

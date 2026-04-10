@@ -1,0 +1,45 @@
+{
+    "form": {
+        "required": "This field is required.",
+        "submit": "Submit",
+        "cancel": "Cancel",
+        "loading": "Loading..."
+    },
+    "notification": {
+        "close": "Close",
+        "error": "Error",
+        "success": "Success",
+        "warning": "Warning",
+        "info": "Information"
+    },
+    "error_page": {
+        "title": "Error",
+        "something_went_wrong": "Something went wrong",
+        "something_went_wrong_detail": "The problem has been logged. If the issue persists, contact the administrator.",
+        "environment": "Environment",
+        "headers": "Headers",
+        "source_line": "line {:line}",
+        "source_not_available": "Source code not available",
+        "php_version": "PHP version",
+        "php_sapi": "PHP SAPI",
+        "system": "System",
+        "memory_peak": "Memory (peak)",
+        "memory_current": "Memory (current)",
+        "zend_engine": "Zend Engine",
+        "extensions": "Extensions",
+        "cli_no_request": "CLI environment — no HTTP request",
+        "cli_no_headers": "CLI environment — no headers",
+        "no_headers": "No headers",
+        "method": "Method",
+        "uri": "URI",
+        "host": "Host",
+        "protocol": "Protocol",
+        "remote_ip": "Remote IP"
+    },
+    "php_type": {
+        "security": "Access denied — invalid security signature.",
+        "invalid_json": "Invalid request format.",
+        "ai_provider": "AI provider error.",
+        "internal_error": "Internal server error."
+    }
+}

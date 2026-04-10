@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace Zoom\PlatformBridge\Runtime;
+namespace PlatformBridge\Runtime;
 
-use Zoom\PlatformBridge\Config\ConfigKeys;
+use PlatformBridge\Config\ConfigKeys;
 
 /**
  * Pomocná třída pro zpracování atributů layoutu (sloupce, span, pozice v gridu) z definic sekcí a bloků.
@@ -17,7 +17,7 @@ use Zoom\PlatformBridge\Config\ConfigKeys;
  * Doporučené postupy:
  * - Při přidávání nových layout funkcí rozšiř ConfigKeys a odpovídajícím způsobem uprav buildování atributů.
  *
- * @see Zoom\PlatformBridge\Config\ConfigKeys
+ * @see PlatformBridge\Config\ConfigKeys
  *
  * @package PlatformBridge\Runtime
  */

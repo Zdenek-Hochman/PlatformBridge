@@ -2,11 +2,9 @@
 
 declare(strict_types=1);
 
-namespace Zoom\PlatformBridge\AI;
+namespace PlatformBridge\AI\Client;
 
-use Zoom\PlatformBridge\AI\AiClientConfig;
-use Zoom\PlatformBridge\AI\AiResponse;
-use Zoom\PlatformBridge\AI\Exception\AiException;
+use PlatformBridge\AI\Exception\AiException;
 
 /**
  * AI klient pro komunikaci s API

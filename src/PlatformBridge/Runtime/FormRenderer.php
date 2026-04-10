@@ -2,13 +2,13 @@
 
 declare(strict_types=1);
 
-namespace Zoom\PlatformBridge\Runtime;
+namespace PlatformBridge\Runtime;
 
-use Zoom\PlatformBridge\Config\ConfigManager;
-use Zoom\PlatformBridge\Config\ConfigKeys;
-use Zoom\PlatformBridge\Handler\FieldFactory;
-use Zoom\PlatformBridge\Form\Form;
-use Zoom\PlatformBridge\Template\Engine;
+use PlatformBridge\Config\ConfigManager;
+use PlatformBridge\Config\ConfigKeys;
+use PlatformBridge\Handler\FieldFactory;
+use PlatformBridge\Form\Form;
+use PlatformBridge\Template\Engine;
 
 /**
  * Vykreslování formulářů podle konfigurace.
@@ -19,7 +19,7 @@ use Zoom\PlatformBridge\Template\Engine;
  *  - Kontext (dynamické hodnoty) předávejte přes klíče odpovídající 'name' nebo 'id' bloku
  *  - Pro každý render volat build() s novým kontextem
  *
- * @see Zoom\PlatformBridge\Config\ConfigManager
+ * @see PlatformBridge\Config\ConfigManager
  */
 final class FormRenderer
 {

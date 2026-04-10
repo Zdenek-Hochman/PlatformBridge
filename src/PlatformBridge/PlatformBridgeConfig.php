@@ -2,9 +2,16 @@
 
 declare(strict_types=1);
 
-namespace Zoom\PlatformBridge;
+namespace PlatformBridge;
 
-use Zoom\PlatformBridge\Paths\PathResolver;
+use PlatformBridge\Paths\PathResolver;
+
+use PlatformBridge\Config\DTO\{
+	PathsDto,
+	UrlsDto,
+	SecurityDto,
+	TranslationsDto
+};
 
 /**
  * Konfigurační objekt pro PlatformBridge.
@@ -21,24 +28,18 @@ final class PlatformBridgeConfig
     private ?int $resolvedTtl;
 
     public function __construct(
-        private ?string $configPath,
-        private ?string $viewsPath,
-        private ?string $cachePath,
-        private string $assetUrl,
-        private string $apiUrl,
-        private string $securityConfigPath,
-        private string $locale,
-        private bool $useHmac = false,
-        private ?int $paramsTtl = null,
-        private ?PathResolver $pathResolver = null,
+		private PathsDto $paths,
+		private UrlsDto $urls,
+		private SecurityDto $security,
+		private TranslationsDto $translations,
     ) {
         [$this->secretKey, $this->resolvedTtl] = $this->loadSecurityConfig();
     }
 
-	public function getPathResolver(): PathResolver
-	{
-		return $this->pathResolver;
-	}
+    public function getPathResolver(): PathResolver
+    {
+        return $this->paths->resolver;
+    }
 
     /**
      * Vrátí cestu ke složce s JSON konfigurací (blocks.json, layouts.json, generators.json).
@@ -48,11 +49,7 @@ final class PlatformBridgeConfig
      */
     public function getConfigPath(): string
     {
-		if ($this->configPath !== null) {
-       		 return $this->configPath;
-    	}
-
-        return $this->pathResolver->configPath();
+        return $this->paths->getConfigPath();
     }
 
     /**
@@ -63,11 +60,11 @@ final class PlatformBridgeConfig
      */
     public function getViewsPath(): string
     {
-		if ($this->viewsPath !== null) {
-       		 return $this->viewsPath;
-    	}
+        if ($this->paths->viewsPath !== null) {
+            return $this->paths->viewsPath;
+        }
 
-    	return $this->pathResolver->viewsPath();
+        return $this->paths->resolver->viewsPath();
     }
 
     /**
@@ -78,14 +75,14 @@ final class PlatformBridgeConfig
      */
     public function getCachePath(): string
     {
-		if ($this->cachePath !== null) {
-			return $this->cachePath;
-    	}
+        if ($this->paths->cachePath !== null) {
+            return $this->paths->cachePath;
+        }
 
-        return $this->pathResolver->cachePath();
+        return $this->paths->resolver->cachePath();
     }
 
-	/**
+    /**
      * Vrátí URL pro načítání assetů (JS/CSS).
      *
      * @return string URL k asset složce
@@ -93,7 +90,7 @@ final class PlatformBridgeConfig
      */
     public function getAssetUrl(): string
     {
-        return $this->assetUrl;
+        return $this->urls->assetUrl;
     }
 
     /**
@@ -104,10 +101,10 @@ final class PlatformBridgeConfig
      */
     public function getApiUrl(): string
     {
-        return $this->apiUrl;
+        return $this->urls->apiUrl;
     }
 
-	/**
+    /**
      * Vrátí secret key pro HMAC podepisování parametrů.
      * Načítá se ze security-config.php pokud je HMAC zapnutý.
      *
@@ -119,7 +116,7 @@ final class PlatformBridgeConfig
         return $this->secretKey;
     }
 
-	/**
+    /**
      * Vrátí TTL (time-to-live) pro podepsané parametry v sekundách.
      * Pokud není nastaveno, parametry nikdy neexpirují.
      *
@@ -143,7 +140,7 @@ final class PlatformBridgeConfig
      */
     private function loadSecurityConfig(): array
     {
-        if (!$this->useHmac) {
+        if (!$this->security->useHmac) {
             return [null, null];
         }
 
@@ -151,7 +148,7 @@ final class PlatformBridgeConfig
 
         $secretKey = $config['secretKey'] ?? throw new \InvalidArgumentException("Security config must contain 'secretKey'.");
 
-        $ttl = $this->paramsTtl ?? ($config['ttl'] ?? null);
+        $ttl = $this->security->paramsTtl ?? ($config['ttl'] ?? null);
 
         return [$secretKey, $ttl];
     }
@@ -167,11 +164,11 @@ final class PlatformBridgeConfig
      */
     private function requireSecurityConfig(): array
     {
-        clearstatcache(true, $this->securityConfigPath);
+        clearstatcache(true, $this->security->configPath);
 
-        if (!file_exists($this->securityConfigPath)) {
+        if (!file_exists($this->security->configPath)) {
             throw new \InvalidArgumentException(
-                "Security config not found: {$this->securityConfigPath}"
+                "Security config not found: {$this->security->configPath}"
             );
         }
 
@@ -179,7 +176,7 @@ final class PlatformBridgeConfig
             define('BRIDGE_BOOTSTRAPPED', true);
         }
 
-        $config = require $this->securityConfigPath;
+        $config = require $this->security->configPath;
 
         if (!is_array($config)) {
             throw new \InvalidArgumentException('Security config must return an array.');
@@ -191,37 +188,59 @@ final class PlatformBridgeConfig
     /**
      * Vrátí aktuální nastavenou lokalizaci (jazyk).
      *
-     * @return string Kód jazyka (např. "cs_CZ")
+     * @return string Kód jazyka (např. 'cs', 'en')
      * @internal
      */
-    // public function getLocale(): string
-    // {
-    //     return $this->locale;
-    // }
+    public function getLocale(): string
+    {
+        return $this->translations->locale;
+    }
+
+    /**
+     * Vrátí mysqli instanci pro překladový systém.
+     *
+     * @return \mysqli|null mysqli připojení nebo null pokud není nastaveno
+     * @internal
+     */
+    public function getMysqli(): ?\mysqli
+    {
+        return $this->translations->mysqli;
+    }
+
+    /**
+     * Vrátí název tabulky pro překlady.
+     *
+     * @return string Název tabulky (default: 'pb_translations')
+     * @internal
+     */
+    public function getTranslationTable(): string
+    {
+        return $this->translations->table;
+    }
 
     /**
      * Vrátí konfiguraci handlerů pro formulářová pole.
      *
      * @return array{handlers: class-string[], default: class-string} Pole tříd handlerů a výchozí handler
      *
-     * @see \Zoom\PlatformBridge\Handler\HandlerRegistry
+     * @see \PlatformBridge\Handler\HandlerRegistry
      */
     public function getHandlersConfig(): array
     {
         return [
             'handlers' => [
-                \Zoom\PlatformBridge\Handler\Fields\RadioHandler::class,
-                \Zoom\PlatformBridge\Handler\Fields\SelectHandler::class,
-                \Zoom\PlatformBridge\Handler\Fields\CheckboxHandler::class,
-                \Zoom\PlatformBridge\Handler\Fields\TextareaHandler::class,
-                \Zoom\PlatformBridge\Handler\Fields\TickBoxHandler::class,
-                \Zoom\PlatformBridge\Handler\Fields\HiddenHandler::class,
-                \Zoom\PlatformBridge\Handler\Fields\TextHandler::class,
-                \Zoom\PlatformBridge\Handler\Fields\NumberHandler::class,
-                \Zoom\PlatformBridge\Handler\Fields\DateHandler::class,
-                \Zoom\PlatformBridge\Handler\Fields\FileHandler::class,
+                \PlatformBridge\Handler\Fields\RadioHandler::class,
+                \PlatformBridge\Handler\Fields\SelectHandler::class,
+                \PlatformBridge\Handler\Fields\CheckboxHandler::class,
+                \PlatformBridge\Handler\Fields\TextareaHandler::class,
+                \PlatformBridge\Handler\Fields\TickBoxHandler::class,
+                \PlatformBridge\Handler\Fields\HiddenHandler::class,
+                \PlatformBridge\Handler\Fields\TextHandler::class,
+                \PlatformBridge\Handler\Fields\NumberHandler::class,
+                \PlatformBridge\Handler\Fields\DateHandler::class,
+                \PlatformBridge\Handler\Fields\FileHandler::class,
             ],
-            'default' => \Zoom\PlatformBridge\Handler\Fields\TextHandler::class,
+            'default' => \PlatformBridge\Handler\Fields\TextHandler::class,
         ];
     }
 }

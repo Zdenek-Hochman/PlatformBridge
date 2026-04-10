@@ -1,11 +1,11 @@
 # 🤖 PlatformBridge — Dokumentace
 
-> **Verze:** 1.0.0
+> **Verze:** 1.0.1
 > **Autor:** Zdeněk Hochman
 > **Licence:** Proprietary
-> **Namespace:** `Zoom\PlatformBridge`
+> **Namespace:** `PlatformBridge`
 
-Middleware platforma pro integraci interní aplikace se Zoom API. Umožňuje dynamické generování UI formulářů z JSON konfigurace, jejich odesílání na AI API a zobrazování výsledků. Obsahuje vlastní šablonovací engine, HMAC bezpečnost, SSE streaming a kompletní frontend.
+Middleware platforma pro integraci interní aplikace se Zoom API. Umožňuje dynamické generování UI formulářů z JSON konfigurace, jejich odesílání na AI API a zobrazování výsledků. Obsahuje vlastní šablonovací engine, HMAC bezpečnost, překladový systém, CLI installer a kompletní TypeScript frontend s transporty (HTTP/SSE/WebSocket).
 
 ---
 
@@ -19,6 +19,7 @@ Middleware platforma pro integraci interní aplikace se Zoom API. Umožňuje dyn
   - [Builder pattern](#builder-pattern)
   - [JSON konfigurace](#json-konfigurace)
   - [Bridge config](#bridge-config)
+  - [Security config](#security-config)
 - [Hlavní třídy](#-hlavní-třídy)
   - [PlatformBridge (fasáda)](#platformbridge-fasáda)
   - [ConfigManager](#configmanager)
@@ -28,13 +29,18 @@ Middleware platforma pro integraci interní aplikace se Zoom API. Umožňuje dyn
   - [AI Client](#ai-client)
   - [SignedParams (HMAC)](#signedparams-hmac)
   - [AssetManager](#assetmanager)
-  - [ErrorHandler](#errorhandler)
+  - [ErrorHandler & ErrorRenderer](#errorhandler--errorrenderer)
+  - [Translator](#translator)
+  - [VariableResolver](#variableresolver)
+  - [PathResolver](#pathresolver)
+  - [JsonGuard](#jsonguard)
 - [Šablonovací engine](#-šablonovací-engine)
 - [Handlery formulářových polí](#-handlery-formulářových-polí)
 - [AI API vrstva](#-ai-api-vrstva)
-- [SSE Streaming](#-sse-streaming)
+- [Endpointy](#-endpointy)
 - [Frontend (TypeScript)](#-frontend-typescript)
 - [Build systém](#-build-systém)
+- [CLI Installer](#-cli-installer)
 - [Doporučení](#-doporučení)
 - [Upozornění](#-upozornění)
 - [Hacky a triky](#-hacky-a-triky)
@@ -58,8 +64,10 @@ Middleware platforma pro integraci interní aplikace se Zoom API. Umožňuje dyn
 ### 1. Composer (jako balíček)
 
 ```bash
-composer require zoom/platform-bridge
+composer require platformbridge/platform-bridge
 ```
+
+Po instalaci se automaticky spustí CLI installer (`bin/platformbridge install`), který publikuje konfigurační soubory a assety.
 
 ### 2. Lokální vývoj (klonování repozitáře)
 
@@ -95,19 +103,17 @@ npm run build
 ### Adresářová struktura po instalaci
 
 ```
-├── assets/
-│   ├── dist/           # Zkompilované assety (JS/CSS)
-│   └── src/
-│       ├── scss/       # Zdrojové SCSS styly
-│       └── ts/         # Zdrojový TypeScript
+├── config/                    # Vývojové konfigurace (lokální vývoj)
+│   ├── api.php             # Vývojový API endpoint
+│   ├── bridge-config.php   # Vývojová API konfigurace
+│   └── security-config.php # Vývojový HMAC klíč
+├── assets/                   # Zkompilované assety (JS/CSS)
+│   ├── css/pb-main.css
+│   └── js/pb-main.js
 ├── resources/
-│   ├── config/
-│   │   ├── bridge-config.php   # Secret key & TTL
-│   │   └── defaults/           # JSON konfigurace (blocks, layouts, generators)
-│   └── views/                  # Šablony (.tpl)
-├── src/PlatformBridge/         # PHP zdrojový kód
-├── var/cache/                  # Zkompilované cache šablon
-└── vendor/                     # Composer závislosti
+│   ├── defaults/           # JSON konfigurace (blocks, layouts, generators)
+│   └── views/              # Šablony (.tpl)
+├── var/cache/              # Zkompilované cache šablon
 ```
 
 ---
@@ -119,7 +125,7 @@ npm run build
 ```php
 require_once __DIR__ . '/vendor/autoload.php';
 
-use Zoom\PlatformBridge\PlatformBridge;
+use PlatformBridge\PlatformBridge;
 
 $bridge = PlatformBridge::createDefault();
 ```
@@ -131,14 +137,27 @@ $bridge = PlatformBridge::createDefault();
 ```php
 require_once __DIR__ . '/vendor/autoload.php';
 
-use Zoom\PlatformBridge\PlatformBridge;
+use PlatformBridge\PlatformBridge;
 
 $bridge = PlatformBridge::create()
-    ->withConfigPath(__DIR__ . '/resources/config/defaults')
+    ->withConfigPath(__DIR__ . '/resources/defaults')
     ->withViewsPath(__DIR__ . '/resources/views')
-    ->withCachePath(__DIR__ . '/var/cache')
     ->withSecretKey(true)   // HMAC podepisování parametrů
     ->withParamsTtl(3600)   // Expirace podepsaných dat (1 hodina)
+    ->withLocale('cs')      // Jazyk aplikace
+    ->build();
+```
+
+### Použití s překladovým systémem (mysqli)
+
+```php
+$mysqli = new \mysqli('localhost', 'root', '', 'platform_bridge', 3306);
+
+$bridge = PlatformBridge::create()
+    ->withConfigPath(__DIR__ . '/resources/defaults')
+    ->withSecretKey(true)
+    ->withLocale('cs')
+    ->withMysqli($mysqli)   // Překladový systém z databáze
     ->build();
 ```
 
@@ -167,22 +186,23 @@ echo $html;
 │                   PlatformBridge                     │  ← Hlavní fasáda
 │                   (Entry Point)                      │
 ├─────────────┬───────────┬───────────┬───────────────┤
-│ ConfigManager│ Template  │  Form     │  AI Client    │
+│ ConfigManager│ Template  │  Runtime  │  AI Client    │
 │ (JSON cfg)  │ Engine    │ Renderer  │  (cURL)       │
 ├─────────────┼───────────┼───────────┼───────────────┤
-│ ConfigLoader│ Parser    │FieldFactory│ AiRequest     │
-│ ConfigValid.│ VarModif. │ HandlerReg│ AiResponse    │
+│ ConfigLoader│ Parser    │FormRender │ AiRequest     │
+│ ConfigValid.│ VarModif. │LayoutMgr  │ AiResponse    │
+│ ConfigResol.│           │FieldFact. │ ApiHandler    │
 ├─────────────┼───────────┼───────────┼───────────────┤
 │ blocks.json │ *.tpl     │ Handlers  │ Endpoints     │
 │ layouts.json│ (views)   │ (Strategy)│ (Registry)    │
 │ generators  │           │           │               │
 ├─────────────┴───────────┴───────────┼───────────────┤
-│           Security Layer            │  Asset Mgr    │
-│      SignedParams (HMAC-SHA256)     │  (CSS/JS)     │
-├─────────────────────────────────────┼───────────────┤
-│         SSE Streaming (volitelné)   │  ErrorHandler │
-│   SseStream / SseEvent / Progress   │  (globální)   │
-└─────────────────────────────────────┴───────────────┘
+│      Security Layer     │ Translator│  Asset Mgr    │
+│  SignedParams / JsonGuard│ + VarRes. │  (CSS/JS)     │
+├─────────────────────────┼───────────┼───────────────┤
+│     Paths (PathResolver)│ Installer │  Error Layer  │
+│   PathsConfig / UrlRes. │ (CLI bin) │ Handler+Rend. │
+└─────────────────────────┴───────────┴───────────────┘
 ```
 
 **Návrhové vzory použité v projektu:**
@@ -191,8 +211,9 @@ echo $html;
 - **Strategy** — `FieldHandler` → různé handlery pro různé typy polí
 - **Factory** — `FieldFactory`, `FormElementFactory` pro vytváření elementů
 - **Registry** — `HandlerRegistry`, `EndpointRegistry` pro registraci komponent
-- **Value Object** — `PlatformBridgeConfig`, `AiResponse`, `SseEvent`
+- **Value Object** — `PlatformBridgeConfig`, `AiResponse`, DTO třídy (`PathsDto`, `SecurityDto`, `UrlsDto`, `TranslationsDto`)
 - **Template Method** — `FieldConfigurator` jako abstraktní báze handlerů
+- **PHP 8 Attributes** — `#[Endpoint]` atribut pro deklarativní registraci AI endpointů
 
 ---
 
@@ -204,19 +225,19 @@ echo $html;
 
 | Metoda | Popis | Výchozí |
 |---|---|---|
-| `withConfigPath(string)` | Cesta ke složce s JSON konfiguracemi | `resources/config/defaults` |
-| `withViewsPath(string)` | Cesta k šablonám (.tpl) | `resources/views` |
-| `withCachePath(string)` | Cesta ke cache adresáři | `var/cache` |
-| `withTranslationsPath(string)` | Cesta k překladům | `resources/translations` |
+| `withConfigPath(string)` | Cesta ke složce s JSON konfiguracemi | Automaticky via `PathResolver` |
+| `withViewsPath(string)` | Cesta k šablonám (.tpl) | Automaticky via `PathResolver` |
 | `withLocale(string)` | Jazyk aplikace | `'cs'` |
-| `withBridgeConfigPath(string)` | Cesta k `bridge-config.php` | `resources/config/bridge-config.php` |
 | `withSecretKey(bool)` | Zapne/vypne HMAC podepisování | `false` |
-| `withParamsTtl(int)` | TTL podepsaných parametrů (sekundy) | `null` (z configu) |
+| `withParamsTtl(int)` | TTL podepsaných parametrů (sekundy) | `null` (bez expirace) |
+| `withMysqli(\mysqli, string)` | Připojení pro překladový systém z DB | `null` (bez DB překladů) |
 | `build()` | Sestaví instanci `PlatformBridge` | — |
+
+> **Poznámka:** Cesty se automaticky resolvují přes `PathResolver` podle kontextu (standalone vs. vendor). Explicitní nastavení cest je potřeba pouze pro nestandardní struktury.
 
 ### JSON konfigurace
 
-Konfigurace je rozdělena do 3 souborů ve složce `resources/config/defaults/`:
+Konfigurace je rozdělena do 3 souborů ve složce `resources/defaults/`:
 
 #### `blocks.json` — Definice formulářových bloků
 
@@ -231,7 +252,7 @@ Každý blok definuje jeden formulářový prvek:
             "ai_key": "Language",
             "component": "input",
             "variant": "radio",
-            "label": "Text language variant",
+            "label": "{$config.language.label|Text language variant}",
             "rules": {
                 "default": "en",
                 "required": true
@@ -246,7 +267,7 @@ Každý blok definuje jeden formulářový prvek:
             "name": "tone",
             "ai_key": "CommunicationTone",
             "component": "select",
-            "label": "Tón",
+            "label": "{$config.tone.label|Tón}",
             "rules": {
                 "default": "formal",
                 "required": true
@@ -260,6 +281,8 @@ Každý blok definuje jeden formulářový prvek:
 }
 ```
 
+> **Překladové proměnné:** Textové hodnoty v JSON mohou obsahovat `{$doména.klíč|Fallback}` — tyto se při načtení nahradí přes `VariableResolver` aktuálním překladem.
+
 **Klíčové atributy bloku:**
 
 | Klíč | Typ | Popis |
@@ -269,7 +292,7 @@ Každý blok definuje jeden formulářový prvek:
 | `ai_key` | string | Klíč odesílaný do AI API |
 | `component` | string | Typ komponenty: `input`, `select`, `textarea` |
 | `variant` | string | Varianta: `text`, `radio`, `checkbox`, `hidden`, `email`... |
-| `label` | string | Popisek pole |
+| `label` | string | Popisek pole (podporuje překladové proměnné) |
 | `small` | string | Doplňkový text pod polem |
 | `tooltip` | string | Tooltip/nápověda |
 | `value` | mixed | Výchozí hodnota |
@@ -362,7 +385,7 @@ Propojuje layout s API endpointem:
 
 ### Bridge config
 
-Soubor `resources/config/bridge-config.php` obsahuje citlivé nastavení:
+Soubor `bridge-config.php` obsahuje konfiguraci AI API připojení:
 
 ```php
 <?php
@@ -372,15 +395,51 @@ if (!defined('BRIDGE_BOOTSTRAPPED')) {
 }
 
 return [
+    // API klíč pro autentizaci vůči AI provideru
+    'api_key'     => 'YOUR-API-KEY',
+
+    // Timeout HTTP požadavku na AI v sekundách
+    'timeout'     => 30,
+
+    // Počet opakování při selhání požadavku
+    'max_retries' => 3,
+
+    // URL AI API endpointu
+    'base_url'    => 'https://api.example.com/v2/AI/',
+
+    // Registrace vlastních AI endpointů
+    'endpoints' => [
+        ['class' => CreateSubjectEndpoint::class, 'file' => __DIR__ . '/../CreateSubjectEndpoint.php'],
+    ],
+];
+```
+
+### Security config
+
+Soubor `security-config.php` obsahuje HMAC bezpečnostní nastavení (oddělený od bridge-config):
+
+```php
+<?php
+if (!defined('BRIDGE_BOOTSTRAPPED')) {
+    http_response_code(403);
+    die('Access denied.');
+}
+
+return [
+    // Tajný klíč pro podepisování parametrů (min. 32 znaků)
     'secretKey' => 'put-your-long-super-secret-key-here-32chars-minimum',
-    'ttl' => 3600,   // Expirace podepsaných parametrů (sekundy)
+
+    // Platnost podepsaných parametrů v sekundách (null = bez expirace)
+    'ttl' => 3600,
 ];
 ```
 
 > ⚠️ **Secret key musí mít minimálně 32 znaků.** Pro generování použijte:
 > ```php
-> echo \Zoom\PlatformBridge\Security\SignedParams::generateSecretKey();
+> echo \PlatformBridge\Security\SignedParams::generateSecretKey();
 > ```
+
+> ⚠️ **Oba konfigurační soubory nesmí být veřejně přístupné.** Ujistěte se, že nejsou v public webroot nebo jsou chráněny `.htaccess`.
 
 ---
 
@@ -388,7 +447,7 @@ return [
 
 ### PlatformBridge (fasáda)
 
-**Namespace:** `Zoom\PlatformBridge\PlatformBridge`
+**Namespace:** `PlatformBridge\PlatformBridge`
 
 Vstupní bod celé knihovny. Zapouzdřuje všechny interní komponenty.
 
@@ -399,27 +458,38 @@ $bridge = PlatformBridge::createDefault();        // Výchozí konfigurace
 
 // Hlavní API
 $html = $bridge->renderFullForm('subject', [...]);  // Kompletní formulář + assety
-$gen  = $bridge->getGenerator('subject');           // Info o generátoru
 $html = $bridge->getAssets();                       // Pouze CSS/JS tagy
 
 // Přístup k interním komponentám
-$engine = $bridge->getTemplateEngine();             // Template engine
-$config = $bridge->getConfig();                     // Konfigurace
+$engine     = $bridge->getTemplateEngine();         // Template engine
+$config     = $bridge->getConfig();                 // Konfigurace (PlatformBridgeConfig)
+$translator = $bridge->getTranslator();             // Překladový systém
+$resolver   = $bridge->getVariableResolver();       // VariableResolver pro {$domain.key}
 ```
 
 **Metoda `renderFullForm()`** — hlavní flow:
 1. Extrahuje `inject` hodnoty z parametrů
 2. Zavolá `FormRenderer::build()` pro sestavení sekcí
-3. Sestaví parametry (endpoint, request_amount, ...)
+3. Sestaví parametry (endpoint, request_amount, locale, ...)
 4. Podepíše parametry přes HMAC (pokud aktivní)
 5. Renderuje Wrapper šablonu
 6. Připojí CSS/JS assety
+
+**Boot sekvence (interní):**
+1. `bootErrorHandler()` — globální error handler
+2. `bootTranslator()` — překladový systém + VariableResolver
+3. `bootConfig()` — načtení JSON konfigurace (s proměnnými)
+4. `bootTemplateEngine()` — šablonovací engine
+5. `bootHandlers()` — registrace formulářových handlerů
+6. `bootFormRenderer()` — inicializace FormRenderer
+7. `bootAssetManager()` — správce assetů
+8. `bootSecurity()` — HMAC podepisování
 
 ---
 
 ### ConfigManager
 
-**Namespace:** `Zoom\PlatformBridge\Config\ConfigManager`
+**Namespace:** `PlatformBridge\Config\ConfigManager`
 
 Centrální třída pro práci s JSON konfigurací. Načítá, validuje a poskytuje přístup ke třem konfiguračním souborům.
 
@@ -447,11 +517,14 @@ $blocks   = $config->getSectionBlocks('subject_advanced', 'settings');
 - Cross-validace vztahů (generator → layout → blocks)
 - Podpora tečkové notace pro přístup k nested hodnotám
 
+**ConfigLoader — merge strategie:**
+Konfigurace používá **full override** strategii — pokud existuje uživatelský konfigurační soubor, použije se POUZE ten (žádné slučování s výchozími hodnotami). Kandidáti se hledají v pořadí: chráněný `.json.php` → nechráněný `.json`.
+
 ---
 
 ### Template Engine
 
-**Namespace:** `Zoom\PlatformBridge\Template\Engine`
+**Namespace:** `PlatformBridge\Template\Engine`
 
 Vlastní šablonovací engine s Smarty-like syntaxí a kompilací do PHP.
 
@@ -481,7 +554,7 @@ $engine->clear();
 
 ### Form & FieldFactory
 
-**Namespace:** `Zoom\PlatformBridge\Form\Form`
+**Namespace:** `PlatformBridge\Form\Form`
 
 Statické API pro deklarativní vytváření formulářových polí.
 
@@ -508,11 +581,15 @@ $factory = new FieldFactory($registry);
 $elements = $factory->createFromBlock($blockDefinition);
 ```
 
+**Runtime vrstvy:**
+- `FormRenderer` — sestavuje sekce formuláře z JSON konfigurace
+- `LayoutManager` — generuje `data-layout-*` atributy pro CSS Grid (span, row-span, grid-column, grid-row) a `data-visible-if` pro podmíněnou viditelnost
+
 ---
 
 ### HandlerRegistry
 
-**Namespace:** `Zoom\PlatformBridge\Handler\HandlerRegistry`
+**Namespace:** `PlatformBridge\Handler\HandlerRegistry`
 
 Strategy pattern registr pro zpracování různých typů formulářových bloků.
 
@@ -543,7 +620,7 @@ $handler = $registry->resolve($block);  // Najde vhodný handler
 
 ### AI Client
 
-**Namespace:** `Zoom\PlatformBridge\AI\AiClient`
+**Namespace:** `PlatformBridge\AI\Client`
 
 HTTP klient pro komunikaci s AI API přes cURL.
 
@@ -593,7 +670,7 @@ $data = $response->getOrFail();
 
 ### SignedParams (HMAC)
 
-**Namespace:** `Zoom\PlatformBridge\Security\SignedParams`
+**Namespace:** `PlatformBridge\Security\SignedParams`
 
 HMAC-SHA256 podepisování parametrů pro bezpečný přenos dat.
 
@@ -631,7 +708,7 @@ $key = SignedParams::generateSecretKey(32);  // 64-char hex string
 
 ### AssetManager
 
-**Namespace:** `Zoom\PlatformBridge\Asset\AssetManager`
+**Namespace:** `PlatformBridge\Asset\AssetManager`
 
 Správce CSS/JS assetů s logikou "vložit pouze jednou" (once pattern).
 
@@ -640,7 +717,7 @@ Správce CSS/JS assetů s logikou "vložit pouze jednou" (once pattern).
 $assets = $bridge->getAssets();  // <link> + <script> tagy
 
 // Manuální použití
-$manager = new AssetManager('assets/dist/serve.php');
+$manager = new AssetManager('https://example.com/dist');
 $css = $manager->getStyles();    // <link rel="stylesheet">
 $js  = $manager->getScripts();   // <script src="...">
 $all = $manager->getAssets();    // Oba najednou
@@ -650,21 +727,27 @@ $css2 = $manager->getStyles();   // ''
 
 // Force reload
 $css3 = $manager->getStyles(force: true);  // <link> znovu
+
+// Reset stavu (pro testy)
+AssetManager::reset();
 ```
 
 ---
 
-### ErrorHandler
+### ErrorHandler & ErrorRenderer
 
-**Namespace:** `Zoom\PlatformBridge\Error\ErrorHandler`
+**Namespace:** `PlatformBridge\Error`
 
-Globální error handler s vizuálním výstupem pro vývoj.
+Globální error handler s vizuálním výstupem pro vývoj (Whoops-style).
 
 ```php
-$handler = new ErrorHandler(showDetails: true);  // Dev mód
-$handler = new ErrorHandler(showDetails: false); // Produkce
+// ErrorRenderer ovládá zobrazení detailů
+$renderer = new ErrorRenderer(showDetails: true);   // Dev mód (stack trace)
+$renderer = new ErrorRenderer(showDetails: false);  // Produkce (generická zpráva)
 
-$handler->register();  // Registruje exception, error a shutdown handlery
+// ErrorHandler registruje globální handlery
+$handler = new ErrorHandler($renderer);
+$handler->register();
 ```
 
 **Zachytává:**
@@ -672,7 +755,127 @@ $handler->register();  // Registruje exception, error a shutdown handlery
 - PHP chyby (`set_error_handler`) — konvertuje na `ErrorException`
 - Fatální chyby (`register_shutdown_function`)
 
-> ⚠️ V produkci nastavte `showDetails: false` — skryje stack trace a zobrazí generickou chybovou zprávu.
+**`RenderableException`** — Interface pro výjimky s vlastním HTML renderováním.
+
+> ⚠️ V produkci nastavte `showDetails: false` na `ErrorRenderer` — skryje stack trace a zobrazí generickou chybovou zprávu.
+
+---
+
+### Translator
+
+**Namespace:** `PlatformBridge\Translator\Translator`
+
+Překladový systém s podporou domén, tečkové notace a databázových zdrojů.
+
+```php
+// Vytvoření (interně v PlatformBridge::boot())
+$translator = Translator::create(
+    locale: 'cs',
+    langPath: '/path/to/resources/lang',
+    platformLoader: $platformLoader,  // Volitelně: překlady z DB
+);
+
+// Překlad
+$text = $translator->t('ui', 'btn.save', [], 'Save');  // Doména, klíč, parametry, fallback
+
+// Interpolace parametrů
+$text = $translator->t('errors', 'field.required', ['field' => 'Email']);
+// → "Pole Email je povinné"
+
+// Přístup ke komponentám
+$resolver = $translator->getVariableResolver();
+$catalog  = $translator->getCatalog();
+$locale   = $translator->getLocale();
+```
+
+**Zdroje překladů:**
+- `JsonFileLoader` — načítá ze souborů `resources/lang/{locale}/{domain}.json`
+- `PlatformLoader` → `MysqliAdapter` — načítá z databázové tabulky
+
+**Domény překladů:**
+- `ui` — popisky UI prvků
+- `errors` — chybové hlášky
+- `api` — překlady API odpovědí
+- `config` — popisky v JSON konfiguraci
+
+---
+
+### VariableResolver
+
+**Namespace:** `PlatformBridge\Translator\VariableResolver`
+
+Nahrazuje překladové proměnné `{$doména.klíč}` v textech a JSON konfiguracích.
+
+```php
+// Nahrazení v řetězci
+$resolved = $resolver->resolve('{$config.tone.label|Tón}');
+// → "Tón komunikace" (nebo fallback "Tón" pokud překlad neexistuje)
+
+// Rekurzivní nahrazení v poli
+$resolvedArray = $resolver->resolveArray($configData);
+
+// Detekce proměnných
+if (VariableResolver::hasVariable($text)) {
+    // Text obsahuje {$...} proměnné
+}
+```
+
+**Formát proměnné:** `{$doména.klíč|Volitelný fallback}`
+
+---
+
+### PathResolver
+
+**Namespace:** `PlatformBridge\Paths\PathResolver`
+
+Centralizovaná správa cest s automatickou detekcí kontextu (standalone vs. vendor).
+
+```php
+// Automatická detekce kontextu
+$paths = PathResolverFactory::auto($rootDir);
+
+// Cesty projektu
+$paths->cachePath();          // var/cache/
+$paths->assetsPath();         // dist/
+$paths->apiFile();            // Cesta k api.php
+$paths->securityConfigFile(); // security-config.php
+$paths->bridgeConfigFile();   // bridge-config.php
+
+// Cesty balíčku
+$paths->viewsPath();          // resources/views/
+$paths->configPath();         // resources/defaults/
+$paths->langPath();           // resources/lang/
+$paths->packageStubsPath();   // resources/stubs/
+
+// Introspekce
+$paths->isVendor();            // true pokud instalován přes Composer
+$paths->projectRoot();         // Kořen projektu
+$paths->packageRoot();         // Kořen balíčku
+```
+
+---
+
+### JsonGuard
+
+**Namespace:** `PlatformBridge\Security\JsonGuard`
+
+Ochrana JSON konfiguračních souborů přes PHP exit guard. Zabrání zobrazení obsahu při přímém přístupu z prohlížeče.
+
+```php
+// Ochrana JSON obsahu
+$protected = JsonGuard::protect($jsonString);   // Přidá PHP exit guard
+$original  = JsonGuard::strip($protectedContent); // Odstraní guard
+
+// Práce se soubory
+$data = JsonGuard::readFile('/path/to/file.json.php');
+JsonGuard::writeProtected('/path/to/output.json.php', $jsonString);
+
+// Konverze existujícího souboru
+JsonGuard::convertToProtected('config.json', 'config.json.php', deleteSource: true);
+
+// Zkontrolovat název chráněného souboru
+$filename = JsonGuard::protectedFilename('blocks.json'); // → blocks.json.php
+```
 
 ---
 
@@ -697,7 +900,7 @@ Vlastní šablonovací systém s Smarty-like syntaxí, kompilací do PHP a cache
 | `{_require /path}` | Require šablony | `{_require /Components/Icons}` |
 | `{function="fn()"}` | Volání PHP funkce | `{function="strtoupper($name)"}` |
 | `{% CONSTANT %}` | PHP konstanta | `{% PHP_EOL %}` |
-| `{_tran k='key' d='default'}` | Překlad | `{_tran k='btn.save' d='Save'}` |
+| `{_tran k='key' d='default'}` | Překlad (vyžaduje Translator) | `{_tran k='btn.save' d='Save'}` |
 | `{* komentář *}` | Komentář (odstraní se) | |
 
 ### Bezpečnost šablon
@@ -708,7 +911,7 @@ Engine obsahuje **blacklist nebezpečných PHP funkcí** (`exec`, `shell_exec`, 
 
 ## 🎛 Handlery formulářových polí
 
-Systém používá **Strategy pattern** — každý typ pole má vlastní handler.
+Systém používá **Strategy pattern** — každý typ pole má vlastní handler dědící z `FieldConfigurator`.
 
 ### Registrované handlery
 
@@ -728,7 +931,7 @@ Systém používá **Strategy pattern** — každý typ pole má vlastní handle
 ### Vytvoření vlastního handleru
 
 ```php
-use Zoom\PlatformBridge\Handler\Fields\FieldConfigurator;
+use PlatformBridge\Handler\Fields\FieldConfigurator;
 
 class ColorPickerHandler extends FieldConfigurator
 {
@@ -760,40 +963,60 @@ $registry->mapVariant('color-picker', ColorPickerHandler::class);
 
 ## 🤖 AI API vrstva
 
-### Architektura endpointů
+### Architektura
 
 ```
 AI/
-├── AiClient.php           # HTTP klient (cURL)
-├── AiClientConfig.php     # Konfigurace klienta
-├── AiRequest.php          # Request builder
-├── AiResponse.php         # Response wrapper
-├── AiResponseRenderer.php # Renderování odpovědí
-├── AiException.php        # Typované výjimky
+├── Client/                         # HTTP klient
+│   ├── AiClient.php                # cURL HTTP klient
+│   ├── AiClientConfig.php          # Konfigurace klienta
+│   ├── AiRequest.php               # Request builder
+│   ├── AiResponse.php              # Response wrapper
+│   └── AiResponseRenderer.php      # Renderování odpovědí
 ├── API/
-│   ├── ApiHandler.php     # JSON endpoint handler
-│   ├── SseApiHandler.php  # SSE streaming handler
-│   ├── EndpointDefinition.php # Abstraktní endpoint (uživatel dědí)
-│   └── EndpointRegistry.php # Registr endpointů (z bridge-config.php)
-└── SSE/
-    ├── SseStream.php      # SSE output stream
-    ├── SseEvent.php       # SSE event value object
-    ├── SseProgress.php    # Progress tracking
-    ├── SsePhase.php       # Fáze zpracování (enum)
-    └── ParallelRequestManager.php  # curl_multi
+│   ├── Core/                       # Jádro API zpracování
+│   │   ├── ApiHandler.php          # Vstupní bod (bootstrap + handle)
+│   │   ├── AiRequestProcessor.php  # Zpracování AI požadavků
+│   │   ├── ApiErrorHandler.php     # Chybové odpovědi
+│   │   ├── Endpoint/               # Registr a resolving endpointů
+│   │   │   ├── EndpointDefinition.php
+│   │   │   ├── EndpointFactory.php
+│   │   │   ├── EndpointRegistry.php
+│   │   │   ├── EndpointResolver.php
+│   │   │   ├── FieldMapper.php
+│   │   │   └── RegistrationParser.php
+│   │   └── Response/               # Parsování a sestavení odpovědí
+│   │       ├── ApiResponseBuilder.php
+│   │       └── ResponseParser.php
+│   ├── Enum/
+│   │   ├── HttpMethod.php          # HTTP metody (enum)
+│   │   └── ResponseType.php        # Typy odpovědí (enum)
+│   └── Types/
+│       ├── Attributes/             # PHP 8 atributy pro endpointy
+│       │   ├── Endpoint.php        # #[Endpoint] atribut
+│       │   └── AttributeEndpoint.php # Bázová třída
+│       └── Configurable/
+│           └── ConfigurableEndpoint.php # Deklarativní endpointy
+└── Exception/
+    ├── AiException.php             # Typované výjimky
+    └── JsonException.php
 ```
 
 ### Flow API požadavku
 
-1. Frontend odešle formulářová data (JSON)
-2. `ApiHandler` / `SseApiHandler` zpracuje vstup
-3. Ověří HMAC podpis (`SignedParams::verify()`)
-4. Najde endpoint v `EndpointRegistry`
-5. Sestaví `AiRequest` z formulářových dat
-6. `AiClient` odešle cURL request na AI API
-7. `AiResponse` parsuje odpověď
-8. `AiResponseRenderer` renderuje HTML přes šablony
-9. Vrátí JSON / SSE stream na frontend
+1. Frontend odešle formulářová data (JSON POST)
+2. `ApiHandler::bootstrap()` inicializuje prostředí:
+   - Autodetekuje cesty přes `PathResolverFactory::auto()`
+   - Načte `bridge-config.php` a `security-config.php`
+   - Zaregistruje uživatelské endpointy do `EndpointRegistry`
+3. `ApiHandler::handle()` zpracuje request:
+   - Ověří HMAC podpis (`SignedParams::verify()`)
+   - `EndpointResolver` najde endpoint v `EndpointRegistry`
+   - `AiRequestProcessor` sestaví `AiRequest` z formulářových dat
+   - `AiClient` odešle cURL request na AI API
+   - `ResponseParser` parsuje odpověď
+   - `ApiResponseBuilder` renderuje HTML přes šablony
+4. Vrátí JSON odpověď na frontend
 
 ### Typy odpovědí endpointů
 
@@ -805,26 +1028,110 @@ AI/
 
 ---
 
-## 📡 SSE Streaming
+## 🔌 Endpointy
 
-Server-Sent Events pro real-time progress reporting (připraveno, aktuálně zakomentováno).
+Endpointy definují, jak se zpracovávají jednotlivé AI požadavky. Existují **dva přístupy**:
 
-### Fáze zpracování (`SsePhase`)
+### 1. PHP 8 Attribute endpoint (doporučený)
 
-| Fáze | Popis |
-|---|---|
-| `INIT` | Inicializace |
-| `VALIDATING` | Validace vstupu |
-| `PREPARING` | Příprava požadavku |
-| `SENDING` | Odesílání na API |
-| `PROCESSING` | Zpracování odpovědi |
-| `RENDERING` | Renderování výsledku |
-| `COMPLETE` | Dokončeno |
-| `ERROR` | Chyba |
+Hlavní přístup — metadata se deklarují přes PHP 8 atribut `#[Endpoint]`:
 
-### Paralelní požadavky
+```php
+<?php
 
-`ParallelRequestManager` podporuje 1–10 současných cURL požadavků přes `curl_multi_*`. Jakmile jeden doběhne, okamžitě se zavolá callback a odešle se SSE event.
+use PlatformBridge\AI\API\Types\Attributes\{AttributeEndpoint, Endpoint};
+use PlatformBridge\AI\API\Enum\ResponseType;
+
+#[Endpoint(
+    name: 'CreateSubject',
+    generator: 'subject',
+    responseType: ResponseType::Nested,
+    template: '/Components/NestedResult',
+    variantKey: 'type'
+)]
+class CreateSubjectEndpoint extends AttributeEndpoint
+{
+    protected function transformInput(array $input, mixed ...$context): array
+    {
+        [$variant] = $context;
+
+        return match ($variant) {
+            'template' => $this->transformTemplateVariant($input),
+            'custom'   => $this->transformCustomVariant($input),
+            default    => $input,
+        };
+    }
+
+    private function transformTemplateVariant(array $input): array
+    {
+        return array_diff_key($input, array_flip(['email_topic', 'topic_source']));
+    }
+
+    private function transformCustomVariant(array $input): array
+    {
+        return array_diff_key($input, array_flip(['template_id', 'topic_source']));
+    }
+}
+```
+
+**Registrace v `bridge-config.php`:**
+
+```php
+'endpoints' => [
+    ['class' => CreateSubjectEndpoint::class, 'file' => __DIR__ . '/../CreateSubjectEndpoint.php'],
+],
+```
+
+### 2. Deklarativní (ConfigurableEndpoint)
+
+Alternativní přístup — endpoint se definuje čistě jako pole v `bridge-config.php` bez vlastní PHP třídy:
+
+```php
+'endpoints' => [
+    'CreateSubject' => [
+        'generator_id'  => 'subject',
+        'response_type' => 'nested',
+        'template'      => '/Components/NestedResult',
+        'variant_key'   => 'topic_source',
+        'variants'      => [
+            'template' => [
+                'remove_fields' => ['email_topic', 'topic_source'],
+            ],
+            'custom' => [
+                'remove_fields' => ['template_id', 'topic_source'],
+            ],
+        ],
+    ],
+],
+```
+
+#### Podporovaná pravidla pro `variants`
+
+| Pravidlo | Typ | Popis |
+|---|---|---|
+| `remove_fields` | `string[]` | Odstraní zadaná pole ze vstupu |
+| `keep_fields` | `string[]` | Ponechá pouze zadaná pole (whitelist) |
+| `defaults` | `array` | Doplní výchozí hodnoty pro chybějící klíče |
+
+#### Vlastní transformační funkce
+
+Pro složitější logiku lze místo `variants` použít callable:
+
+```php
+'CreateSubject' => [
+    'generator_id'  => 'subject',
+    'response_type' => 'nested',
+    'template'      => '/Components/NestedResult',
+    'transform'     => function(array $input, ?string $variant): array {
+        return match ($variant) {
+            'template' => array_diff_key($input, array_flip(['topic_source'])),
+            default    => $input,
+        };
+    },
+],
+```
+
+> **Poznámka:** Deklarativní `variants` a callable `transform` se vzájemně vylučují — `transform` má přednost.
 
 ---
 
@@ -833,22 +1140,63 @@ Server-Sent Events pro real-time progress reporting (připraveno, aktuálně zak
 ### Architektura
 
 ```
-assets/src/ts/
-├── main.ts              # Entry point
+assets/ts/
+├── pb-main.ts           # Entry point (bundled → dist/js/pb-main.js)
 ├── app.ts               # Hlavní Application třída
-├── Core/                # EventBus, Constants
-├── services/            # ApiClient, SessionManager, ErrorHandler
-├── features/            # FormValidator, ResultActionHandler, TypedResponseRenderer
-└── ui/                  # LoadingManager (+ zakomentovaný ProgressLoader)
+├── Const/               # Konstanty (Components, selektory)
+├── Core/                # Jádro aplikace
+│   ├── Dom.ts           # DOM utility
+│   ├── ErrorHandler.ts  # Klientský error handler
+│   ├── EventBus.ts      # Event systém (pub/sub)
+│   └── MessageRenderer.ts # Renderování zpráv/notifikací
+├── Features/            # Funkční moduly
+│   ├── FormValidator.ts        # Validace formulářových dat
+│   ├── ResultActionHandler.ts  # Akce nad výsledky (kopie, smazání, regenerace)
+│   └── VisibilityController.ts # Podmíněná viditelnost polí (visible_if)
+├── Middleware/           # API middleware pipeline
+│   ├── CacheMiddleware.ts  # Cache API odpovědí
+│   ├── RetryMiddleware.ts  # Opakování při selhání
+│   └── TimingMiddleware.ts # Měření doby požadavků
+├── Services/             # Služby
+│   ├── ApiClient.ts         # Hlavní API klient
+│   ├── ApiErrorHandler.ts   # Zpracování API chyb
+│   ├── SessionManager.ts    # Správa session
+│   ├── TransportRegistry.ts # Registr transportů
+│   └── Transports/          # Transportní vrstvy
+│       ├── HttpTransport.ts    # Standardní HTTP/fetch
+│       ├── SseTransport.ts     # Server-Sent Events streaming
+│       └── WebSocketTransport.ts # WebSocket transport
+├── Types/                # TypeScript definice
+│   ├── Api.ts            # API typy (Request, Response, SSE events)
+│   └── Validation.ts     # Validační typy
+├── UI/                   # UI komponenty
+│   ├── CustomSelect.ts      # Vlastní select komponenta
+│   └── LayoutController.ts  # CSS Grid layout controller
+└── Utils/
+    └── Assert.ts         # Runtime assertions
 ```
 
 ### Flow formuláře
 
 1. **Klik na Generate** → `FormValidator` validuje vstupy
 2. **Extrakce dat** → Sbírá data z formuláře
-3. **API volání** → `ApiClient` odešle POST
-4. **Zobrazení výsledku** → `TypedResponseRenderer` vloží HTML
-5. **Akce** → `ResultActionHandler` zajišťuje kopírování, smazání, regeneraci
+3. **Middleware pipeline** → `RetryMiddleware`, `CacheMiddleware`, `TimingMiddleware`
+4. **Transport** → `HttpTransport` odešle POST (nebo `SseTransport` pro streaming)
+5. **Zobrazení výsledku** → Vloží HTML do stránky
+6. **Akce** → `ResultActionHandler` zajišťuje kopírování, smazání, regeneraci
+7. **Viditelnost** → `VisibilityController` spravuje podmíněné zobrazení polí
+
+### Transport Registry
+
+Frontend používá **Transport Registry** pattern pro výběr transportu:
+
+| Transport | Popis | Stav |
+|---|---|---|
+| `HttpTransport` | Standardní HTTP POST/fetch | ✅ Aktivní |
+| `SseTransport` | Server-Sent Events streaming | 🔧 Frontend připraven |
+| `WebSocketTransport` | WebSocket real-time | 🔧 Frontend připraven |
+
+> **Poznámka:** SSE a WebSocket transporty jsou na frontendu implementovány, ale backend counterpart (SSE stream) zatím neexistuje.
 
 ---
 
@@ -859,17 +1207,77 @@ Projekt používá **esbuild** pro ultra-rychlý build TypeScript i SCSS.
 ### Konfigurace (`build.mjs`)
 
 ```javascript
-// TypeScript → assets/dist/js/main.js
-// SCSS → assets/dist/css/main.css
-// Oboje: bundled, minified, bez sourcemap
+// TypeScript → dist/js/pb-main.js
+// SCSS → dist/css/pb-main.css
+// Dev: sourcemaps zapnuty
+// Prod: minified, bez sourcemaps
 ```
 
 ### Příkazy
 
 ```bash
 npm run dev    # Watch mode (automatický rebuild při změnách)
-npm run build  # Jednorázový build
+npm run build  # Jednorázový production build
 ```
+
+### Výstup
+
+```
+dist/
+├── css/
+│   ├── pb-main.css       # Zkompilované styly
+│   └── pb-main.css.map   # Sourcemap (pouze dev)
+└── js/
+    ├── pb-main.js        # Zkompilovaný JavaScript
+    └── pb-main.js.map    # Sourcemap (pouze dev)
+```
+
+---
+
+## 🛠 CLI Installer
+
+CLI nástroj pro automatizovanou instalaci a aktualizaci PlatformBridge v cílovém projektu.
+
+### Použití
+
+```bash
+# Kompletní instalace (spustí se automaticky po `composer install`)
+php bin/platformbridge install
+
+# Aktualizace assetů a API endpointu
+php bin/platformbridge update
+
+# Inicializace konfigurace
+php bin/platformbridge init
+
+# S přepsáním existujících souborů
+php bin/platformbridge install --force
+
+# Pouze vybrané kroky
+php bin/platformbridge install --only=assets,config
+```
+
+### Kroky instalace
+
+| Krok | Popis |
+|---|---|
+| `init` | Inicializace konfiguračního souboru |
+| `dirs` | Vytvoření potřebných adresářů |
+| `guard` | Ochrana JSON souborů (JsonGuard) |
+| `assets` | Publikování JS/CSS assetů |
+| `api` | Publikování API endpointu |
+| `config` | Publikování bridge-config.php |
+| `security` | Publikování security-config.php |
+| `translations` | Publikování překladů |
+| `cache` | Příprava cache adresáře |
+
+### Provisioner třídy
+
+- `ConfigProvisioner` — publikování konfiguračních souborů
+- `DirectoryProvisioner` — vytváření adresářové struktury
+- `AssetProvisioner` — kopírování zkompilovaných assetů
+- `FileProvisioner` — obecné kopírování souborů
+- `StubPublisher` — bezpečné publikování stubů (přeskočí existující)
 
 ---
 
@@ -911,10 +1319,23 @@ $bridge->renderFullForm('subject', [
 ### 7. JSON konfigurace — cross-validace
 Systém automaticky validuje vztahy mezi `generators → layouts → blocks`. Pokud blok referencovaný v layoutu neexistuje v `blocks.json`, dostanete jasnou chybovou hlášku.
 
-### 8. ErrorHandler — přepněte v produkci
+### 8. Preferujte PHP 8 Attribute endpointy
 ```php
-new ErrorHandler(showDetails: false);  // Skryje stack trace
+// ✅ Doporučeno — typově bezpečné, IDE-friendly
+#[Endpoint(name: 'MyEndpoint', generator: 'my-gen', responseType: ResponseType::Nested)]
+class MyEndpoint extends AttributeEndpoint { ... }
+
+// ⚠️ Alternativa — bez vlastní třídy, ale méně flexibilní
+'MyEndpoint' => ['generator_id' => 'my-gen', 'response_type' => 'nested', ...]
 ```
+
+### 9. Využívejte překladové proměnné v JSON
+```json
+{
+    "label": "{$config.tone.label|Tón}"
+}
+```
+`VariableResolver` automaticky nahradí `{$doména.klíč|Fallback}` při načtení konfigurace.
 
 ---
 
@@ -923,26 +1344,17 @@ new ErrorHandler(showDetails: false);  // Skryje stack trace
 ### 1. Secret key minimální délka
 Secret key pro HMAC **musí mít minimálně 32 znaků**. Kratší klíč vyhodí `InvalidArgumentException`.
 
-### 2. `bridge-config.php` nesmí být veřejně přístupný
-Soubor obsahuje secret key — ujistěte se, že není v public webroot nebo je chráněný `.htaccess`.
+### 2. Konfigurační soubory nesmí být veřejně přístupné
+`bridge-config.php` a `security-config.php` obsahují citlivé údaje. Ujistěte se, že nejsou v public webroot nebo jsou chráněny `.htaccess`. JSON konfigurace je možné chránit přes `JsonGuard`.
 
 ### 3. Template engine cache — rekompilace
 **V aktuální verzi se šablony rekompilují při KAŽDÉM požadavku** (optimalizace pro vývoj). TODO v kódu naznačuje, že kontrola `filemtime()` bude odkomentována pro produkci.
 
-```php
-// TODO: Uncomment this
-// if (!file_exists($cachePath) || (filemtime($cachePath) < filemtime($templatePath))) {
-$this->cacheCompiledTemplate();  // Vždy se překompiluje
-// }
-```
+### 4. Translator — částečně aktivní
+Překladový systém (`Translator`) je aktivní — `VariableResolver` nahrazuje proměnné v JSON konfiguracích. Integrace do template enginu (`{_tran}` tag) je připravena, ale zatím zakomentovaná. Metody `createTranslationEndpoint()` a `translateResponseKeys()` jsou zakomentované.
 
-### 4. SSE streaming je zakomentovaný
-Frontend i backend podpora SSE je kompletně připravená, ale zakomentovaná. Aktivace vyžaduje odkomentování bloků v:
-- `assets/src/ts/app.ts` (SseClient, ProgressLoader)
-- Nastavení `options.enableSse: true`
-
-### 5. Translator je zakomentovaný
-Systém překladů (`Translator`) je připravený, ale neaktivní. Odkomentujte v `PlatformBridge::boot()` a `PlatformBridgeBuilder`.
+### 5. SSE streaming — stav implementace
+Frontend SSE transport (`SseTransport.ts`) je plně implementován. Backend SSE stream (server-side) zatím neexistuje — API používá standardní JSON odpovědi.
 
 ### 6. Statický stav třídy `Form`
 `Form` používá statické properties (`$elements`, `$currentBlockId`). **Nevolat paralelně** — vždy sestavit jeden formulář naráz.
@@ -980,7 +1392,7 @@ Pole se automaticky skrývají/zobrazují na základě hodnoty jiného pole:
     }
 }
 ```
-Frontend JS to zpracuje automaticky — žádný vlastní kód není potřeba.
+Frontend `VisibilityController` to zpracuje automaticky — žádný vlastní kód není potřeba.
 
 ### 3. Přímý přístup k Template Engine
 
@@ -1010,7 +1422,7 @@ Vyrenderuje se jako: `data-tracking-id="abc123" data-analytics="true"`
 ### 5. Generování secret key z CLI
 
 ```bash
-php -r "require 'vendor/autoload.php'; echo \Zoom\PlatformBridge\Security\SignedParams::generateSecretKey();"
+php -r "require 'vendor/autoload.php'; echo \PlatformBridge\Security\SignedParams::generateSecretKey();"
 ```
 
 ### 6. Vymazání cache šablon
@@ -1029,7 +1441,7 @@ array_map('unlink', glob('var/cache/*.cache.php'));
 
 ### 7. Override výchozích cest bez úpravy kódu
 
-Builder automaticky fallbackuje na `resources/` uvnitř balíčku. Pro override stačí zavolat příslušnou `with*()` metodu:
+Builder automaticky resolvuje cesty přes `PathResolver`. Pro override stačí zavolat příslušnou `with*()` metodu:
 
 ```php
 $bridge = PlatformBridge::create()
@@ -1059,65 +1471,14 @@ $html = $bridge->renderFullForm('subject', [
 ]);
 ```
 
-### 10. Přidání vlastního endpointu
+### 10. Dev adresář pro lokální vývoj
 
-Endpointy se definují **deklarativně** jako pole v `bridge-config.php` — není potřeba vytvářet vlastní PHP třídy:
+Adresář `dev/` obsahuje vývojové verze konfigurace (mimo Git):
+- `dev/api.php` — lokální API endpoint
+- `dev/bridge-config.php` — vývojová API konfigurace
+- `dev/security-config.php` — vývojový HMAC klíč
 
-```php
-return [
-    'api_key'   => '...',
-    'base_url'  => '...',
-    'endpoints' => [
-        'CreateSubject' => [
-            'generator_id'  => 'subject',        // ID generátoru v generators.json
-            'response_type' => 'nested',          // 'string' | 'array' | 'nested'
-            'template'      => '/Components/NestedResult',
-            'variant_key'   => 'topic_source',    // Klíč pro detekci varianty (null = bez variant)
-            'variants'      => [                  // Deklarativní pravidla dle varianty
-                'template' => [
-                    'remove_fields' => ['email_topic', 'topic_source'],
-                ],
-                'custom' => [
-                    'remove_fields' => ['template_id', 'topic_source'],
-                ],
-            ],
-        ],
-        'GenerateText' => [
-            'generator_id'  => 'text',
-            'response_type' => 'string',
-            'template'      => '/Components/SingleKeyResult',
-        ],
-    ],
-];
-```
-
-#### Podporovaná pravidla pro `variants`
-
-| Pravidlo | Typ | Popis |
-|---|---|---|
-| `remove_fields` | `string[]` | Odstraní zadaná pole ze vstupu |
-| `keep_fields` | `string[]` | Ponechá pouze zadaná pole (whitelist) |
-| `defaults` | `array` | Doplní výchozí hodnoty pro chybějící klíče |
-
-#### Vlastní transformační funkce
-
-Pro složitější logiku lze místo `variants` použít callable:
-
-```php
-'CreateSubject' => [
-    'generator_id'  => 'subject',
-    'response_type' => 'nested',
-    'template'      => '/Components/NestedResult',
-    'transform'     => function(array $input, ?string $variant): array {
-        return match ($variant) {
-            'template' => array_diff_key($input, array_flip(['topic_source'])),
-            default    => $input,
-        };
-    },
-],
-```
-
-> **Poznámka:** Deklarativní `variants` a callable `transform` se vzájemně vylučují — `transform` má přednost.
+Tyto soubory odpovídají produkčním stubům v `resources/stubs/`, ale s předvyplněnými hodnotami pro lokální vývoj.
 
 ---
 
@@ -1130,14 +1491,53 @@ Pro složitější logiku lze místo `variants` použít callable:
 | `composer.json` | PHP závislosti a autoload konfigurace |
 | `package.json` | Node.js závislosti pro frontend build |
 | `build.mjs` | Konfigurace esbuild (TS + SCSS) |
+| `tsconfig.json` | TypeScript konfigurace |
+| `bin/platformbridge` | CLI installer (Composer bin) |
 | `src/PlatformBridge/` | Kompletní PHP zdrojový kód knihovny |
-| `resources/config/` | JSON konfigurace + bridge config |
+| `resources/defaults/` | JSON konfigurace (blocks, layouts, generators) |
+| `resources/lang/` | Překlady (cs/, en/) |
+| `resources/stubs/` | Šablony pro publikování installerem |
 | `resources/views/` | Šablony (.tpl) |
-| `assets/src/` | TypeScript + SCSS zdrojové soubory |
-| `assets/dist/` | Zkompilované CSS/JS |
+| `assets/ts/` | TypeScript zdrojové soubory |
+| `assets/scss/` | SCSS zdrojové soubory |
+| `dist/` | Zkompilované CSS/JS (build výstup) |
+| `dev/` | Vývojové konfigurace (lokální vývoj) |
 | `var/cache/` | Cache zkompilovaných šablon |
 | `docs/` | Dokumentace |
 
+### Kompletní struktura `src/PlatformBridge/`
+
+```
+src/PlatformBridge/
+├── PlatformBridge.php           # Hlavní fasáda
+├── PlatformBridgeBuilder.php    # Builder pro konfiguraci
+├── PlatformBridgeConfig.php     # Immutable konfigurace (Value Object)
+├── AI/                          # AI API vrstva
+│   ├── Client/                  # HTTP klient (AiClient, AiRequest, AiResponse, ...)
+│   ├── API/
+│   │   ├── Core/                # ApiHandler, AiRequestProcessor, Endpoint/, Response/
+│   │   ├── Enum/                # HttpMethod, ResponseType
+│   │   └── Types/               # Attributes/ (PHP 8 endpointy), Configurable/
+│   └── Exception/               # AiException, JsonException
+├── Asset/                       # AssetManager
+├── Config/                      # ConfigManager, ConfigLoader, ConfigValidator, ConfigResolver
+│   └── DTO/                     # PathsDto, SecurityDto, UrlsDto, TranslationsDto
+├── Error/                       # ErrorHandler, ErrorRenderer, RenderableException
+├── Form/                        # Form (statické API), Element/ (Input, Select, ...), Factory/
+├── Handler/                     # FieldFactory, HandlerRegistry, Fields/ (handlery)
+├── Installer/                   # Installer, Provisioners/, Publisher/
+├── Paths/                       # PathResolver, PathResolverFactory, PathsConfig, UrlResolver
+├── Runtime/                     # FormRenderer, LayoutManager
+├── Security/                    # SignedParams, JsonGuard, Exception/
+├── Shared/                      # Exception/ (ConfigException, FileException, JsonException)
+│   └── Utils/                   # FileUtils, JsonUtils, TypeUtils
+├── Template/                    # Engine, Parser, VariableModifier
+└── Translator/                  # Translator, VariableResolver, TranslationCatalog, Domain
+    ├── Adapter/                 # MysqliAdapter
+    ├── Database/                # MysqliConnection, TableProvisioner
+    └── Loader/                  # JsonFileLoader, PlatformLoader
+```
+
 ---
 
-> **Verze dokumentace:** 1.0.0 | **Poslední aktualizace:** Únor 2026
+> **Verze dokumentace:** 1.0.1 | **Poslední aktualizace:** Duben 2026

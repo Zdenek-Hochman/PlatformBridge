@@ -2,7 +2,9 @@
 
 declare(strict_types=1);
 
-namespace Zoom\PlatformBridge\Security;
+namespace PlatformBridge\Security;
+
+use PlatformBridge\Security\Exception\SecurityException;
 
 /**
  * Security boundary pro podepisování a ověřování parametrů.

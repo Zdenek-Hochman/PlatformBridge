@@ -2,11 +2,13 @@
 
 declare(strict_types=1);
 
-namespace Zoom\PlatformBridge\Config;
+namespace PlatformBridge\Config;
 
-use Zoom\PlatformBridge\Config\Exception\ConfigException;
-use Zoom\PlatformBridge\Paths\PathResolver;
-use Zoom\PlatformBridge\Security\JsonGuard;
+use PlatformBridge\Shared\Exception\ConfigException;
+use PlatformBridge\Shared\Exception\FileException;
+use PlatformBridge\Translator\VariableResolver;
+use PlatformBridge\Shared\Utils\JsonUtils;
+use PlatformBridge\Paths\PathResolver;
 
 /**
  * Načítá konfigurační JSON soubory pro PlatformBridge.
@@ -46,7 +48,9 @@ final class ConfigLoader
         private readonly string $userConfigPath,
         private readonly PathResolver $pathResolver,
         private readonly ConfigValidator $validator,
-    ) {}
+        private readonly VariableResolver $variableResolver
+    ) {
+    }
 
     /**
      * Načte a zvaliduje všechny konfigurační soubory.
@@ -71,62 +75,29 @@ final class ConfigLoader
         $this->validator->validateRelations($blocks, $layouts, $generators);
 
         return [
-            'blocks' => $blocks,
-            'layouts' => $layouts,
-            'generators' => $generators,
+            'blocks' => $this->variableResolver->resolveArray($blocks),
+            'layouts' => $this->variableResolver->resolveArray($layouts),
+            'generators' => $this->variableResolver->resolveArray($generators),
         ];
 
     }
 
+    /**
+     * Načte a dekóduje konfigurační JSON soubor s fallbackem přes PathResolver.
+     *
+     * @throws FileException Pokud soubor neexistuje nebo je nečitelný
+     * @throws \PlatformBridge\Shared\Exception\JsonException Pokud JSON je nevalidní
+     */
     private function loadJsonFile(string $filename): array
     {
-		$paths = $this->pathResolver->resolveConfigFiles($this->userConfigPath, $filename);
+        $paths = $this->pathResolver->resolveConfigFiles($this->userConfigPath, $filename);
 
-		foreach ($paths as $path) {
-			if (file_exists($path)) {
-				return $this->decodeJsonFile($path, $filename);
-			}
-		}
-
-        throw ConfigException::fileNotFound($filename);
-    }
-
-	/**
-	 * Načte a dekóduje JSON soubor do asociativního pole.
-	 *
-	 * Nejprve načte obsah souboru, odstraní případnou ochrannou PHP hlavičku
-	 * ({@see JsonGuard}), a následně provede dekódování JSON s vyhazováním výjimek.
-	 *
-	 * Ověřuje také, že výsledná struktura je pole (objekt nebo pole v JSON).
-	 *
-	 * @param string $filePath Absolutní cesta k souboru na disku
-	 * @param string $displayName Název souboru pro účely chybových hlášek
-	 * @return array Dekódovaná JSON data jako asociativní pole
-	 *
-	 * @throws ConfigException Pokud soubor nelze načíst, JSON je nevalidní nebo má neočekávanou strukturu
-	 */
-    private function decodeJsonFile(string $filePath, string $displayName): array
-    {
-        $raw = file_get_contents($filePath);
-        if ($raw === false) {
-            throw ConfigException::fileNotFound($filePath);
+        foreach ($paths as $path) {
+            if (file_exists($path)) {
+                return JsonUtils::readFile($path);
+            }
         }
 
-        $json = JsonGuard::strip($raw);
-
-        try {
-            $data = json_decode($json, true, 512, JSON_THROW_ON_ERROR);
-        } catch (\JsonException $e) {
-            throw ConfigException::invalidJson($filePath, $e->getMessage());
-        }
-
-        if (!is_array($data)) {
-            throw ConfigException::invalidStructure(
-                $displayName,
-                'JSON root musí být objekt nebo pole.'
-            );
-        }
-
-        return $data;
+        throw FileException::notFound($filename);
     }
 }

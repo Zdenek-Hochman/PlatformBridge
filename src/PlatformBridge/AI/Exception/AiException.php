@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 
-namespace Zoom\PlatformBridge\AI\Exception;
+namespace PlatformBridge\AI\Exception;
 
 use Exception;
 use Throwable;

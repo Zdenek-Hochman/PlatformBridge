@@ -1,7 +1,7 @@
 <?php
 
-namespace Zoom\PlatformBridge\Handler\Fields;
-use Zoom\PlatformBridge\Form\Form;
+namespace PlatformBridge\Handler\Fields;
+use PlatformBridge\Form\Form;
 
 /**
  * Handler pro datumové input pole (date, datetime-local, time, month, week).

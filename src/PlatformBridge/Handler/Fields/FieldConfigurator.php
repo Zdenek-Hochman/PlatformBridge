@@ -1,6 +1,6 @@
 <?php
 
-namespace Zoom\PlatformBridge\Handler\Fields;
+namespace PlatformBridge\Handler\Fields;
 
 abstract class FieldConfigurator implements FieldHandler
 {

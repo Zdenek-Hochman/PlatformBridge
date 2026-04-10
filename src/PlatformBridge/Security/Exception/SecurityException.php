@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace Zoom\PlatformBridge\Security;
+namespace PlatformBridge\Security\Exception;
 
-use Zoom\PlatformBridge\Error\RenderableException;
+use PlatformBridge\Error\RenderableException;
 
 /**
  * Výjimka pro bezpečnostní chyby (neplatný podpis, expirace, atd.).

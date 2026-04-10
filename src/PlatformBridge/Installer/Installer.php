@@ -2,18 +2,19 @@
 
 declare(strict_types=1);
 
-namespace Zoom\PlatformBridge\Installer;
+namespace PlatformBridge\Installer;
 
-use Zoom\PlatformBridge\Paths\PathResolverFactory;
-use Zoom\PlatformBridge\Paths\PathResolver;
-use Zoom\PlatformBridge\Paths\PathsConfig;
+use PlatformBridge\Paths\PathResolverFactory;
+use PlatformBridge\Paths\PathResolver;
+use PlatformBridge\Paths\PathsConfig;
 
-use Zoom\PlatformBridge\Installer\Publisher\StubPublisher;
-use Zoom\PlatformBridge\Installer\Provisioners\ConfigProvisioner;
-use Zoom\PlatformBridge\Installer\Provisioners\ProvisionResult;
-use Zoom\PlatformBridge\Installer\Provisioners\FileProvisioner;
-use Zoom\PlatformBridge\Installer\Provisioners\AssetProvisioner;
-use Zoom\PlatformBridge\Installer\Provisioners\DirectoryProvisioner;
+use PlatformBridge\Installer\Publisher\StubPublisher;
+use PlatformBridge\Installer\Provisioners\ConfigProvisioner;
+use PlatformBridge\Installer\Provisioners\ProvisionResult;
+use PlatformBridge\Installer\Provisioners\FileProvisioner;
+use PlatformBridge\Installer\Provisioners\AssetProvisioner;
+use PlatformBridge\Installer\Provisioners\DirectoryProvisioner;
+// use PlatformBridge\Translator\Database\TableProvisioner;
 
 /**
  * Orchestrátor instalačních kroků PlatformBridge.
@@ -52,7 +53,7 @@ final class Installer
     private array $only = [];
 
     /** @var list<string> Povolené názvy kroků pro --only */
-    private const ALLOWED_STEPS = ['init', 'dirs', 'assets', 'api', 'config', 'security', 'cache', 'guard'];
+    private const ALLOWED_STEPS = ['init', 'dirs', 'assets', 'api', 'config', 'security', 'translations', 'cache', 'guard'];
 
     public function __construct(?string $packageRoot = null)
     {
@@ -159,7 +160,10 @@ final class Installer
         // 7. Publikuj security config
         $this->runStep('security', $this->stepFile('security'));
 
-        // 8. Zajisti cache adresář
+        // 8. Zajisti tabulku pro překlady (pokud je mysqli k dispozici)
+        $this->runStep('translations', $this->stepTranslations(...));
+
+        // 9. Zajisti cache adresář
         $this->runStep('cache', $this->stepCache(...));
 
         $this->info("\n✅ PlatformBridge installed successfully!");
@@ -263,6 +267,63 @@ final class Installer
         $this->info($result->message());
     }
 
+    /**
+     * Translations step: provisioning tabulky pb_translations v databázi.
+     *
+     * Pokud není k dispozici mysqli připojení, krok se přeskočí.
+     * Tabulka se vytvoří pouze pokud neexistuje (idempotentní).
+     */
+    private function stepTranslations(): void
+    {
+        $mysqli = $this->resolveMysqli();
+
+        if ($mysqli === null) {
+            $this->info("[translations] Skipped — no mysqli connection configured");
+            return;
+        }
+
+        // $provisioner = new TableProvisioner($mysqli);
+
+        // if ($provisioner->ensure()) {
+        //     $this->info("[translations] ✓ Table 'pb_translations' created");
+        // } else {
+        //     $this->info("[translations] Table 'pb_translations' already exists");
+        // }
+    }
+
+    /**
+     * Pokusí se získat mysqli instanci z bridge-config.php.
+     *
+     * Bridge-config může definovat 'mysqli' callback nebo instanci.
+     * Pokud neexistuje nebo není nakonfigurována, vrátí null.
+     */
+    private function resolveMysqli(): ?\mysqli
+    {
+        $configFile = $this->paths->bridgeConfigFile();
+
+        if (!file_exists($configFile)) {
+            return null;
+        }
+
+        try {
+            $config = require $configFile;
+        } catch (\Throwable) {
+            return null;
+        }
+
+        if (!is_array($config)) {
+            return null;
+        }
+
+        $mysqli = $config['mysqli'] ?? null;
+
+        if ($mysqli instanceof \Closure) {
+            $mysqli = $mysqli();
+        }
+
+        return $mysqli instanceof \mysqli ? $mysqli : null;
+    }
+
     // ─── Internal helpers ────────────────────────────────────
 
     /**
@@ -319,10 +380,10 @@ final class Installer
 
     /**
      * Autodetekce package root z umístění třídy.
-     * Installer.php žije v src/PlatformBridge/Installer/ → 4× dirname.
+     * Installer.php žije v src/PlatformBridge/Installer/ → 3× dirname.
      */
     private static function detectPackageRoot(): string
     {
-        return dirname(__DIR__, 4);
+        return dirname(__DIR__, 3);
     }
 }

@@ -1,8 +1,6 @@
 <?php
 
-namespace Zoom\PlatformBridge\Template;
-
-use Zoom\PlatformBridge\Translator\Translator;
+namespace PlatformBridge\Template;
 
 /**
  * Třída TemplateParser slouží k parsování šablon a modifikaci proměnných.
@@ -267,14 +265,30 @@ class Parser extends VariableModifier
     /**
      * Metoda processTranslate zpracovává překlad textu.
      *
+     * Kompiluje {_tran k='domain.key' d='default'} tag do PHP kódu,
+     * který za běhu zavolá $this->translate() na Engine instanci.
+     *
+     * Podporuje:
+     * - Statické klíče: {_tran k='errors.http.400' d='Bad request'}
+     * - Proměnné klíče: {_tran k='$key' d='Unknown'}
+     * - Přístup k poli: {_tran k='$item.key' d='Default'}
+     *
      * @param array $matches Pole s výsledky regulárního výrazu.
      * @return string Výsledný PHP kód pro výpis přeloženého textu.
      */
     private function processTranslate(array $matches): string
     {
-        $key = parent::transformHtmlVariables($matches["key"] ?? "", false, false);
+        $key = $matches["key"] ?? "";
+        $default = $matches["default"] ?? "";
 
-        return "echo " . json_encode(Translator::fetchTranslations($key, $matches["lang"], $matches["default"]), JSON_UNESCAPED_UNICODE) . ";";
+        // Klíč obsahuje PHP proměnnou ($) → transformuj pro runtime
+        if (str_contains($key, '$')) {
+            $keyCode = parent::transformHtmlVariables($key, false, false);
+            return 'echo $this->translate(' . $keyCode . ', ' . var_export($default, true) . ');';
+        }
+
+        // Statický klíč → generuj přímý PHP kód pro runtime překlad
+        return 'echo $this->translate(' . var_export($key, true) . ', ' . var_export($default, true) . ');';
     }
 
     /**

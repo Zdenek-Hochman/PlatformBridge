@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace Zoom\PlatformBridge\Installer\Publisher;
+namespace PlatformBridge\Installer\Publisher;
 
-use Zoom\PlatformBridge\Security\JsonGuard;
+use PlatformBridge\Security\JsonGuard;
 
 /**
  * Bezpečné publikování souborů se skip logikou.

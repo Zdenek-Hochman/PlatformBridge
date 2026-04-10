@@ -2,8 +2,10 @@
 
 declare(strict_types=1);
 
-namespace Zoom\PlatformBridge\AI\API;
+namespace PlatformBridge\AI\API\Types\Attributes;
 
+use PlatformBridge\AI\API\Enum\ResponseType;
+use PlatformBridge\AI\API\Core\Endpoint\EndpointDefinition;
 use Attribute;
 
 /**
@@ -17,7 +19,7 @@ use Attribute;
  *   #[Endpoint(
  *       name: 'CreateSubject',
  *       generator: 'subject',
- *       responseType: 'nested',
+ *       responseType: ResponseType::Nested,
  *       template: '/Components/NestedResult',
  *       variantKey: 'type'
  *   )]
@@ -39,15 +41,16 @@ final class Endpoint
     /**
      * @param string      $name         Název endpointu pro AI API (např. 'CreateSubject')
      * @param string|null $generator    ID generátoru v generators.json (pro required fields mapping)
-     * @param string      $responseType Typ odpovědi: 'string' | 'array' | 'nested'
+     * @param ResponseType $responseType Typ odpovědi: ResponseType::String | ResponseType::Array | ResponseType::Nested
      * @param string      $template     Cesta k šabloně pro renderování odpovědi
      * @param string|null $variantKey   Klíč ve vstupních datech pro detekci varianty (null = bez variant)
      */
     public function __construct(
         public readonly string  $name,
         public readonly ?string $generator = null,
-        public readonly string  $responseType = EndpointDefinition::RESPONSE_STRING,
+        public readonly ResponseType $responseType = ResponseType::String,
         public readonly string  $template = EndpointDefinition::SINGLE_KEY_TEMPLATE,
         public readonly ?string $variantKey = null,
-    ) {}
+    ) {
+    }
 }

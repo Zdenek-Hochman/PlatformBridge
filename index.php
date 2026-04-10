@@ -7,4 +7,4 @@ if (php_sapi_name() === 'cli' || !defined('PLATFORM_BRIDGE_LOADED')) {
 }
 
 // Vrátí namespace třídy pro require
-return \Zoom\PlatformBridge\PlatformBridge::class;
+return \PlatformBridge\PlatformBridge::class;

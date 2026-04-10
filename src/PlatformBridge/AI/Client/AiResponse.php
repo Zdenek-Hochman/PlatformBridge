@@ -1,9 +1,10 @@
 <?php
+
 declare(strict_types=1);
 
-namespace Zoom\PlatformBridge\AI;
+namespace PlatformBridge\AI\Client;
 
-use Zoom\PlatformBridge\AI\Exception\AiException;
+use PlatformBridge\AI\Exception\AiException;
 
 /**
  * Vylepšená odpověď z AI API
@@ -17,7 +18,8 @@ class AiResponse
         protected readonly bool $success = true,
         protected readonly ?string $error = null,
         protected readonly array $meta = []
-    ) {}
+    ) {
+    }
 
     public function isSuccess(): bool
     {
@@ -89,8 +91,8 @@ class AiResponse
     public function toArray(): array
     {
         return [
-			'success' => $this->success,
-			'status_code' => $this->statusCode,
+            'success' => $this->success,
+            'status_code' => $this->statusCode,
             'meta' => $this->meta,
             'response' => $this->response,
             'error' => $this->error,
@@ -108,8 +110,8 @@ class AiResponse
 
         $metaKeys = ['request_id', 'timestamp', 'usage'];
 
-		$meta = array_filter(array_intersect_key($response, array_flip($metaKeys)));
-		// $payload = array_diff_key($payload, array_flip($metaKeys));
+        $meta = array_filter(array_intersect_key($response, array_flip($metaKeys)));
+        // $payload = array_diff_key($payload, array_flip($metaKeys));
 
         return new self(
             response: $payload,

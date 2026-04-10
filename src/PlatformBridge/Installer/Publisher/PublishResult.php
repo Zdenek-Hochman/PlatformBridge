@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Zoom\PlatformBridge\Installer\Publisher;
+namespace PlatformBridge\Installer\Publisher;
 
 /**
  * Výsledek publish/provisioning operace.

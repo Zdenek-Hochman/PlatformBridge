@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 
-namespace Zoom\PlatformBridge\Form\Element;
+namespace PlatformBridge\Form\Element;
 
 /**
  * Výčet typů polí formuláře.
@@ -23,7 +23,7 @@ enum ElementType: string
      */
     public function getElementClass(): string
     {
-        return "\\Zoom\\PlatformBridge\\Form\\Element\\" . $this->value;
+        return "\\PlatformBridge\\Form\\Element\\" . $this->value;
     }
 
 	/**

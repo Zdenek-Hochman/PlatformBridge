@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Zoom\PlatformBridge\Error;
+namespace PlatformBridge\Error;
 
 /**
  * Whoops-style error renderer s interaktivním stack trace, náhledem zdrojového kódu

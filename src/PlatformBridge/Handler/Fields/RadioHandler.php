@@ -1,8 +1,8 @@
 <?php
 
-namespace Zoom\PlatformBridge\Handler\Fields;
+namespace PlatformBridge\Handler\Fields;
 
-use Zoom\PlatformBridge\Form\Form;
+use PlatformBridge\Form\Form;
 
 /**
  * Handler pro vytváření skupiny radio input polí.

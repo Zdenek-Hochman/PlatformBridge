@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace Zoom\PlatformBridge\Installer\Provisioners;
+namespace PlatformBridge\Installer\Provisioners;
 
-use Zoom\PlatformBridge\Installer\Publisher\StubPublisher;
-use Zoom\PlatformBridge\Installer\Publisher\PublishResult;
+use PlatformBridge\Installer\Publisher\StubPublisher;
+use PlatformBridge\Installer\Publisher\PublishResult;
 
 /**
  * Publikuje dist assety (JS/CSS) do hostující aplikace.

@@ -1,7 +1,7 @@
 <?php
 
-namespace Zoom\PlatformBridge\Handler\Fields;
-use Zoom\PlatformBridge\Form\Form;
+namespace PlatformBridge\Handler\Fields;
+use PlatformBridge\Form\Form;
 
 /**
  * Handler pro vytváření checkbox input polí.

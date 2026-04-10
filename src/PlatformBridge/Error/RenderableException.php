@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Zoom\PlatformBridge\Error;
+namespace PlatformBridge\Error;
 
 /**
  * Interface pro výjimky, které definují vlastní způsob prezentace v error rendereru.

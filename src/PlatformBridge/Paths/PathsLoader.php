@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace Zoom\PlatformBridge\Paths;
+namespace PlatformBridge\Paths;
 
-use Zoom\PlatformBridge\Security\JsonGuard;
+use PlatformBridge\Shared\Utils\JsonUtils;
 
 /**
  * Načítá konfigurační soubor platformbridge.json(.php) a vytváří {@see PathsConfig}.
@@ -27,7 +27,7 @@ final class PathsLoader
             return new PathsConfig(self::defaults(false), []);
         }
 
-        $data = self::read($protectedFile);
+        $data = JsonUtils::readFile($protectedFile, true);
         return new PathsConfig(self::defaults(false), $data);
     }
 
@@ -46,7 +46,7 @@ final class PathsLoader
             );
         }
 
-        $data = self::read($protectedFile);
+        $data = JsonUtils::readFile($protectedFile, true);
         return new PathsConfig(self::defaults(true), $data);
     }
 
@@ -87,41 +87,5 @@ final class PathsLoader
     public static function defaultsAsJson(bool $isVendor): string
     {
         return json_encode(self::defaults($isVendor), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
-    }
-
-    /**
-     * Načte a dekóduje chráněný JSON soubor.
-     *
-     * @throws \RuntimeException Pokud soubor nelze načíst, je prázdný, příliš velký nebo nevalidní
-     */
-    public static function read(string $file): array
-    {
-        $maxSize = 65536;
-        $fileSize = filesize($file);
-        if ($fileSize === false || $fileSize > $maxSize) {
-            throw new \RuntimeException(
-                basename($file) . ' is too large (max ' . ($maxSize / 1024) . ' KB). '
-                . 'This may indicate file corruption or a security issue.'
-            );
-        }
-
-        $content = file_get_contents($file);
-        if ($content === false || trim($content) === '') {
-            throw new \RuntimeException(
-                basename($file) . ' is empty or unreadable.'
-            );
-        }
-
-        $content = JsonGuard::strip($content);
-
-        $data = json_decode($content, true, 512, JSON_THROW_ON_ERROR);
-
-        if (!is_array($data)) {
-            throw new \RuntimeException(
-                basename($file) . ' must contain a JSON object, got ' . gettype($data)
-            );
-        }
-
-        return $data;
     }
 }

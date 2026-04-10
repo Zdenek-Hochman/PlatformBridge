@@ -1,6 +1,6 @@
 <?php
 
-namespace Zoom\PlatformBridge\Paths;
+namespace PlatformBridge\Paths;
 /**
  * Value object pro konfiguraci cest načtenou z platformbridge.json.
  *

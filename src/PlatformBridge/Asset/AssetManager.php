@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Zoom\PlatformBridge\Asset;
+namespace PlatformBridge\Asset;
 
 /**
  * Správce assetů (JS/CSS) s logikou "once".

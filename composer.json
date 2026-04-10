@@ -1,5 +1,5 @@
 {
-    "name": "zoom/platform-bridge",
+    "name": "platformbridge/platform-bridge",
     "description": "AI-powered form builder with template engine and field factory",
     "type": "library",
     "license": "proprietary",
@@ -12,7 +12,7 @@
     },
     "autoload": {
         "psr-4": {
-    		"Zoom\\PlatformBridge\\": "src/PlatformBridge/"
+    		"PlatformBridge\\": "src/PlatformBridge/"
         }
     },
     "config": {

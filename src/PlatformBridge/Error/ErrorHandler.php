@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Zoom\PlatformBridge\Error;
+namespace PlatformBridge\Error;
 
 /**
  * Zachytává PHP chyby, neošetřené výjimky a fatální shutdown chyby.
@@ -16,6 +16,7 @@ namespace Zoom\PlatformBridge\Error;
 final class ErrorHandler
 {
     private ErrorRenderer $renderer;
+    private static bool $registered = false;
 
     public function __construct(?ErrorRenderer $renderer = null)
     {
@@ -27,6 +28,11 @@ final class ErrorHandler
      */
     public function register(): void
     {
+        if (self::$registered) {
+            return;
+        }
+        self::$registered = true;
+
         set_exception_handler([$this, 'handleException']);
         set_error_handler([$this, 'handleError']);
         register_shutdown_function([$this, 'handleShutdown']);

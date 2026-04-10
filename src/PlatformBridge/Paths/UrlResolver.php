@@ -1,6 +1,6 @@
 <?php
 
-namespace Zoom\PlatformBridge\Paths;
+namespace PlatformBridge\Paths;
 
 final class UrlResolver {
 

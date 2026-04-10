@@ -2898,16 +2898,17 @@
     }
     pipeline = [
       { name: "DOM", time: performance.now(), step: () => this.initDom() },
+      // { name: "I18n", time: performance.now(), step: () => this.initTranslator() },
       { name: "Core", time: performance.now(), step: () => this.initCore() },
       { name: "Services", time: performance.now(), step: () => this.initServices() },
       { name: "Features", time: performance.now(), step: () => this.initFeatures() },
       { name: "Bindings", time: performance.now(), step: () => this.bindEvents() }
       // { name: "Public API", time: performance.now(), step: () => this.exposePublicApi() },
     ];
-    init() {
+    async init() {
       for (const stage of this.pipeline) {
         console.log("Init: " + stage.name + " Time:", performance.now() - stage.time);
-        stage.step();
+        await stage.step();
       }
     }
     initDom() {
@@ -2915,6 +2916,21 @@
       LayoutController.autoInit();
       VisibilityController.init();
     }
+    /**
+     * Inicializuje překladový systém.
+     * Načte překlady z localStorage cache nebo fetch z TranslationEndpoint.
+     */
+    // private async initTranslator(): Promise<void> {
+    // 	const module = document.querySelector<HTMLElement>(`.${MODULE.ROOT}`);
+    // 	const locale = module?.dataset.locale ?? 'cs';
+    // 	const translationUrl = module?.dataset.translationUrl ?? '/api/translations';
+    // 	await Translator.boot({
+    // 		locale,
+    // 		endpoint: translationUrl,
+    // 		domains: ['errors', 'ui'],
+    // 		timeout: 3000,
+    // 	});
+    // }
     initCore() {
       this.events = new EventBus(window);
       this.errorHandler = new ErrorHandler(this.events, { autoListen: true, debug: true });
@@ -2993,7 +3009,7 @@
   // assets/ts/pb-main.ts
   document.addEventListener("DOMContentLoaded", () => {
     const app = new App();
-    app.init();
+    app.init().catch((err) => console.error("[PlatformBridge] Init failed:", err));
   });
 })();
 //# sourceMappingURL=pb-main.js.map

@@ -1,6 +1,6 @@
 <?php
 
-namespace Zoom\PlatformBridge\Handler;
+namespace PlatformBridge\Handler;
 
 /**
  * Factory pro vytváření formulářových prvků z bloků konfigurace.

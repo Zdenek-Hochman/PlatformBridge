@@ -3,6 +3,7 @@ import { Dom, DomNode, EventBus, ErrorHandler } from "assets/ts/Core";
 import { ApiClient, ApiErrorHandler, SessionManager } from "assets/ts/Services";
 import { FormValidator, VisibilityController, ResultActionHandler } from 'assets/ts/Features';
 import { CustomSelect, LayoutController } from "assets/ts/UI";
+// import { Translator } from 'assets/ts/i18n';
 // import { PlatformBridge } from 'assets/ts/Public/PlatformBridge';
 
 import { HttpTransport, SseTransport } from 'assets/ts/Services/Transports';
@@ -28,6 +29,7 @@ export class App {
 
 	private readonly pipeline = [
 		{ name: "DOM", time: performance.now(), step: () => this.initDom() },
+		// { name: "I18n", time: performance.now(), step: () => this.initTranslator() },
 		{ name: "Core", time: performance.now(), step: () => this.initCore() },
 		{ name: "Services", time: performance.now(), step: () => this.initServices() },
 		{ name: "Features", time: performance.now(), step: () => this.initFeatures() },
@@ -35,10 +37,10 @@ export class App {
 		// { name: "Public API", time: performance.now(), step: () => this.exposePublicApi() },
 	];
 
-	init(): void {
+	async init(): Promise<void> {
 		for (const stage of this.pipeline) {
 			console.log("Init: " + stage.name + " Time:", performance.now() - stage.time);
-			stage.step();
+			await stage.step();
 		}
 	}
 
@@ -47,6 +49,23 @@ export class App {
 		LayoutController.autoInit();
 		VisibilityController.init();
 	}
+
+	/**
+	 * Inicializuje překladový systém.
+	 * Načte překlady z localStorage cache nebo fetch z TranslationEndpoint.
+	 */
+	// private async initTranslator(): Promise<void> {
+	// 	const module = document.querySelector<HTMLElement>(`.${MODULE.ROOT}`);
+	// 	const locale = module?.dataset.locale ?? 'cs';
+	// 	const translationUrl = module?.dataset.translationUrl ?? '/api/translations';
+
+	// 	await Translator.boot({
+	// 		locale,
+	// 		endpoint: translationUrl,
+	// 		domains: ['errors', 'ui'],
+	// 		timeout: 3000,
+	// 	});
+	// }
 
 	private initCore(): void {
 		this.events = new EventBus(window);

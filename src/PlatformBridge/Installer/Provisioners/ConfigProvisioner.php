@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-namespace Zoom\PlatformBridge\Installer\Provisioners;
+namespace PlatformBridge\Installer\Provisioners;
 
-use Zoom\PlatformBridge\Paths\PathsConfig;
-use Zoom\PlatformBridge\Paths\PathsLoader;
-use Zoom\PlatformBridge\Security\JsonGuard;
+use PlatformBridge\Paths\PathsConfig;
+use PlatformBridge\Paths\PathsLoader;
+use PlatformBridge\Security\JsonGuard;
 
 /**
  * Spravuje lifecycle konfiguračního souboru platformbridge.json(.php).

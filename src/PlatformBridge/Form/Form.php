@@ -2,13 +2,13 @@
 
 declare(strict_types=1);
 
-namespace Zoom\PlatformBridge\Form;
+namespace PlatformBridge\Form;
 
-use Zoom\PlatformBridge\Config\ConfigKeys;
-use Zoom\PlatformBridge\Form\Element\ElementType;
-use Zoom\PlatformBridge\Form\Factory\FormElementFactory;
-use Zoom\PlatformBridge\Runtime\LayoutManager;
-use Zoom\PlatformBridge\Template\Engine;
+use PlatformBridge\Config\ConfigKeys;
+use PlatformBridge\Form\Element\ElementType;
+use PlatformBridge\Form\Factory\FormElementFactory;
+use PlatformBridge\Runtime\LayoutManager;
+use PlatformBridge\Template\Engine;
 
 /**
  * Statické API pro deklarativní skládání formulářových elementů.

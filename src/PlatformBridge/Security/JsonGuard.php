@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Zoom\PlatformBridge\Security;
+namespace PlatformBridge\Security;
 
 /**
  * Třída JsonGuard poskytuje bezpečnostní mechanismy pro ochranu citlivých JSON konfiguračních souborů

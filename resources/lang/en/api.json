@@ -1,0 +1,15 @@
+{
+    "response": {
+        "parse_error": "Failed to process submitted data.",
+        "missing_signed_params": "Missing signed params (__ai_signed).",
+        "missing_endpoint": "Missing endpoint name in configuration.",
+        "config_not_found": "Configuration file not found: {:path}",
+        "config_must_return_array": "Configuration file must return an array.",
+        "api_key_required": "API key is required."
+    },
+    "sse": {
+        "server_error": "SSE server error ({:status}).",
+        "readable_stream_not_supported": "ReadableStream is not supported.",
+        "stream_aborted": "Stream was aborted or timed out."
+    }
+}

@@ -2,69 +2,33 @@
 
 declare(strict_types=1);
 
-namespace Zoom\PlatformBridge\Config\Exception;
+namespace PlatformBridge\Shared\Exception;
 
-use Zoom\PlatformBridge\Error\RenderableException;
+use PlatformBridge\Error\RenderableException;
 
 /**
  * Výjimka pro chyby v konfiguraci PlatformBridge.
  *
- * Používá se pro:
- * - Chybějící konfigurační soubory
- * - Nevalidní JSON
+ * Používá se výhradně pro doménové konfigurační chyby:
  * - Chybějící povinné klíče
+ * - Neplatná struktura dat
  * - Neplatné reference (layout_ref, block ref)
  * - Porušení pravidel validace
+ *
+ * Pro chyby souborového systému viz {@see FileException}.
+ * Pro chyby JSON dekódování/kódování viz {@see JsonException}.
  *
  * Implementuje {@see RenderableException} pro zobrazení cesty k souboru a klíče.
  */
 class ConfigException extends \RuntimeException implements RenderableException
 {
-    public const CODE_FILE_NOT_FOUND = 1001;
-    public const CODE_INVALID_JSON = 1002;
     public const CODE_INVALID_STRUCTURE = 1003;
     public const CODE_MISSING_KEY = 1004;
     public const CODE_INVALID_REFERENCE = 1005;
     public const CODE_VALIDATION_FAILED = 1006;
-    public const CODE_DIRECTORY_NOT_FOUND = 1007;
 
     private ?string $configFile = null;
     private ?string $configKey = null;
-
-	/**
-	 * Vytvoří výjimku pro chybějící konfigurační soubor.
-	 *
-	 * @param string $path Cesta k chybějícímu souboru
-	 *
-	 * @return self Instance výjimky ConfigException s kódem CODE_FILE_NOT_FOUND
-	 */
-    public static function fileNotFound(string $path): self
-    {
-        $exception = new self(
-            "Konfigurační soubor nenalezen: {$path}",
-            self::CODE_FILE_NOT_FOUND
-        );
-        $exception->configFile = $path;
-        return $exception;
-    }
-
-	/**
-	 * Vytvoří výjimku pro nevalidní JSON v konfiguračním souboru.
-	 *
-	 * @param string $path Cesta k souboru s nevalidním JSON
-	 * @param string $error Chybová zpráva z parsování JSON
-	 *
-	 * @return self Instance výjimky ConfigException s kódem CODE_INVALID_JSON
-	 */
-    public static function invalidJson(string $path, string $error): self
-    {
-        $exception = new self(
-            "Nevalidní JSON v souboru {$path}: {$error}",
-            self::CODE_INVALID_JSON
-        );
-        $exception->configFile = $path;
-        return $exception;
-    }
 
 	/**
 	 * Vytvoří výjimku pro chybějící povinný klíč v konfiguračním souboru.
@@ -140,14 +104,11 @@ class ConfigException extends \RuntimeException implements RenderableException
 	/**
 	 * Vrací titulek chyby pro zobrazení uživateli podle typu chyby v konfiguraci.
 	 *
-	 * @return string Titulek chyby (např. 'Konfigurace – soubor nenalezen', 'Konfigurace – validace selhala')
+	 * @return string Titulek chyby (např. 'Konfigurace – chybějící klíč', 'Konfigurace – validace selhala')
 	 */
     public function getTitle(): string
     {
         return match ($this->code) {
-            self::CODE_FILE_NOT_FOUND     => 'Konfigurace – soubor nenalezen',
-            self::CODE_DIRECTORY_NOT_FOUND => 'Konfigurace – adresář nenalezen',
-            self::CODE_INVALID_JSON       => 'Konfigurace – nevalidní JSON',
             self::CODE_MISSING_KEY        => 'Konfigurace – chybějící klíč',
             self::CODE_INVALID_REFERENCE  => 'Konfigurace – neplatná reference',
             self::CODE_INVALID_STRUCTURE  => 'Konfigurace – neplatná struktura',
@@ -174,10 +135,6 @@ class ConfigException extends \RuntimeException implements RenderableException
     public function getHint(): ?string
     {
         return match ($this->code) {
-            self::CODE_FILE_NOT_FOUND, self::CODE_DIRECTORY_NOT_FOUND
-                => 'Ověř, že konfigurační soubory existují a cesty v konfiguraci jsou správné.',
-            self::CODE_INVALID_JSON
-                => 'Zkontroluj JSON syntaxi konfiguračního souboru (např. přes jsonlint).',
             self::CODE_MISSING_KEY
                 => 'Doplň chybějící klíč do konfiguračního souboru.',
             self::CODE_INVALID_REFERENCE

@@ -9,7 +9,7 @@
 
 require_once __DIR__ . '/vendor/autoload.php';
 
-use Zoom\PlatformBridge\PlatformBridge;
+use PlatformBridge\PlatformBridge;
 
 // ============================================================================
 // PŘÍKLAD 1: Vytvoření instance s výchozí konfigurací
@@ -20,14 +20,17 @@ use Zoom\PlatformBridge\PlatformBridge;
 // ============================================================================
 // PŘÍKLAD 2: Vytvoření instance s vlastní konfigurací
 // ============================================================================
+$mysqli = new \mysqli('localhost', 'root', '', 'platform_bridge', 3306);
+
 $bridge = PlatformBridge::create()
     // Pro standalone režim: explicitní cesty ke konfiguraci
     // Ve vendor režimu se cesty resolví automaticky přes PathResolver
     ->withConfigPath(__DIR__ . '/resources/defaults')
     // ->withViewsPath(__DIR__ . '/resources/views')
-    // ->withLocale('cs');
     // HMAC podepisování - zapnout/vypnout (secret key se načítá z bridge-config.php)
     ->withSecretKey(true)
+    ->withLocale('cs')
+    ->withMysqli($mysqli)
     // Volitelně: expirace podepsaných dat (v sekundách) - přepíše hodnotu z bridge-config.php
     // ->withParamsTtl(3600) // 1 hodina
     ->build();

@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace Zoom\PlatformBridge\Installer\Provisioners;
+namespace PlatformBridge\Installer\Provisioners;
 
-use Zoom\PlatformBridge\Paths\PathsConfig;
+use PlatformBridge\Paths\PathsConfig;
 
 /**
  * Výsledek provisioning operace konfiguračního souboru.

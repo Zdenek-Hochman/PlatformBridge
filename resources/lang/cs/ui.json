@@ -1,0 +1,45 @@
+{
+    "form": {
+        "required": "Toto pole je povinné.",
+        "submit": "Odeslat",
+        "cancel": "Zrušit",
+        "loading": "Načítání..."
+    },
+    "notification": {
+        "close": "Zavřít",
+        "error": "Chyba",
+        "success": "Úspěch",
+        "warning": "Varování",
+        "info": "Informace"
+    },
+    "error_page": {
+        "title": "Chyba",
+        "something_went_wrong": "Něco se pokazilo",
+        "something_went_wrong_detail": "Problém byl zaznamenán. Pokud potíže přetrvávají, kontaktuj administrátora.",
+        "environment": "Prostředí",
+        "headers": "Hlavičky",
+        "source_line": "řádek {:line}",
+        "source_not_available": "Zdrojový kód není dostupný",
+        "php_version": "PHP verze",
+        "php_sapi": "PHP SAPI",
+        "system": "Systém",
+        "memory_peak": "Paměť (peak)",
+        "memory_current": "Paměť (aktuální)",
+        "zend_engine": "Zend Engine",
+        "extensions": "Extensions",
+        "cli_no_request": "CLI prostředí – žádný HTTP request",
+        "cli_no_headers": "CLI prostředí – žádné hlavičky",
+        "no_headers": "Žádné hlavičky",
+        "method": "Metoda",
+        "uri": "URI",
+        "host": "Host",
+        "protocol": "Protokol",
+        "remote_ip": "Vzdálená IP"
+    },
+    "php_type": {
+        "security": "Přístup zamítnut — neplatný bezpečnostní podpis.",
+        "invalid_json": "Neplatný formát požadavku.",
+        "ai_provider": "Chyba AI poskytovatele.",
+        "internal_error": "Interní chyba serveru."
+    }
+}

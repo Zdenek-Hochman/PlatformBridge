@@ -2,7 +2,10 @@
 
 declare(strict_types=1);
 
-namespace Zoom\PlatformBridge\AI\API;
+namespace PlatformBridge\AI\API\Types\Attributes;
+
+use PlatformBridge\AI\API\Enum\ResponseType;
+use PlatformBridge\AI\API\Core\Endpoint\EndpointDefinition;
 
 /**
  * Bázová třída pro endpointy definované pomocí PHP atributu #[Endpoint].
@@ -63,7 +66,7 @@ abstract class AttributeEndpoint extends EndpointDefinition
         return $this->meta->generator;
     }
 
-    protected function getResponseType(): string
+    protected function getResponseType(): ResponseType
     {
         return $this->meta->responseType;
     }

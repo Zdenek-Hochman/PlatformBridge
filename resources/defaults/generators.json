@@ -2,7 +2,7 @@
 	"generators": {
 		"subject": {
 			"id": "subject",
-  			"label": "Email Subjects (Advanced)",
+			"label": "{$config.generators.subject.label|Email Subjects (Advanced)}",
 			"layout_ref": "subject_advanced",
 			"config": {
 				"endpoint": "CreateSubject",

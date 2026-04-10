@@ -12,7 +12,7 @@ title UML Class Diagram – PlatformBridge (kompletní)
 ' ─────────────────────────────────────────────
 ' PACKAGE: Fasáda & Builder
 ' ─────────────────────────────────────────────
-package "Zoom\\PlatformBridge" #DDEEFF {
+package "PlatformBridge" #DDEEFF {
 
     class PlatformBridgeBuilder {
         -configPath: ?string
@@ -70,7 +70,7 @@ package "Zoom\\PlatformBridge" #DDEEFF {
 ' ─────────────────────────────────────────────
 ' PACKAGE: Config
 ' ─────────────────────────────────────────────
-package "Zoom\\PlatformBridge\\Config" #DDFFD0 {
+package "PlatformBridge\\Config" #DDFFD0 {
 
     class ConfigManager <<final>> {
         -configDir: string
@@ -135,7 +135,7 @@ package "Zoom\\PlatformBridge\\Config" #DDFFD0 {
 ' ─────────────────────────────────────────────
 ' PACKAGE: Handler
 ' ─────────────────────────────────────────────
-package "Zoom\\PlatformBridge\\Handler" #FFF3CC {
+package "PlatformBridge\\Handler" #FFF3CC {
 
     interface FieldHandler {
         +supports(array): bool
@@ -180,7 +180,7 @@ package "Zoom\\PlatformBridge\\Handler" #FFF3CC {
 ' ─────────────────────────────────────────────
 ' PACKAGE: Form
 ' ─────────────────────────────────────────────
-package "Zoom\\PlatformBridge\\Form" #FFE8E0 {
+package "PlatformBridge\\Form" #FFE8E0 {
 
     class Form <<final>> {
         -{static} elements: array
@@ -243,7 +243,7 @@ package "Zoom\\PlatformBridge\\Form" #FFE8E0 {
 ' ─────────────────────────────────────────────
 ' PACKAGE: Runtime
 ' ─────────────────────────────────────────────
-package "Zoom\\PlatformBridge\\Runtime" #EAE0FF {
+package "PlatformBridge\\Runtime" #EAE0FF {
 
     class FormRenderer <<final>> {
         -fieldFactory: FieldFactory
@@ -260,7 +260,7 @@ package "Zoom\\PlatformBridge\\Runtime" #EAE0FF {
 ' ─────────────────────────────────────────────
 ' PACKAGE: Template
 ' ─────────────────────────────────────────────
-package "Zoom\\PlatformBridge\\Template" #FFF0D0 {
+package "PlatformBridge\\Template" #FFF0D0 {
 
     class Engine <<final>> {
         -config: array
@@ -285,7 +285,7 @@ package "Zoom\\PlatformBridge\\Template" #FFF0D0 {
 ' ─────────────────────────────────────────────
 ' PACKAGE: AI
 ' ─────────────────────────────────────────────
-package "Zoom\\PlatformBridge\\AI" #FFD0D0 {
+package "PlatformBridge\\AI" #FFD0D0 {
 
     class AiClient {
         #config: AiClientConfig
@@ -349,7 +349,7 @@ package "Zoom\\PlatformBridge\\AI" #FFD0D0 {
 ' ─────────────────────────────────────────────
 ' PACKAGE: AI\API
 ' ─────────────────────────────────────────────
-package "Zoom\\PlatformBridge\\AI\\API" #FFD0E8 {
+package "PlatformBridge\\AI\\API" #FFD0E8 {
 
     abstract class EndpointDefinition {
         #variantKey: ?string
@@ -412,7 +412,7 @@ package "Zoom\\PlatformBridge\\AI\\API" #FFD0E8 {
 ' ─────────────────────────────────────────────
 ' PACKAGE: Security
 ' ─────────────────────────────────────────────
-package "Zoom\\PlatformBridge\\Security" #D0F0D0 {
+package "PlatformBridge\\Security" #D0F0D0 {
     class SignedParams <<final>> {
         -secretKey: string
         -ttl: ?int
@@ -429,7 +429,7 @@ package "Zoom\\PlatformBridge\\Security" #D0F0D0 {
 ' ─────────────────────────────────────────────
 ' PACKAGE: Asset / Error / Translator
 ' ─────────────────────────────────────────────
-package "Zoom\\PlatformBridge\\Asset" #E0E0E0 {
+package "PlatformBridge\\Asset" #E0E0E0 {
     class AssetManager <<final>> {
         +getScripts(bool): string
         +getStyles(bool): string
@@ -437,7 +437,7 @@ package "Zoom\\PlatformBridge\\Asset" #E0E0E0 {
     }
 }
 
-package "Zoom\\PlatformBridge\\Error" #E0E0E0 {
+package "PlatformBridge\\Error" #E0E0E0 {
     class ErrorHandler <<final>> {
         +register(): void
         +handleException(Throwable): void
@@ -445,7 +445,7 @@ package "Zoom\\PlatformBridge\\Error" #E0E0E0 {
     }
 }
 
-package "Zoom\\PlatformBridge\\Translator" #E0E0E0 {
+package "PlatformBridge\\Translator" #E0E0E0 {
     class Translator {
         +{static} setLocale(string): void
         +{static} translate(string, array, ?string): string

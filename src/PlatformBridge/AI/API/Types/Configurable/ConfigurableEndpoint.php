@@ -2,7 +2,10 @@
 
 declare(strict_types=1);
 
-namespace Zoom\PlatformBridge\AI\API;
+namespace PlatformBridge\AI\API\Types\Configurable;
+
+use PlatformBridge\AI\API\Enum\ResponseType;
+use PlatformBridge\AI\API\Core\Endpoint\EndpointDefinition;
 
 /**
  * Konfigurovatelný endpoint vytvořený z pole parametrů.
@@ -71,9 +74,9 @@ final class ConfigurableEndpoint extends EndpointDefinition
     /**
      * {@inheritDoc}
      */
-    protected function getResponseType(): string
+    protected function getResponseType(): ResponseType
     {
-        return $this->config['response_type'] ?? self::RESPONSE_STRING;
+        return ResponseType::from($this->config['response_type'] ?? 'string');
     }
 
     /**

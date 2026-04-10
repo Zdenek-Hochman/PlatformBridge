@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 
-namespace Zoom\PlatformBridge\Form\Element;
+namespace PlatformBridge\Form\Element;
 
 /**
  * Rozhraní pro pole formuláře.

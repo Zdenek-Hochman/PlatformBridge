@@ -1,10 +1,10 @@
 <?php
 declare(strict_types=1);
 
-namespace Zoom\PlatformBridge\Form\Factory;
+namespace PlatformBridge\Form\Factory;
 
-use Zoom\PlatformBridge\Form\Element\ElementValidator;
-use Zoom\PlatformBridge\Form\Element\ElementType;
+use PlatformBridge\Form\Element\ElementValidator;
+use PlatformBridge\Form\Element\ElementType;
 
 /**
  * Factory pro vytvoření formulářového elementu z konfigurace.
@@ -82,7 +82,7 @@ class FormElementFactory
      * @param array $params parametry připravené funkcí create()
 	 *
      * @return mixed vrací to, co konkrétní Element vrací z prepareFormElementStructure()
-	 * @see \Zoom\PlatformBridge\Form\Element\ElementInterface::prepareFormElementStructure()
+	 * @see \PlatformBridge\Form\Element\ElementInterface::prepareFormElementStructure()
 	 *
      * @throws \RuntimeException pokud není třída dostupná nebo prepare metoda chybí
      */

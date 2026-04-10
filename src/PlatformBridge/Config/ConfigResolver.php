@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace Zoom\PlatformBridge\Config;
+namespace PlatformBridge\Config;
 
-use Zoom\PlatformBridge\Config\Exception\ConfigException;
+use PlatformBridge\Shared\Exception\ConfigException;
 
 /**
  * Resolver konfiguračních struktur PlatformBridge.
@@ -23,7 +23,7 @@ use Zoom\PlatformBridge\Config\Exception\ConfigException;
  * - třída je stateful
  * - volání {@see setData()} invaliduje všechny interní cache
  *
- * @package Zoom\PlatformBridge\Config
+ * @package PlatformBridge\Config
  */
 final class ConfigResolver
 {

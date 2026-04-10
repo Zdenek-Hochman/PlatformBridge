@@ -5,6 +5,6 @@ import { App } from "./app";
 document.addEventListener("DOMContentLoaded", () => {
     // Vytvoří instanci aplikace
     const app = new App();
-    // Spustí inicializační logiku aplikace
-    app.init();
+    // Spustí inicializační logiku aplikace (async kvůli i18n bootu)
+    app.init().catch(err => console.error('[PlatformBridge] Init failed:', err));
 });

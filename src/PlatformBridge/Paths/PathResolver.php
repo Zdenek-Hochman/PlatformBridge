@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace Zoom\PlatformBridge\Paths;
+namespace PlatformBridge\Paths;
 
-use Zoom\PlatformBridge\Security\JsonGuard;
+use PlatformBridge\Security\JsonGuard;
 
 
 /**
@@ -28,7 +28,7 @@ final class PathResolver
 
     /**
      * Absolutní cesta ke kořeni balíčku PlatformBridge (adresář se zdrojovým kódem a výchozími zdroji).
-     * Např. .../vendor/zoom/platformbridge nebo .../src při standalone použití.
+     * Např. .../vendor/platformbridge/platform-bridge nebo .../src při standalone použití.
      */
     private readonly string $packageRoot;
 
@@ -50,7 +50,7 @@ final class PathResolver
     /**
      * Konstruktor nastaví kořenové cesty a konfigurační objekt.
      *
-     * @param string $packageRoot Absolutní cesta ke kořeni balíčku (např. vendor/zoom/platformbridge)
+     * @param string $packageRoot Absolutní cesta ke kořeni balíčku (např. vendor/platformbridge/platform-bridge)
      * @param string $projectRoot Absolutní cesta ke kořeni projektu (aplikace)
      * @param PathsConfig $config  Objekt s relativními cestami (z platformbridge.json)
      */
@@ -127,6 +127,15 @@ final class PathResolver
     public function configPath(): string
     {
         return $this->packageRoot . DIRECTORY_SEPARATOR . 'resources' . DIRECTORY_SEPARATOR . 'defaults';
+    }
+
+    /**
+     * Vrací absolutní cestu do adresáře s překladovými soubory (lang).
+     * Např. .../platformbridge/resources/lang
+     */
+    public function langPath(): string
+    {
+        return $this->packageRoot . DIRECTORY_SEPARATOR . 'resources' . DIRECTORY_SEPARATOR . 'lang';
     }
 
 	// ─── Package paths (stubs, config) ───────────────────────

@@ -5,7 +5,7 @@
  * PlatformBridge CLI – Installer & Updater
  *
  * Tento soubor se spouští výhradně jako vendor binary přes Composer:
- *   vendor/zoom/platform-bridge/bin/platformbridge
+ *   vendor/platformbridge/platform-bridge/bin/platformbridge
  *
  * Cesta k autoloaderu je proto vždy vendor/autoload.php (3× dirname z bin/).
  */
@@ -28,7 +28,7 @@ ERR);
 
 require_once $autoloadPath;
 
-use Zoom\PlatformBridge\Installer\Installer;
+use PlatformBridge\Installer\Installer;
 
 // ─── Parsování CLI ───────────────────────────────────────────
 

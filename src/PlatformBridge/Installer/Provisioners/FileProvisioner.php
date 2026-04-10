@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-namespace Zoom\PlatformBridge\Installer\Provisioners;
+namespace PlatformBridge\Installer\Provisioners;
 
-use Zoom\PlatformBridge\Paths\PathsConfig;
-use Zoom\PlatformBridge\Installer\Publisher\PublishResult;
-use Zoom\PlatformBridge\Installer\Publisher\StubPublisher;
+use PlatformBridge\Paths\PathsConfig;
+use PlatformBridge\Installer\Publisher\PublishResult;
+use PlatformBridge\Installer\Publisher\StubPublisher;
 
 
 /**

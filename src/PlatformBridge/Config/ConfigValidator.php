@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace Zoom\PlatformBridge\Config;
+namespace PlatformBridge\Config;
 
-use Zoom\PlatformBridge\Config\Exception\ConfigException;
+use PlatformBridge\Shared\Exception\ConfigException;
 
 /**
  * Validátor konfiguračních souborů PlatformBridge.

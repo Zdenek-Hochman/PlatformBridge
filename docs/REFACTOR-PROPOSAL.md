@@ -8,7 +8,7 @@
 ## 1. Finální struktura balíčku
 
 ```
-zoom/platform-bridge/
+platformbridge/platform-bridge/
 │
 ├── bin/
 │   └── platformbridge                  # CLI entry point
@@ -153,7 +153,7 @@ if (watch) {
 |------|-----|-----|
 | `npm run dev` | Vývoj | Vývojář balíčku |
 | `npm run build` | Před commitem / před tagem | Vývojář balíčku |
-| `composer require zoom/platform-bridge` | Instalace | Uživatel |
+| `composer require platformbridge/platform-bridge` | Instalace | Uživatel |
 | `php vendor/bin/platformbridge install` | Po instalaci | Uživatel |
 
 **Uživatel nikdy nepotřebuje Node.js.** Soubory v `dist/` jsou commitnuté v gitu a součástí composer distribuce.
@@ -196,7 +196,7 @@ HOST APLIKACE (po install):
 ### Co zůstane ve vendor
 
 ```
-vendor/zoom/platform-bridge/
+vendor/platformbridge/platform-bridge/
 ├── bin/platformbridge
 ├── config/bridge-config.php        ← výchozí referenční hodnoty
 ├── dist/js/ + css/                 ← zdrojové assety pro publish
@@ -213,13 +213,13 @@ vendor/zoom/platform-bridge/
 
 declare(strict_types=1);
 
-namespace Zoom\PlatformBridge\Config;
+namespace PlatformBridge\Config;
 
 /**
  * Centrální resoluce cest – eliminuje pevné cesty v celém balíčku.
  *
  * Podporuje:
- *   - vendor režim: balíček v vendor/zoom/platform-bridge/
+ *   - vendor režim: balíček v vendor/platformbridge/platform-bridge/
  *   - standalone režim: balíček jako root projekt (XAMPP dev)
  */
 final class PathResolver
@@ -367,7 +367,7 @@ final class PathResolver
 
 declare(strict_types=1);
 
-namespace Zoom\PlatformBridge\Installer;
+namespace PlatformBridge\Installer;
 
 /**
  * Bezpečné publikování souborů se skip logikou.
@@ -443,9 +443,9 @@ final class StubPublisher
 
 declare(strict_types=1);
 
-namespace Zoom\PlatformBridge\Installer;
+namespace PlatformBridge\Installer;
 
-use Zoom\PlatformBridge\Config\PathResolver;
+use PlatformBridge\Config\PathResolver;
 
 final class Installer
 {
@@ -589,7 +589,7 @@ final class Installer
 
 ### Princip: stub → user copy → fallback na package default
 
-**Ve vendor/zoom/platform-bridge/config/bridge-config.php:**
+**Ve vendor/platformbridge/platform-bridge/config/bridge-config.php:**
 ```php
 <?php
 // Výchozí referenční konfigurace balíčku.
@@ -684,7 +684,7 @@ Uživatel chce upravit `generators.json` (přidat vlastní generátor), ale nech
 
 declare(strict_types=1);
 
-namespace Zoom\PlatformBridge\Config;
+namespace PlatformBridge\Config;
 
 /**
  * ConfigLoader s podporou merge strategie.
@@ -828,7 +828,7 @@ require_once $autoloadPath;
 // Konfigurace se načte z config/platform-bridge/bridge-config.php
 // s fallbackem na vendor defaults.
 
-\Zoom\PlatformBridge\AI\API\ApiHandler::bootstrap()->handle();
+\PlatformBridge\AI\API\ApiHandler::bootstrap()->handle();
 ```
 
 ### Úprava `ApiHandler::bootstrap()`
@@ -837,7 +837,7 @@ require_once $autoloadPath;
 public static function bootstrap(): self
 {
     // PathResolver automaticky detekuje vendor/standalone režim
-    $paths = new \Zoom\PlatformBridge\Config\PathResolver();
+    $paths = new \PlatformBridge\Config\PathResolver();
 
     if (!defined('BRIDGE_BOOTSTRAPPED')) {
         define('BRIDGE_BOOTSTRAPPED', true);
@@ -847,7 +847,7 @@ public static function bootstrap(): self
     $configFile = $paths->resolvedBridgeConfigFile();
     $config = require $configFile;
 
-    $loader = new \Zoom\PlatformBridge\Config\ConfigLoader(
+    $loader = new \PlatformBridge\Config\ConfigLoader(
         $paths->userConfigPath(),
         $paths->packageDefaultsPath(),
     );
@@ -893,7 +893,7 @@ public static function bootstrap(): self
 
 ```json
 {
-    "name": "zoom/platform-bridge",
+    "name": "platformbridge/platform-bridge",
     "description": "AI-powered form builder with template engine and field factory",
     "type": "library",
     "license": "proprietary",
@@ -906,7 +906,7 @@ public static function bootstrap(): self
     },
     "autoload": {
         "psr-4": {
-            "Zoom\\PlatformBridge\\": "src/PlatformBridge/"
+            "PlatformBridge\\": "src/PlatformBridge/"
         }
     },
     "config": {
@@ -915,10 +915,10 @@ public static function bootstrap(): self
     },
     "scripts": {
         "post-install-cmd": [
-            "@php vendor/zoom/platform-bridge/bin/platformbridge install"
+            "@php vendor/platformbridge/platform-bridge/bin/platformbridge install"
         ],
         "post-update-cmd": [
-            "@php vendor/zoom/platform-bridge/bin/platformbridge update"
+            "@php vendor/platformbridge/platform-bridge/bin/platformbridge update"
         ]
     },
     "extra": {
@@ -1074,7 +1074,7 @@ final class PlatformBridgeBuilder
 │                    RESOLUCE CEST                              │
 │                                                               │
 │  PathResolver detekuje režim:                                │
-│    vendor:     vendor/zoom/platform-bridge/ → project root   │
+│    vendor:     vendor/platformbridge/platform-bridge/ → project root   │
 │    standalone: kořen projektu = package root                 │
 │                                                               │
 │  Fallback řetězec:                                           │

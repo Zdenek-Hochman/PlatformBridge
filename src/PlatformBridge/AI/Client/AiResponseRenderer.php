@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace Zoom\PlatformBridge\AI;
+namespace PlatformBridge\AI\Client;
 
-use Zoom\PlatformBridge\Paths\PathResolver;
-use Zoom\PlatformBridge\Template\Engine;
+use PlatformBridge\Paths\PathResolver;
+use PlatformBridge\Template\Engine;
 
 /**
  * Třída zodpovědná za renderování AI odpovědí pomocí template engine.
@@ -15,7 +15,9 @@ use Zoom\PlatformBridge\Template\Engine;
  */
 final class AiResponseRenderer
 {
-    public function __construct(private Engine $engine) {}
+    public function __construct(private Engine $engine)
+    {
+    }
 
     /**
      * Vytvoří instanci s výchozí konfigurací template engine.

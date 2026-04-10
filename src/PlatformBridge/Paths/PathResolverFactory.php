@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Zoom\PlatformBridge\Paths;
+namespace PlatformBridge\Paths;
 
 /**
  * Factory pro automatickou detekci vendor/standalone režimu a vytvoření PathResolveru.
@@ -12,7 +12,7 @@ final class PathResolverFactory
     /**
      * Automaticky vytvoří instanci PathResolver podle umístění balíčku.
      *
-     * Detekuje, zda je balíček spuštěn jako vendor závislost (v vendor/zoom/platformbridge)
+     * Detekuje, zda je balíček spuštěn jako vendor závislost (v vendor/platformbridge/platform-bridge)
      * nebo jako standalone (přímo v projektu). Podle toho nastaví projectRoot a načte konfiguraci.
      *
      * @param string $packageRoot Absolutní cesta ke kořeni balíčku
@@ -38,7 +38,7 @@ final class PathResolverFactory
     }
 
     /**
-     * Detekuje, zda je balíček spuštěn jako vendor závislost (tedy v vendor/zoom/platformbridge).
+     * Detekuje, zda je balíček spuštěn jako vendor závislost (tedy v vendor/platformbridge/platform-bridge).
      *
      * Kontroluje existenci autoload.php dvě úrovně nad balíčkem a porovnává cesty,
      * aby rozlišil mezi vendor a standalone režimem.

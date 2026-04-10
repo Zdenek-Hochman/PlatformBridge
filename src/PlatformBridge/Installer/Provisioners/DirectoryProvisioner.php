@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-namespace Zoom\PlatformBridge\Installer\Provisioners;
+namespace PlatformBridge\Installer\Provisioners;
 
-use Zoom\PlatformBridge\Paths\PathsConfig;
-use Zoom\PlatformBridge\Security\JsonGuard;
-use Zoom\PlatformBridge\Installer\Publisher\PublishResult;
+use PlatformBridge\Paths\PathsConfig;
+use PlatformBridge\Security\JsonGuard;
+use PlatformBridge\Installer\Publisher\PublishResult;
 
 /**
  * Spravuje adresářovou strukturu hostující aplikace.

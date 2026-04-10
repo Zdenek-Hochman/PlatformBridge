@@ -2,11 +2,20 @@
 
 declare(strict_types=1);
 
-namespace Zoom\PlatformBridge;
+namespace PlatformBridge;
 
-use Zoom\PlatformBridge\Paths\PathResolver;
-use Zoom\PlatformBridge\Paths\PathResolverFactory;
-use Zoom\PlatformBridge\Paths\UrlResolver;
+use PlatformBridge\Paths\{
+	PathResolver,
+	PathResolverFactory,
+	UrlResolver
+};
+
+use PlatformBridge\Config\DTO\{
+	PathsDto,
+	UrlsDto,
+	SecurityDto,
+	TranslationsDto
+};
 
 /**
  * Builder pro konfiguraci PlatformBridge instance.
@@ -34,6 +43,8 @@ final class PlatformBridgeBuilder
     private string $locale = 'cs';
     private bool $useHmac = false;
     private ?int $paramsTtl = null;
+    private ?\mysqli $mysqli = null;
+    private string $translationTable = 'pb_translations';
 
     // PathResolver se vytvoří jednou a sdílí
     private PathResolver $paths;
@@ -42,7 +53,7 @@ final class PlatformBridgeBuilder
     public function __construct()
     {
         $this->paths ??= PathResolverFactory::auto(dirname(__DIR__, 2));
-		$this->urlResolver = new UrlResolver($this->paths);
+        $this->urlResolver = new UrlResolver($this->paths);
     }
 
     /**
@@ -79,6 +90,21 @@ final class PlatformBridgeBuilder
     public function withLocale(string $locale): self
     {
         $this->locale = $locale;
+        return $this;
+    }
+
+    /**
+     * Předá mysqli instanci pro překladový systém.
+     * Tabulka 'pb_translations' bude automaticky vytvořena pokud neexistuje.
+     *
+     * @param \mysqli $mysqli Existující mysqli připojení
+     * @param string $tableName Název tabulky (default: 'pb_translations')
+     * @return self
+     */
+    public function withMysqli(\mysqli $mysqli, string $tableName = 'pb_translations'): self
+    {
+        $this->mysqli = $mysqli;
+        $this->translationTable = $tableName;
         return $this;
     }
 
@@ -121,20 +147,26 @@ final class PlatformBridgeBuilder
     public function build(): PlatformBridge
     {
         $config = new PlatformBridgeConfig(
-            configPath:         $this->configPath,
-            viewsPath:          $this->viewsPath,
-            cachePath:          $this->cachePath,
-
-            assetUrl:           $this->urlResolver->assetUrl(),
-            apiUrl:             $this->urlResolver->apiUrl(),
-
-            securityConfigPath: $this->paths->securityConfigFile(),
-
-            locale:             $this->locale,
-            useHmac:            $this->useHmac,
-            paramsTtl:          $this->paramsTtl,
-
-            pathResolver:       $this->paths,
+           	paths: new PathsDto(
+				$this->configPath,
+				$this->viewsPath,
+				$this->cachePath,
+				$this->paths
+			),
+			urls: new UrlsDto(
+				$this->urlResolver->assetUrl(),
+				$this->urlResolver->apiUrl()
+			),
+            security: new SecurityDto(
+				$this->paths->securityConfigFile(),
+				$this->useHmac,
+				$this->paramsTtl
+			),
+			translations: new TranslationsDto(
+				$this->mysqli,
+				$this->translationTable,
+				$this->locale
+			),
         );
 
         return PlatformBridge::fromConfig($config);

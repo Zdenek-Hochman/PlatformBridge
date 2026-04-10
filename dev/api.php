@@ -1,4 +1,5 @@
 <?php
+
 /**
  * PlatformBridge API Endpoint – VÝVOJOVÁ VERZE
  *
@@ -33,4 +34,4 @@ if (!file_exists($autoloadPath)) {
 require_once $autoloadPath;
 
 // ─── Bootstrap ──────────────────────────────────────────────────
-\Zoom\PlatformBridge\AI\API\ApiHandler::bootstrap()->handle();
+\PlatformBridge\AI\API\Core\ApiHandler::bootstrap()->handle();
