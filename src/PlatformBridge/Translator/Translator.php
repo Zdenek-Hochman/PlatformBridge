@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace PlatformBridge\Translator;
 
+use PlatformBridge\Translator\Loader\TranslationLoaderInterface;
 use PlatformBridge\Translator\Loader\JsonFileLoader;
-use PlatformBridge\Translator\Loader\PlatformLoader;
 
 /**
  * Hlavní fasáda překladového systému PlatformBridge.
@@ -51,12 +51,12 @@ final class Translator
      *
      * @param string $locale Kód locale
      * @param string $langPath Absolutní cesta k resources/lang
-     * @param PlatformLoader|null $platformLoader Volitelný další loader (DB apod.)
+     * @param TranslationLoaderInterface|null $platformLoader Volitelný další loader (DB apod.)
      */
     public static function create(
         string $locale,
         string $langPath,
-        ?PlatformLoader $platformLoader = null,
+        ?TranslationLoaderInterface $platformLoader = null,
     ): self {
         $translator = new self($locale);
 
@@ -75,10 +75,10 @@ final class Translator
      * Přidá loader do řetězce.
      * Loadery se vykonávají v pořadí přidání — pozdější přepisují dřívější.
      */
-    public function addLoader(PlatformLoader $loader): self
+    public function addLoader(TranslationLoaderInterface $loader): self
     {
         $this->loaders[] = $loader;
-        $this->loaded = false; // Vynutit reload
+        $this->loaded = false;
         return $this;
     }
 

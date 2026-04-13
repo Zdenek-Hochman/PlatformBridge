@@ -6,17 +6,7 @@ namespace PlatformBridge;
 
 use PlatformBridge\Asset\AssetManager;
 use PlatformBridge\Template\Engine;
-
-use PlatformBridge\Config\{
-	ConfigManager,
-	ConfigLoader,
-	ConfigValidator,
-};
-
-use PlatformBridge\Handler\{
-	HandlerRegistry,
-	FieldFactory
-};
+use PlatformBridge\Config\ConfigManager;
 
 use PlatformBridge\Error\{
 	ErrorHandler,
@@ -29,10 +19,13 @@ use PlatformBridge\Translator\{
 	VariableResolver
 };
 
-use PlatformBridge\Translator\Adapter\MysqliAdapter;
-use PlatformBridge\Translator\Loader\PlatformLoader;
 use PlatformBridge\Runtime\FormRenderer;
 use PlatformBridge\Security\SignedParams;
+
+use PlatformBridge\Container\{
+	Container,
+	ServiceProvider
+};
 
 /**
  * Hlavní fasáda knihovny PlatformBridge.
@@ -43,15 +36,7 @@ use PlatformBridge\Security\SignedParams;
  */
 final class PlatformBridge
 {
-    private ConfigManager $configManager;
-    private HandlerRegistry $handlerRegistry;
-    private FieldFactory $fieldFactory;
-    private Engine $templateEngine;
-    private ?AssetManager $assetManager = null;
-    private Translator $translator;
-    private VariableResolver $variableResolver;
-    private FormRenderer $formRenderer;
-    private ?SignedParams $signedParams = null;
+    private Container $container;
 
     private function __construct(private readonly PlatformBridgeConfig $config)
     {
@@ -92,39 +77,14 @@ final class PlatformBridge
     }
 
     /**
-     * Inicializuje všechny hlavní komponenty knihovny PlatformBridge.
+     * Inicializuje DI kontejner a registruje všechny služby.
      */
     private function boot(): void
     {
-        //TODO: Zvážit lazy loading komponent a DI pro lepší výkon a testovatelnost
         self::bootErrorHandler();
-        $this->bootTranslator();
-        $this->bootConfig();
-        $this->bootTemplateEngine();
-        $this->bootHandlers();
-        $this->bootFormRenderer();
-        $this->bootAssetManager();
-        $this->bootSecurity();
-    }
 
-    /**
-     * Inicializuje překladový systém.
-     *
-     * Translator se startuje před konfigurací, aby VariableResolver
-     * mohl nahrazovat {\$domain.key} proměnné v JSON konfiguracích.
-     */
-    private function bootTranslator(): void
-    {
-        $paths = $this->config->getPathResolver();
-        $locale = $this->config->getLocale();
-
-        $this->translator = Translator::create(
-            locale: $locale,
-            langPath: $paths->langPath(),
-            platformLoader: $this->createPlatformLoader($locale),
-        );
-
-        $this->variableResolver = $this->translator->getVariableResolver();
+        $this->container = new Container();
+        (new ServiceProvider($this->config))->register($this->container);
     }
 
     /**
@@ -138,154 +98,6 @@ final class PlatformBridge
     }
 
     /**
-     * Inicializuje konfigurační systém aplikace.
-     *
-     * Vytvoří instanci {@see ConfigLoader}, která načítá konfiguraci
-     * z hlavní konfigurační cesty a defaultních balíčkových cest.
-     * Následně inicializuje {@see ConfigManager} a spustí načtení konfigurace.
-     *
-     * @return void
-     */
-    private function bootConfig(): void
-    {
-        $loader = new ConfigLoader(
-            $this->config->getConfigPath(),
-            $this->config->getPathResolver(),
-            new ConfigValidator(),
-            $this->variableResolver
-        );
-
-        $this->configManager = new ConfigManager($loader);
-        $this->configManager->load();
-    }
-
-    /**
-     * Inicializuje šablonovací engine aplikace.
-     *
-     * Vytvoří instanci {@see Engine} s nastavením cest k šablonám a cache.
-     * Debug režim je zde explicitně vypnutý.
-     *
-     * @return void
-     */
-    private function bootTemplateEngine(): void
-    {
-        $this->templateEngine = new Engine([
-            'tpl_dir'   => $this->config->getViewsPath(),
-            'cache_dir' => $this->config->getCachePath(),
-            'debug'     => false,
-        ]);
-
-        // Připoj translator do Engine pro runtime překlady v TPL ({_tran} tag)
-        // $this->templateEngine->setTranslator($this->translator);
-    }
-
-    /**
-     * Inicializuje handlery a továrnu pro vytváření polí.
-     *
-     * Vytvoří registry handlerů pomocí interní factory metody
-     * a následně inicializuje {@see FieldFactory}, která tyto handlery využívá.
-     *
-     * @return void
-     */
-    private function bootHandlers(): void
-    {
-        // TODO: pokud handlery začnou potřebovat dependency → zavést factory auto-wiring
-        $this->handlerRegistry = $this->createHandlerRegistry();
-        $this->fieldFactory = new FieldFactory($this->handlerRegistry);
-    }
-
-    /**
-     * Inicializuje renderer formulářů.
-     *
-     * Vytvoří instanci {@see FormRenderer}, která zajišťuje vykreslování formulářů
-     * na základě field factory, konfigurace a šablonovacího enginu.
-     *
-     * @return void
-     */
-    private function bootFormRenderer(): void
-    {
-        $this->formRenderer = new FormRenderer(
-            $this->fieldFactory,
-            $this->configManager,
-            $this->templateEngine
-        );
-    }
-
-    /**
-     * Inicializuje správce statických assetů.
-     *
-     * Vytvoří instanci {@see AssetManager} s base URL pro assety,
-     * která se používá pro generování cest k CSS, JS a dalším zdrojům.
-     *
-     * @return void
-     */
-    private function bootAssetManager(): void
-    {
-        $this->assetManager = new AssetManager($this->config->getAssetUrl());
-    }
-
-    /**
-     * Inicializuje bezpečnostní komponenty aplikace.
-     *
-     * Pokud je v konfiguraci dostupný secret key, vytvoří instanci {@see SignedParams}
-     * pro podepisování a validaci parametrů s definovanou dobou platnosti (TTL).
-     * V opačném případě zůstává funkcionalita nepodepsaných parametrů neaktivní.
-     *
-     * @return void
- */
-    private function bootSecurity(): void
-    {
-        $secretKey = $this->config->getSecretKey();
-
-        if ($secretKey !== null) {
-            $this->signedParams = new SignedParams($secretKey, $this->config->getParamsTtl());
-        }
-    }
-
-    /**
-     * Vytvoří a nakonfiguruje registry handlerů.
-     *
-     * Na základě konfigurace instanciuje jednotlivé handlery a registruje je
-     * do {@see HandlerRegistry}. Volitelně nastaví výchozí handler, pokud je definován.
-     *
-     * @return HandlerRegistry Inicializovaná registry handlerů
-     */
-    private function createHandlerRegistry(): HandlerRegistry
-    {
-        $handlersConfig = $this->config->getHandlersConfig();
-        $registry = new HandlerRegistry();
-
-        foreach ($handlersConfig['handlers'] as $handlerClass) {
-            $registry->addHandler(new $handlerClass());
-        }
-
-        if (isset($handlersConfig['default'])) {
-            $registry->setDefaultHandler($handlersConfig['default']);
-        }
-
-        // $registry->mapVariant('color-picker', CustomColorPickerHandler::class);
-
-        return $registry;
-    }
-
-    private function createPlatformLoader(string $locale): ?PlatformLoader
-    {
-        $mysqli = $this->config->getMysqli();
-
-        if ($mysqli === null) {
-            return null;
-        }
-
-        $adapter = MysqliAdapter::fromMysqli(
-            $mysqli,
-            $this->config->getTranslationTable(),
-            ensureTable: true,
-        );
-
-        return new PlatformLoader($adapter, $locale);
-    }
-
-    /**
      * Vykreslí formulář podle ID generátoru.
      *
      * @param string $generatorId ID generátoru z konfigurace
@@ -294,7 +106,7 @@ final class PlatformBridge
      */
     private function renderForm(string $generatorId, array $context = []): array
     {
-        return $this->formRenderer->build($generatorId, $context);
+        return $this->container->get(FormRenderer::class)->build($generatorId, $context);
     }
 
     /**
@@ -314,7 +126,7 @@ final class PlatformBridge
         unset($additionalParams['inject']);
 
         $sections = $this->renderForm($generatorId, $inject);
-        $generator = $this->configManager->getGenerator($generatorId);
+        $generator = $this->container->get(ConfigManager::class)->getGenerator($generatorId);
 
         // Sestavení kompletních parametrů
         $params = $this->buildParams($generatorId, $additionalParams);
@@ -328,7 +140,7 @@ final class PlatformBridge
             'apiUrl'       => $this->config->getApiUrl(),
         ];
 
-        $html = $this->templateEngine->assign($template)->render('/Atoms/Wrapper');
+        $html = $this->container->get(Engine::class)->assign($template)->render('/Atoms/Wrapper');
 
         return $this->prependAssets($html);
     }
@@ -342,9 +154,11 @@ final class PlatformBridge
      */
     private function buildParams(string $generatorId, array $extra): array
     {
+        $configManager = $this->container->get(ConfigManager::class);
+
         $base = [
-            'endpoint'       => $this->configManager->getConfigValue($generatorId, 'endpoint'),
-            'request_amount' => $this->configManager->getConfigValue($generatorId, 'api.request_amount'),
+            'endpoint'       => $configManager->getConfigValue($generatorId, 'endpoint'),
+            'request_amount' => $configManager->getConfigValue($generatorId, 'api.request_amount'),
             'config_path'    => $this->config->getConfigPath(),
             'locale'         => $this->config->getLocale(),
         ];
@@ -363,7 +177,11 @@ final class PlatformBridge
      */
     private function buildSignedParams(array $params): ?string
     {
-        return $this->signedParams?->sign($params);
+        if (!$this->container->has(SignedParams::class)) {
+            return null;
+        }
+
+        return $this->container->get(SignedParams::class)->sign($params);
     }
 
     /**
@@ -374,7 +192,7 @@ final class PlatformBridge
      */
     private function buildRawParams(array $params): ?array
     {
-        return $this->signedParams ? null : $params;
+        return $this->container->has(SignedParams::class) ? null : $params;
     }
 
     /**
@@ -385,7 +203,7 @@ final class PlatformBridge
      */
     private function prependAssets(string $html): string
     {
-        return ($this->assetManager?->getAssets() ?? '') . $html;
+        return ($this->container->get(AssetManager::class)->getAssets() ?? '') . $html;
     }
 
     /**
@@ -395,7 +213,7 @@ final class PlatformBridge
      */
     public function getTemplateEngine(): Engine
     {
-        return $this->templateEngine;
+        return $this->container->get(Engine::class);
     }
 
     /**
@@ -405,7 +223,7 @@ final class PlatformBridge
      */
     public function getTranslator(): Translator
     {
-        return $this->translator;
+        return $this->container->get(Translator::class);
     }
 
     /**
@@ -415,7 +233,7 @@ final class PlatformBridge
      */
     public function getVariableResolver(): VariableResolver
     {
-        return $this->variableResolver;
+        return $this->container->get(VariableResolver::class);
     }
 
     /**
@@ -465,9 +283,6 @@ final class PlatformBridge
      */
     public function getAssets(): string
     {
-        if ($this->assetManager === null) {
-            return '';
-        }
-        return $this->assetManager->getAssets();
+        return $this->container->get(AssetManager::class)->getAssets();
     }
 }

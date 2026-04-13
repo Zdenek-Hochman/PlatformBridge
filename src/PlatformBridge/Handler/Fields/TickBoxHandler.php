@@ -1,29 +1,18 @@
 <?php
 
 namespace PlatformBridge\Handler\Fields;
+
 use PlatformBridge\Form\Form;
+use PlatformBridge\Handler\{HandlerAttribute, ComponentType};
 
 /**
  * Handler pro vytváření tick-box komponent.
  */
+#[HandlerAttribute(component: ComponentType::TickBox)]
 class TickBoxHandler extends FieldConfigurator
 {
-	/** @var array Podporované varianty tohoto handleru */
-	private const SUPPORTED_VARIANTS = ['tick-box'];
-
 	/** @var array Povolené atributy pro tick-box */
 	private const ALLOWED_ATTRIBUTES = ['size'];
-
-    /**
-     * Určuje, zda tento handler podporuje zadaný blok.
-     *
-     * @param array $block Konfigurační blok
-     * @return bool
-     */
-    public function supports(array $block): bool
-    {
-        return in_array($block['component'] ?? null, self::SUPPORTED_VARIANTS, true);
-    }
 
     /**
      * Vytvoří tick-box komponentu na základě zadaného bloku.

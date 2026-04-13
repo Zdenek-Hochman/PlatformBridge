@@ -3,30 +3,14 @@
 namespace PlatformBridge\Handler\Fields;
 
 use PlatformBridge\Form\Form;
+use PlatformBridge\Handler\{HandlerAttribute, ComponentType};
 
 /**
  * Handler pro vytváření skupiny radio input polí.
  */
+#[HandlerAttribute(component: ComponentType::Input, variants: ['radio'])]
 class RadioHandler extends FieldConfigurator
 {
-    /** @var array Podporované varianty tohoto handleru */
-    private const SUPPORTED_VARIANTS = ['radio'];
-
-    /** @var array Povolené atributy specifické pro type:radio (z rules) */
-    private const ALLOWED_ATTRIBUTES = [];  // Radio nemá žádné rules-based atributy v type:radio
-
-    /**
-     * Určuje, zda tento handler podporuje zadaný blok.
-     *
-     * @param array $block Konfigurační blok
-     * @return bool
-     */
-    public function supports(array $block): bool
-    {
-        return ($block['component'] ?? null) === 'input'
-            && in_array($block['variant'] ?? '', self::SUPPORTED_VARIANTS, true);
-    }
-
     /**
      * Vytvoří skupinu radio input polí na základě zadaného bloku.
      *

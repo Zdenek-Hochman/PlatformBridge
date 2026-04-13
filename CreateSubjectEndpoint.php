@@ -15,26 +15,34 @@ use PlatformBridge\AI\API\Enum\ResponseType;
 )]
 class CreateSubjectEndpoint extends AttributeEndpoint
 {
-    protected function transformInput(array $input, mixed ...$context): array
-    {
-        [$variant] = $context;
+	private const EXCLUDED_KEYS = [
+		'template' => ['email_topic', 'topic_source'],
+		'custom' => ['template_id', 'topic_source'],
+	];
 
-        return match ($variant) {
-            'template' => $this->transformTemplateVariant($input),
-            'custom' => $this->transformCustomVariant($input),
-            default => $input,
-        };
-    }
+	private function pipeline(string $variant): array
+	{
+		return [
+			fn(array $input) => $this->removeExcludedKeys($input, $variant),
+			// fn(array $input) => $this->normalizeValues($input),
+		];
+	}
 
-    private function transformTemplateVariant(array $originalInput): array
-    {
-        $excludedKeys = ['email_topic', 'topic_source'];
-        return array_diff_key($originalInput, array_flip($excludedKeys));
-    }
+	protected function transformInput(array $input, mixed ...$context): array
+	{
+		[$variant] = $context;
 
-    private function transformCustomVariant(array $originalInput): array
-    {
-        $excludedKeys = ['template_id', 'topic_source'];
-        return array_diff_key($originalInput, array_flip($excludedKeys));
-    }
+		return array_reduce(
+			$this->pipeline($variant),
+			fn(array $carry, callable $fn) => $fn($carry),
+			$input
+		);
+	}
+
+	private function removeExcludedKeys(array $input, string $variant): array
+	{
+		$excludedKeys = self::EXCLUDED_KEYS[$variant] ?? [];
+
+		return array_diff_key($input, array_flip($excludedKeys));
+	}
 }

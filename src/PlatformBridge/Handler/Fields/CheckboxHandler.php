@@ -1,30 +1,18 @@
 <?php
 
 namespace PlatformBridge\Handler\Fields;
+
 use PlatformBridge\Form\Form;
+use PlatformBridge\Handler\{HandlerAttribute, ComponentType};
 
 /**
  * Handler pro vytváření checkbox input polí.
  */
+#[HandlerAttribute(component: ComponentType::Input, variants: ['checkbox'])]
 class CheckboxHandler extends FieldConfigurator
 {
-	/** @var array Podporované varianty tohoto handleru */
-	private const SUPPORTED_VARIANTS = ['checkbox'];
-
 	/** @var array Povolené atributy pro checkbox inputy */
 	private const ALLOWED_ATTRIBUTES = [];
-
-    /**
-     * Určuje, zda tento handler podporuje zadaný blok.
-     *
-     * @param array $block Konfigurační blok
-     * @return bool
-     */
-    public function supports(array $block): bool
-    {
-        return ($block['component'] ?? null) === 'input'
-            && in_array($block['variant'] ?? '', self::SUPPORTED_VARIANTS, true);
-    }
 
     /**
      * Vytvoří checkbox input pole na základě zadaného bloku.

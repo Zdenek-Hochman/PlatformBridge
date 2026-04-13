@@ -16,7 +16,7 @@ use PlatformBridge\Translator\Domain;
  *
  * @see docs/TRANSLATOR-PROPOSAL-V2.md §4.2
  */
-final class MysqliAdapter
+final class MysqliAdapter implements TranslationAdapterInterface
 {
     public function __construct(
         private readonly MysqliConnection $connection,

@@ -1,29 +1,18 @@
 <?php
 
 namespace PlatformBridge\Handler\Fields;
+
 use PlatformBridge\Form\Form;
+use PlatformBridge\Handler\{HandlerAttribute, ComponentType};
 
 /**
  * Handler pro vytváření select polí (výběrových seznamů).
  */
+#[HandlerAttribute(component: ComponentType::Select)]
 class SelectHandler extends FieldConfigurator
 {
-	/** @var array Podporované varianty tohoto handleru */
-	private const SUPPORTED_VARIANTS = ['select'];
-
 	/** @var array Povolené atributy pro select */
 	private const ALLOWED_ATTRIBUTES = ['multiple', 'size'];
-
-    /**
-     * Určuje, zda tento handler podporuje zadaný blok.
-     *
-     * @param array $block Konfigurační blok
-     * @return bool
-     */
-    public function supports(array $block): bool
-    {
-        return in_array($block['component'] ?? null, self::SUPPORTED_VARIANTS, true);
-    }
 
     /**
      * Vytvoří select pole na základě zadaného bloku.

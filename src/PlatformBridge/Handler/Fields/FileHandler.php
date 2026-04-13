@@ -1,30 +1,18 @@
 <?php
 
 namespace PlatformBridge\Handler\Fields;
+
 use PlatformBridge\Form\Form;
+use PlatformBridge\Handler\{HandlerAttribute, ComponentType};
 
 /**
  * Handler pro souborové input pole (file).
  */
+#[HandlerAttribute(component: ComponentType::Input, variants: ['file'])]
 class FileHandler extends FieldConfigurator
 {
-	/** @var array Podporované varianty tohoto handleru */
-	private const SUPPORTED_VARIANTS = ['file'];
-
 	/** @var array Povolené atributy pro souborové inputy */
 	private const ALLOWED_ATTRIBUTES = ['accept', 'multiple'];
-
-    /**
-     * Určuje, zda tento handler podporuje zadaný blok.
-     *
-     * @param array $block Konfigurační blok
-     * @return bool
-     */
-    public function supports(array $block): bool
-    {
-        return ($block['component'] ?? null) === 'input'
-            && in_array($block['variant'] ?? '', self::SUPPORTED_VARIANTS, true);
-    }
 
     /**
      * Vytvoří pole typu input na základě zadaného bloku.

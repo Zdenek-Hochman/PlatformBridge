@@ -217,30 +217,4 @@ final class PlatformBridgeConfig
     {
         return $this->translations->table;
     }
-
-    /**
-     * Vrátí konfiguraci handlerů pro formulářová pole.
-     *
-     * @return array{handlers: class-string[], default: class-string} Pole tříd handlerů a výchozí handler
-     *
-     * @see \PlatformBridge\Handler\HandlerRegistry
-     */
-    public function getHandlersConfig(): array
-    {
-        return [
-            'handlers' => [
-                \PlatformBridge\Handler\Fields\RadioHandler::class,
-                \PlatformBridge\Handler\Fields\SelectHandler::class,
-                \PlatformBridge\Handler\Fields\CheckboxHandler::class,
-                \PlatformBridge\Handler\Fields\TextareaHandler::class,
-                \PlatformBridge\Handler\Fields\TickBoxHandler::class,
-                \PlatformBridge\Handler\Fields\HiddenHandler::class,
-                \PlatformBridge\Handler\Fields\TextHandler::class,
-                \PlatformBridge\Handler\Fields\NumberHandler::class,
-                \PlatformBridge\Handler\Fields\DateHandler::class,
-                \PlatformBridge\Handler\Fields\FileHandler::class,
-            ],
-            'default' => \PlatformBridge\Handler\Fields\TextHandler::class,
-        ];
-    }
 }

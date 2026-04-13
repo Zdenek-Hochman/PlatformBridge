@@ -21,13 +21,11 @@ final class FieldMapper
     public function transformToAiKeys(array $input, ?string $generatorId): array
     {
         $mapping = $this->buildMapping($generatorId);
-        $transformed = [];
 
-        foreach ($input as $fieldName => $value) {
-            $transformed[$mapping[$fieldName] ?? $fieldName] = $value;
-        }
-
-        return $transformed;
+		return array_combine(
+        	array_map(fn(string $key) => $mapping[$key] ?? $key, array_keys($input)),
+        	array_values($input)
+    	);
     }
 
     /**

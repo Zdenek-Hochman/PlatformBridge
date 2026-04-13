@@ -7,6 +7,7 @@ namespace PlatformBridge\Translator\Loader;
 use PlatformBridge\Translator\Domain;
 use PlatformBridge\Translator\TranslationCatalog;
 use PlatformBridge\Translator\Adapter\MysqliAdapter;
+use PlatformBridge\Translator\Loader\TranslationLoaderInterface;
 
 /**
  * Načítá překlady z databázového adaptéru.
@@ -18,7 +19,7 @@ use PlatformBridge\Translator\Adapter\MysqliAdapter;
  *   1. JsonFileLoader (základ z resources/lang/)
  *   2. PlatformLoader (DB overrides) ← tento
  */
-final class PlatformLoader
+final class PlatformLoader implements TranslationLoaderInterface
 {
     /**
      * @param MysqliAdapter $adapter DB adaptér

@@ -1,29 +1,18 @@
 <?php
 
 namespace PlatformBridge\Handler\Fields;
+
 use PlatformBridge\Form\Form;
+use PlatformBridge\Handler\{HandlerAttribute, ComponentType};
 
 /**
  * Handler pro vytváření textarea polí.
  */
+#[HandlerAttribute(component: ComponentType::Textarea)]
 class TextareaHandler extends FieldConfigurator
 {
-	/** @var array Podporované varianty tohoto handleru */
-	private const SUPPORTED_VARIANTS = ['textarea'];
-
 	/** @var array Povolené atributy pro textarea */
 	private const ALLOWED_ATTRIBUTES = ['rows', 'cols', 'minlength', 'maxlength', 'wrap'];
-
-    /**
-     * Určuje, zda tento handler podporuje zadaný blok.
-     *
-     * @param array $block Konfigurační blok
-     * @return bool
-     */
-    public function supports(array $block): bool
-    {
-        return in_array($block['component'] ?? null, self::SUPPORTED_VARIANTS, true);
-    }
 
     /**
      * Vytvoří textarea pole na základě zadaného bloku.

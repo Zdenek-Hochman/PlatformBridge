@@ -10,7 +10,7 @@ namespace PlatformBridge\Translator\Database;
  * Obaluje mysqli prepared statements do jednoduchého API.
  * Používá se výhradně pro interní tabulku pb_translations.
  */
-final class MysqliConnection
+final class MysqliConnection implements DatabaseConnectionInterface
 {
     public function __construct(
         private readonly \mysqli $mysqli,

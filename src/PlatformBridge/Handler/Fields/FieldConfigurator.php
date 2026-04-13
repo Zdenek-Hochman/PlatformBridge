@@ -2,8 +2,54 @@
 
 namespace PlatformBridge\Handler\Fields;
 
+use PlatformBridge\Handler\HandlerAttribute;
+
 abstract class FieldConfigurator implements FieldHandler
 {
+    /**
+     * Generická implementace supports() založená na #[HandlerAttribute].
+     *
+     * Čte atribut z aktuální třídy a porovnává component + variant
+     * s hodnotami v konfiguračním bloku. Konkrétní handlery nemusí
+     * tuto metodu přepisovat.
+     *
+     * @param array $block Konfigurační blok
+     * @return bool
+     */
+    public function supports(array $block): bool
+    {
+        /** @var array<class-string, HandlerAttribute|null> */
+        static $cache = [];
+
+        $class = static::class;
+
+        if (!isset($cache[$class])) {
+            $ref = new \ReflectionClass($class);
+            $attrs = $ref->getAttributes(HandlerAttribute::class);
+            $cache[$class] = !empty($attrs) ? $attrs[0]->newInstance() : null;
+        }
+
+        $attr = $cache[$class];
+
+        if ($attr === null) {
+            return false;
+        }
+
+        $component = $block['component'] ?? null;
+
+        if ($component !== $attr->component->value) {
+            return false;
+        }
+
+        if (empty($attr->variants)) {
+            return true;
+        }
+
+        $variant = $block['variant'] ?? null;
+
+        return in_array($variant, $attr->variants, true);
+    }
+
     /**
      * Nastaví výchozí hodnoty pro pole na základě zadaného bloku.
      *

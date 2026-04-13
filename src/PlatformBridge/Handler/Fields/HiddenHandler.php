@@ -3,6 +3,7 @@
 namespace PlatformBridge\Handler\Fields;
 
 use PlatformBridge\Form\Form;
+use PlatformBridge\Handler\{HandlerAttribute, ComponentType};
 
 /**
  * Handler pro skryté input pole (hidden).
@@ -10,23 +11,9 @@ use PlatformBridge\Form\Form;
  * Renderuje minimální <input type="hidden"> bez labelu a doplňkového textu.
  * Hodnota se typicky nastavuje přes inject context při renderování formuláře.
  */
+#[HandlerAttribute(component: ComponentType::Input, variants: ['hidden'])]
 class HiddenHandler extends FieldConfigurator
 {
-    /** @var array Podporované varianty tohoto handleru */
-    private const SUPPORTED_VARIANTS = ['hidden'];
-
-    /**
-     * Určuje, zda tento handler podporuje zadaný blok.
-     *
-     * @param array $block Konfigurační blok
-     * @return bool
-     */
-    public function supports(array $block): bool
-    {
-        return ($block['component'] ?? null) === 'input'
-            && in_array($block['variant'] ?? '', self::SUPPORTED_VARIANTS, true);
-    }
-
     /**
      * Vytvoří skryté pole na základě zadaného bloku.
      *

@@ -1,30 +1,18 @@
 <?php
 
 namespace PlatformBridge\Handler\Fields;
+
 use PlatformBridge\Form\Form;
+use PlatformBridge\Handler\{HandlerAttribute, ComponentType};
 
 /**
  * Handler pro textové input pole (text, email, password, search, url, tel).
  */
+#[HandlerAttribute(component: ComponentType::Input, variants: ['text', 'email', 'password', 'search', 'url', 'tel'])]
 class TextHandler extends FieldConfigurator
 {
-	/** @var array Podporované varianty tohoto handleru */
-	private const SUPPORTED_VARIANTS = ['text', 'email', 'password', 'search', 'url', 'tel'];
-
 	/** @var array Povolené atributy pro textové inputy */
 	private const ALLOWED_ATTRIBUTES = ['minlength', 'maxlength', 'pattern', 'size'];
-
-    /**
-     * Určuje, zda tento handler podporuje zadaný blok.
-     *
-     * @param array $block Konfigurační blok
-     * @return bool
-     */
-    public function supports(array $block): bool
-    {
-        return ($block['component'] ?? null) === 'input'
-            && in_array($block['variant'] ?? 'text', self::SUPPORTED_VARIANTS, true);
-    }
 
     /**
      * Vytvoří pole typu input na základě zadaného bloku.

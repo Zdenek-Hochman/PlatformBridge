@@ -1,30 +1,18 @@
 <?php
 
 namespace PlatformBridge\Handler\Fields;
+
 use PlatformBridge\Form\Form;
+use PlatformBridge\Handler\{HandlerAttribute, ComponentType};
 
 /**
  * Handler pro datumové input pole (date, datetime-local, time, month, week).
  */
+#[HandlerAttribute(component: ComponentType::Input, variants: ['date', 'datetime-local', 'time', 'month', 'week'])]
 class DateHandler extends FieldConfigurator
 {
-	/** @var array Podporované varianty tohoto handleru */
-	private const SUPPORTED_VARIANTS = ['date', 'datetime-local', 'time', 'month', 'week'];
-
 	/** @var array Povolené atributy pro datumové inputy */
 	private const ALLOWED_ATTRIBUTES = ['min', 'max', 'step'];
-
-    /**
-     * Určuje, zda tento handler podporuje zadaný blok.
-     *
-     * @param array $block Konfigurační blok
-     * @return bool
-     */
-    public function supports(array $block): bool
-    {
-        return ($block['component'] ?? null) === 'input'
-            && in_array($block['variant'] ?? '', self::SUPPORTED_VARIANTS, true);
-    }
 
     /**
      * Vytvoří pole typu input na základě zadaného bloku.
